@@ -1,0 +1,14 @@
+<alfresco-config>
+
+	<config evaluator="string-compare" condition="Action Wizards">
+	
+		<!-- The list of transformers to show in the transform actions -->
+		<transformers>
+			<transformer name="video/x-flv" />
+			<transformer name="video/mp4" />
+		</transformers>
+
+	</config>
+
+</alfresco-config>
+

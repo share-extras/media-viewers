@@ -1,0 +1,290 @@
+<!--
+
+                            ***********************************
+                               Share Extensions build script  
+                            ***********************************
+    
+    Author: Will Abson
+    
+    Provides a set of targets for building extensions to Alfresco Share in ZIP, ACP and JAR archive 
+    formats. Since Alfresco 3.3, JAR is the recommended package structure for all simple extensions.
+    For more complex extensions that add additional Java libraries or Spring configuration, ACP
+    should be used.
+    
+    The following file structure is required in your project directory
+    
+        /build.xml - This file
+        /config - All web-tier configuration files, e.g. web scripts and Surf configuration
+        /source/web - All static resource files, e.g. CSS, JS
+        
+    For building AMP files, the files module.properties and file-mapping.properties are also required
+    in the project root directory.
+    
+    During the build process, temporary 'build' and 'dist' directories will be created in the base 
+    project directory. These may be removed at any time using the 'clean' target.
+
+-->
+<project basedir="." default="dist-jar" name="Share Media Preview">
+
+	<!-- Allow override properties -->
+    <property file="build.properties" />
+    <property file="${user.home}/build.properties" />
+	
+	<!-- Property default values. May be overridden using above files or via command-line args -->
+    <property name="jar.name" value="share-extension.jar" />
+    <property name="zip.name" value="share-extension.zip" />
+    <property name="amp.name" value="share-extension.amp" />
+    <property name="config.includes" value="**/*.*" />
+    <property name="config.excludes" value="" />
+    <property name="build.res.includes" value="**/*.*" />
+    <property name="build.res.excludes" value="" />
+    <property name="build.res.dir.name" value="ROOT/share-extension" />
+    <property name="post.verbose" value="false" />
+    <property name="webapp.alfresco.path" value="/alfresco" />
+    <property name="webapp.share.path" value="/share" />
+    <!-- Properties to access the Tomcat Manager application -->
+    <property name="tomcat.url" value="http://localhost:8080" />
+    <property name="webapp.manager.url" value="${tomcat.url}/manager" />
+    <property name="webapp.manager.username" value="admin" />
+    <property name="webapp.manager.password" value="" />
+	
+	<!-- Additional property values. Generally should not be overridden -->
+    <property name="config.dir" value="${basedir}/config" />
+    <property name="res.dir" value="${basedir}/source/web" />
+    <property name="build.dir" value="${basedir}/build" />
+    <property name="build.jar.dir" value="${build.dir}/jar" />
+    <property name="build.zip.dir" value="${build.dir}/war" />
+    <property name="build.amp.dir" value="${build.dir}/amp" />
+    <property name="dist.dir" value="${basedir}/dist" />
+    <property name="amp.file.properties" value="module.properties" />
+    <property name="amp.file.mappings" value="file-mapping.properties" />
+    
+    <!-- Define optional tasks -->
+	<!--
+    <taskdef name="reload"  classname="org.apache.catalina.ant.ReloadTask" />
+    <taskdef name="post"    classname="net.sf.antcontrib.net.PostTask" />
+    -->
+    
+    <!-- Alias targets -->
+    <target name="build-zip" depends="build-zip-tomcat" />
+    <target name="dist-zip" depends="dist-zip-tomcat" />
+
+	<!-- Clean out the build and distribution directories -->
+	<target name="clean" description="Clean out all build directories">
+		<delete dir="${build.dir}" />
+		<delete dir="${dist.dir}" />
+	</target>
+	
+	<!-- Create required prerequisite directory structure -->
+	<target name="prepare" description="Create initial build structures">
+	    <mkdir dir="${build.dir}" />
+		<mkdir dir="${dist.dir}" />
+	</target>
+	
+    <!--
+        Assemble the configuration and resource files in a JAR file structure. This mechanism 
+        was introduced in Alfresco 3.3 and allows Share extensions containing web scripts, Surf 
+        configuration and static assets to be added to the servlet container as shared libraries.
+        
+        For more complex extensions that add additional Java libraries or Spring configuration, ACP
+        should be used.
+        
+        This target excludes the files custom-slingshot-application-context.xml, share-config-custom.xml
+        and similar files as only one of these should be present on the classpath.
+    -->
+    <target name="build-jar" description="Assemble configuration and resource files in a JAR file structure">
+        <mkdir dir="${build.jar.dir}" />
+        <copy todir="${build.jar.dir}" includeEmptyDirs="false">
+            <fileset dir="${config.dir}" includes="${config.includes}" excludes="${config.excludes}" >
+                <exclude name="alfresco/web-extension/custom-slingshot-application-context.xml" />
+                <exclude name="alfresco/web-extension/share-config-custom.xml" />
+                <exclude name="${config.excludes}" />
+            </fileset>
+        </copy>
+        <mkdir dir="${build.jar.dir}/META-INF" />
+        <copy todir="${build.jar.dir}/META-INF" includeEmptyDirs="false">
+            <fileset dir="${res.dir}" includes="${build.res.includes}" excludes="${build.res.excludes}" />
+        </copy>
+    </target>
+	
+	<!-- Build the JAR file -->
+    <target name="dist-jar" depends="clean, prepare, build-jar" 
+    	description="Build a JAR file containing configuration and resource files">
+    	<jar destfile="${dist.dir}/${jar.name}">
+    		<fileset dir="${build.jar.dir}" />
+    	</jar>
+	</target>
+    
+    <!--
+        Assemble the configuration and resource files in a file structure suitable for deploying
+        into an existing Tomcat installation, with the following directories.
+        
+            /shared/classes/alfresco/extension                all repository config files
+            /shared/classes/alfresco/web-extension            all web-tier config files
+            /webapps/ROOT/share-extension                     all web resources
+            
+        The target will only copy resources in the alfresco/extension and alfresco/web-extension 
+        directories from config.dir. It can also optionally map the contents of alfresco/site-data
+        and alfresco/site-webscripts to alfresco/web-extension/site-data and 
+        alfresco/web-extension/site-webscripts if you set build.zip.config.translate=true.
+        
+        By default web resources are placed in the 'share-extension' directory in the ROOT webapp. You 
+        can specify a different directory by overriding the build.res.dir.name property value. If you set 
+        this to 'share', files will be copied into the share webapp.
+        
+        The share-extension directory is not an official location for storing web resources 
+        required by extensions but works as an interim measure for versions of Alfresco prior to
+        version 3.3, provided that the ROOT webapp is enabled in your Tomcat instance.
+        
+        In version 3.3 and above the JAR file mechanism is recommended as an alternative.
+    -->
+    <target name="build-zip-tomcat" depends="build-zip-prepare,build-zip-shared,build-zip-shared-translate"
+    	description="Assemble the configuration and resource files for a Tomcat deployment structure">
+    	<!-- Copy web assets -->
+        <copy todir="${build.zip.dir}/webapps/${build.res.dir.name}">
+            <fileset dir="${res.dir}" includes="${build.res.includes}" excludes="${build.res.excludes}" />
+        </copy>
+    </target>
+
+    <target name="build-zip-prepare">
+        <mkdir dir="${build.zip.dir}/shared/classes" />
+        <mkdir dir="${build.zip.dir}/webapps/${build.res.dir.name}" />
+    </target>
+
+    <target name="build-zip-shared">
+        <copy todir="${build.zip.dir}/shared/classes">
+            <fileset dir="${config.dir}" includes="${config.includes}" excludes="${config.excludes}">
+                <or>
+                	<filename name="alfresco/web-extension/**"/>
+                    <filename name="alfresco/extension/**"/>
+                </or>
+            </fileset>
+        </copy>
+    </target>
+
+    <target name="build-zip-shared-translate" if="build.zip.config.translate">
+        <copy todir="${build.zip.dir}/shared/classes">
+            <globmapper from="alfresco/site-*" to="alfresco/web-extension/site-*" handledirsep="true" />
+            <fileset dir="${config.dir}" includes="${config.includes}" excludes="${config.excludes}">
+                <filename name="alfresco/site-*/**"/>
+            </fileset>
+        </copy>
+    </target>
+    
+    <!-- Build the Tomcat ZIP file -->
+    <target name="dist-zip-tomcat" depends="clean, prepare, build-zip-tomcat"
+        description="Build a ZIP file containing the customisations that can be deployed in an existing Tomcat installation">
+        <zip destfile="${dist.dir}/${zip.name}">
+            <fileset dir="${build.zip.dir}" />
+        </zip>
+    </target>
+    
+    <!--
+        Assemble the configuration and resource files in an AMP file structure. The files
+        module.properties and file-mapping.properties must be present in the root of the 
+        project.
+        
+        This creates a structure which can be deployed into an exising share.war file using the 
+        Alfresco Module Management Tool (MMT). See http://wiki.alfresco.com/wiki/AMP_Files.
+        
+        This mechanism is compatible with all versions of Alfresco Share and can therefore be 
+        used as an alternative to the JAR extension mechanism introduced in version 3.3.
+        
+        Note that this mechanism will place files directly into the webapp structure when the 
+        AMP is deployed, rather than the extension mechanisms used by the JAR and ZIP files that
+        ensure files are placed outside the webapp for safety during upgrades, etc.
+        
+        In this case this should be acceptable since the MMT modifies the WAR file itself 
+        rather than just the exploded files, and AMPs can always be re-applied if needed.
+        
+        In version 3.3 and above the JAR file mechanism is recommended as an alternative for all
+        non-complex extensions.
+    -->
+    <target name="build-amp" description="Assemble the configuration and resource files in an AMP file structure">
+    	
+    	<!-- Copy properties files -->
+        <copy todir="${build.amp.dir}" file="${amp.file.properties}" failonerror="true" />
+        <copy todir="${build.amp.dir}" file="${amp.file.mappings}" failonerror="true" />
+    	
+    	<!-- Copy config files -->
+        <mkdir dir="${build.amp.dir}/config" />
+        <copy todir="${build.amp.dir}/config">
+            <fileset dir="${config.dir}" includes="${config.includes}" excludes="${config.excludes}" />
+        </copy>
+    	
+    	<!-- Copy resource files -->
+        <mkdir dir="${build.amp.dir}/web" />
+        <copy todir="${build.amp.dir}/web">
+            <fileset dir="${res.dir}" includes="${build.res.includes}" excludes="${build.res.excludes}" />
+        </copy>
+    </target>
+    
+    <!-- Build the AMP file -->
+    <target name="dist-amp" depends="clean, prepare, build-amp" description="Build an AMP file containing all customisations">
+        <zip destfile="${dist.dir}/${amp.name}">
+            <fileset dir="${build.amp.dir}" />
+        </zip>
+    </target>
+    
+    <target name="hotcopy-tomcat-zip" depends="build-zip-tomcat" description="Hot copy files into the Tomcat shared/classes folder">
+        <copy todir="${tomcat.home}" includeEmptyDirs="false">
+            <fileset dir="${build.zip.dir}" />
+        </copy>
+    </target>
+    
+    <target name="hotcopy-tomcat-jar" depends="dist-jar" description="Hot copy JAR into the Tomcat shared/classes folder">
+        <mkdir dir="${tomcat.home}/shared/lib" />
+        <copy todir="${tomcat.home}/shared/lib">
+            <fileset file="${dist.dir}/${jar.name}" />
+        </copy>
+    </target>
+    
+    <!--
+        Uncomment to enable web script reloading from Ant. These tasks use the HTTP Post task from 
+        http://ant-contrib.sourceforge.net/.
+        
+        To use these tasks you will need to add ant-contrib.jar to your Ant libs, uncomment the task
+        definitions at the start of this file and override the org/alfresco/index.post.js web script 
+        descriptor to set the authentication to 'none' (since the post task cannot handle HTTP 
+        authentication).
+    -->
+    <!--
+    <target name="reload-webscripts-repo" depends="" description="Reload repository-tier webscripts">
+        <post to="${tomcat.url}${webapp.alfresco.path}/service/index" failonerror="true" verbose="${post.verbose}">
+            <prop name="reset" value="on" />
+        </post>
+    </target>
+    
+    <target name="reload-webscripts-webtier" depends="" description="Reload web-tier webscripts">
+        <post to="${tomcat.url}${webapp.share.path}/service/index" failonerror="true" verbose="${post.verbose}">
+            <prop name="reset" value="on" />
+        </post>
+    </target>
+    -->
+    
+    <!--
+        Uncomment to enable web application reloading from Ant. These tasks use the optional Tomcat
+        ant tasks from catalina-ant.jar distributed with Tomcat.
+        
+        To use these tasks you will need to add catalina-ant.jar to your Ant libs and uncomment the 
+        task definitions at the start of this file.
+    -->
+    <!--
+    <target name="reload-webapp-alfresco" description="Reload alfresco web application" depends="">
+        <reload 
+            url="${webapp.manager.url}" 
+            username="${webapp.manager.username}" 
+            password="${webapp.manager.password}" 
+            path="${webapp.alfresco.path}"/>
+    </target>
+    
+    <target name="reload-webapp-share" description="Reload share web application" depends="">
+        <reload 
+            url="${webapp.manager.url}" 
+            username="${webapp.manager.username}" 
+            password="${webapp.manager.password}" 
+            path="${webapp.share.path}"/>
+    </target>
+    -->
+	
+</project>

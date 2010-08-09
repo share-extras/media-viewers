@@ -1,0 +1,23 @@
+<alfresco-config area="mimetype-map">
+
+   <config evaluator="string-compare" condition="Mimetype Map">
+      <mimetypes>
+
+         <mimetype mimetype="video/ogg" display="Ogg Video">
+            <extension default="true">ogv</extension>
+         </mimetype>
+
+         <mimetype mimetype="audio/ogg" display="Ogg Audio">
+            <extension default="true">oga</extension>
+            <extension>ogg</extension>
+            <extension>spx</extension>
+         </mimetype>
+
+         <mimetype mimetype="application/ogg" display="Ogg Multiplex">
+            <extension default="true">ogx</extension>
+         </mimetype>
+         
+      </mimetypes>
+   </config>
+   
+</alfresco-config>
