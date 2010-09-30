@@ -1,0 +1,5 @@
+<webscript>
+  <shortname>Browse file</shortname>
+  <description>Browse for file</description>
+  <url>/modules/video/browse-file</url>
+</webscript>

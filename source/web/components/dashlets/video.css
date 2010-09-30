@@ -1,0 +1,97 @@
+/* 
+   Custom TreeView icons - see http://developer.yahoo.com/yui/examples/treeview/customicons.html
+*/
+.icon-ppt { display:block; min-height: 22px; padding-top: 2px; padding-left: 20px; background: transparent url(file-icons.png) 0 0px no-repeat; } 
+.icon-dmg { display:block; min-height: 22px; padding-top: 2px; padding-left: 20px; background: transparent url(file-icons.png) 0 -36px no-repeat; } 
+.icon-prv { display:block; min-height: 22px; padding-top: 2px; padding-left: 20px; background: transparent url(file-icons.png) 0 -72px no-repeat; } 
+.icon-gen { display:block; min-height: 22px; padding-top: 2px; padding-left: 20px; background: transparent url(file-icons.png) 0 -108px no-repeat; } 
+.icon-doc { display:block; min-height: 22px; padding-top: 2px; padding-left: 20px; background: transparent url(file-icons.png) 0 -144px no-repeat; } 
+.icon-jar { display:block; min-height: 22px; padding-top: 2px; padding-left: 20px; background: transparent url(file-icons.png) 0 -180px no-repeat; } 
+.icon-zip { display:block; min-height: 22px; padding-top: 2px; padding-left: 20px; background: transparent url(file-icons.png) 0 -216px no-repeat; } 
+.htmlnodelabel { margin-left: 20px; } 
+
+.ygtvcontent
+{
+   cursor: pointer;
+}
+
+.ygtv-highlight1 .ygtvcontent
+{
+   background: #c0e0e0;
+}
+
+.ygtvfocus
+{
+	background-color: transparent;
+	border: none;
+}
+
+.ygtvfocus .ygtvlabel,.ygtvfocus .ygtvlabel:link,.ygtvfocus .ygtvlabel:visited,.ygtvfocus .ygtvlabel:hover
+{
+	background-color: transparent;
+}
+
+.config-video span.video-name
+{
+	vertical-align: super;
+}
+
+div.video-preview, div.video-widget-msg
+{
+	display: none;
+}
+
+div.video-preview.shadow
+{
+   /*margin-left: -10px;
+   border-right: 1px solid #CCCCCC;
+   border-bottom: 1px solid #CCCCCC;*/
+   padding-left: 0px;
+   padding-right: 0px;
+   z-index: -1;
+}
+
+div.video-preview.shadow span,
+div.video-preview.shadow div
+{
+   color: #000000;
+}
+
+div.video-preview.shadow img,
+div.video-preview.shadow span,
+div.video-preview.shadow input
+{
+   vertical-align: middle;
+}
+
+div.video-preview.shadow .bd
+{
+   height: 100%;
+}
+
+div.video-preview.shadow .bd .preview-swf
+{
+   background-color:#FAFAFA;
+   width: 100%;
+   height: 100%;
+}
+
+div.video-preview.shadow .bd .preview-swf div
+{
+   padding-top: 10px;
+}
+
+div.video-preview.shadow .bd .preview-swf.has-content
+{
+   height: 100%;
+}
+
+div.video-preview.shadow .bd .preview-swf.no-preview div
+{
+   /*padding-top: 200px;*/
+}
+
+div.video-preview.real.no-content
+{
+   visibility: hidden;
+}

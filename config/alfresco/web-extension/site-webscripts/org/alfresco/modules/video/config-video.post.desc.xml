@@ -1,0 +1,6 @@
+<webscript>
+  <shortname>config-video-post</shortname>
+  <description>Updates video dashlet</description>
+  <url>/modules/video/config/{componentId}</url>
+  <format default="json">argument</format>
+</webscript>

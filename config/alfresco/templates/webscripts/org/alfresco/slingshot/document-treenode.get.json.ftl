@@ -1,0 +1,35 @@
+<#escape x as jsonUtils.encodeJSONString(x)>
+{
+   "totalResults": ${treenode.items?size?c},
+   "parent":
+   {
+      "nodeRef": "${treenode.parentNode.nodeRef}",
+      "userAccess":
+      {
+         "create": ${treenode.parentNode.hasPermission("CreateChildren")?string},
+         "edit": ${treenode.parentNode.hasPermission("Write")?string},
+         "delete": ${treenode.parentNode.hasPermission("Delete")?string}
+      }
+   },
+   "items":
+   [
+   <#list treenode.items as item>
+      <#assign t = item.node>
+      {
+         "nodeRef": "${t.nodeRef}",
+         "name": "${t.name}",
+         "description": "${(t.properties.description!"")}",
+         "type": "${(t.typeShort)}",
+         "mimetype": "${(t.mimetype!"")}",
+         "hasChildren": ${item.hasSubfolders?string},
+         "userAccess":
+         {
+            "create": ${t.hasPermission("CreateChildren")?string},
+            "edit": ${t.hasPermission("Write")?string},
+            "delete": ${t.hasPermission("Delete")?string}
+         }
+      }<#if item_has_next>,</#if>
+   </#list>
+   ]
+}
+</#escape>

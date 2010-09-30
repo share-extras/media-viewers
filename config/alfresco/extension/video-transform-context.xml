@@ -9,12 +9,23 @@
    <bean id="transformer.worker.ffmpeg.flv" class="org.alfresco.repo.content.transform.RuntimeExecutableContentTransformerWorker">
       <property name="checkCommand">
          <bean class="org.alfresco.util.exec.RuntimeExec">
-            <property name="command">
-            	<list>
-						<value>cmd</value>
-						<value>/C</value>
-                  <value>${ffmpeg.exe} -version</value>
-            	</list>
+            <property name="commandsAndArguments">
+               <map>
+                  <entry key="Windows.*">
+                     <list>
+                        <value>cmd</value>
+                        <value>/C</value>
+                        <value>${ffmpeg.exe} -version</value>
+                     </list>
+                  </entry>
+                  <entry key="Linux">
+                     <list>
+                        <value>sh</value>
+                        <value>-c</value>
+                        <value>${ffmpeg.exe} -version</value>
+                     </list>
+                  </entry>
+               </map>
             </property>
          </bean>
       </property>
@@ -104,12 +115,23 @@
    <bean id="transformer.worker.ffmpeg.mp4" class="org.alfresco.repo.content.transform.RuntimeExecutableContentTransformerWorker">
       <property name="checkCommand">
          <bean class="org.alfresco.util.exec.RuntimeExec">
-            <property name="command">
-            	<list>
-						<value>cmd</value>
-						<value>/C</value>
-						<value>${ffmpeg.exe} -version</value>
-            	</list>
+            <property name="commandsAndArguments">
+               <map>
+                  <entry key="Windows.*">
+                     <list>
+                        <value>cmd</value>
+                        <value>/C</value>
+                        <value>${ffmpeg.exe} -version</value>
+                     </list>
+                  </entry>
+                  <entry key="Linux">
+                     <list>
+                        <value>sh</value>
+                        <value>-c</value>
+                        <value>${ffmpeg.exe} -version</value>
+                     </list>
+                  </entry>
+               </map>
             </property>
          </bean>
       </property>
@@ -197,12 +219,23 @@
    <bean id="transformer.worker.ffmpeg.thumbnail" class="org.alfresco.repo.content.transform.RuntimeExecutableContentTransformerWorker">
       <property name="checkCommand">
          <bean class="org.alfresco.util.exec.RuntimeExec">
-            <property name="command">
-               <list>
-                  <value>cmd</value>
-                  <value>/C</value>
-                  <value>${ffmpeg.exe} -version</value>
-               </list>
+            <property name="commandsAndArguments">
+               <map>
+                  <entry key="Windows.*">
+                     <list>
+                        <value>cmd</value>
+                        <value>/C</value>
+                        <value>${ffmpeg.exe} -version</value>
+                     </list>
+                  </entry>
+                  <entry key="Linux">
+                     <list>
+                        <value>sh</value>
+                        <value>-c</value>
+                        <value>${ffmpeg.exe} -version</value>
+                     </list>
+                  </entry>
+               </map>
             </property>
          </bean>
       </property>
@@ -295,12 +328,23 @@
    <bean id="transformer.worker.ffmpeg.mp3" class="org.alfresco.repo.content.transform.RuntimeExecutableContentTransformerWorker">
       <property name="checkCommand">
          <bean class="org.alfresco.util.exec.RuntimeExec">
-            <property name="command">
-               <list>
-	               <value>cmd</value>
-	               <value>/C</value>
-	               <value>${ffmpeg.exe} -version</value>
-               </list>
+            <property name="commandsAndArguments">
+               <map>
+                  <entry key="Windows.*">
+                     <list>
+                        <value>cmd</value>
+                        <value>/C</value>
+                        <value>${ffmpeg.exe} -version</value>
+                     </list>
+                  </entry>
+                  <entry key="Linux">
+                     <list>
+                        <value>sh</value>
+                        <value>-c</value>
+                        <value>${ffmpeg.exe} -version</value>
+                     </list>
+                  </entry>
+               </map>
             </property>
          </bean>
       </property>
@@ -497,6 +541,18 @@
 					<property name="placeHolderResourcePath" value="alfresco/thumbnail/thumbnail_placeholder_doclib.png" />
 					<property name="runAs" value="System"/>
 				</bean>
+                
+                <!-- Web Preview thumbnail options -->
+                <bean class="org.alfresco.repo.thumbnail.ThumbnailDefinition">
+                   <property name="name" value="webpreview" />
+                    <property name="mimetype" value="application/x-shockwave-flash"/>                       
+                    <property name="transformationOptions">
+                        <bean class="org.alfresco.repo.content.transform.swf.SWFTransformationOptions">
+                            <property name="flashVersion" value="9"/>
+                        </bean>
+                    </property>
+                    <property name="runAs" value="System"/>
+                </bean>
     		
 	             <!-- Image preview thumbnail options -->
 	             <bean class="org.alfresco.repo.thumbnail.ThumbnailDefinition">
