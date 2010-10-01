@@ -283,7 +283,7 @@
    
                   // Create flash web preview by using swfobject
                   var swfId = "AudioPreviewer_" + this.id;
-                  var so = new YAHOO.deconcept.SWFObject(Alfresco.constants.URL_CONTEXT + "components/preview/player_mp3_maxi.swf",
+                  var so = new YAHOO.deconcept.SWFObject(Alfresco.constants.URL_CONTEXT + "res/components/preview/player_mp3_maxi.swf",
                         swfId, "100%", "100%", "9.0.45");
                   so.addVariable("fileName", this.options.name);
                   so.addVariable("mp3", previewCtx.audiourl);

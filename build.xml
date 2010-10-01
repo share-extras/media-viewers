@@ -17,20 +17,20 @@
         /config - All web-tier configuration files, e.g. web scripts and Surf configuration
         /source/web - All static resource files, e.g. CSS, JS
         
-    For building AMP files, the files module.properties and file-mapping.properties are also required
+    For building AMP files, the files module.proerties and file-mapping.properties are also required
     in the project root directory.
     
     During the build process, temporary 'build' and 'dist' directories will be created in the base 
     project directory. These may be removed at any time using the 'clean' target.
 
 -->
-<project basedir="." default="dist-jar" name="Share Media Preview">
+<project basedir="." default="dist-jar" name="Share Example Dashlets">
 
-	<!-- Allow override properties -->
+   <!-- Allow override properties -->
     <property file="build.properties" />
     <property file="${user.home}/build.properties" />
-	
-	<!-- Property default values. May be overridden using above files or via command-line args -->
+   
+   <!-- Property default values. May be overridden using above files or via command-line args -->
     <property name="jar.name" value="share-extension.jar" />
     <property name="zip.name" value="share-extension.zip" />
     <property name="amp.name" value="share-extension.amp" />
@@ -47,8 +47,8 @@
     <property name="webapp.manager.url" value="${tomcat.url}/manager" />
     <property name="webapp.manager.username" value="admin" />
     <property name="webapp.manager.password" value="" />
-	
-	<!-- Additional property values. Generally should not be overridden -->
+   
+   <!-- Additional property values. Generally should not be overridden -->
     <property name="config.dir" value="${basedir}/config" />
     <property name="res.dir" value="${basedir}/source/web" />
     <property name="build.dir" value="${basedir}/build" />
@@ -60,7 +60,7 @@
     <property name="amp.file.mappings" value="file-mapping.properties" />
     
     <!-- Define optional tasks -->
-	<!--
+   <!--
     <taskdef name="reload"  classname="org.apache.catalina.ant.ReloadTask" />
     <taskdef name="post"    classname="net.sf.antcontrib.net.PostTask" />
     -->
@@ -68,19 +68,33 @@
     <!-- Alias targets -->
     <target name="build-zip" depends="build-zip-tomcat" />
     <target name="dist-zip" depends="dist-zip-tomcat" />
+   
 
-	<!-- Clean out the build and distribution directories -->
-	<target name="clean" description="Clean out all build directories">
-		<delete dir="${build.dir}" />
-		<delete dir="${dist.dir}" />
-	</target>
-	
-	<!-- Create required prerequisite directory structure -->
-	<target name="prepare" description="Create initial build structures">
-	    <mkdir dir="${build.dir}" />
-		<mkdir dir="${dist.dir}" />
-	</target>
-	
+   <path id="yuicompressor.classpath">
+       <fileset dir="lib">
+             <include name="yuicompressor-2.4.2.jar"/>
+             <include name="yui-compressor-ant-task-0.5.jar"/>
+       </fileset>
+   </path>
+   
+   <taskdef name="yuicompress" classname="net.noha.tools.ant.yuicompressor.tasks.YuiCompressorTask">
+         <classpath>
+            <path refid="yuicompressor.classpath"/>
+         </classpath>
+   </taskdef>
+    
+   <!-- Clean out the build and distribution directories -->
+   <target name="clean" description="Clean out all build directories">
+      <delete dir="${build.dir}" />
+      <delete dir="${dist.dir}" />
+   </target>
+   
+   <!-- Create required prerequisite directory structure -->
+   <target name="prepare" description="Create initial build structures">
+       <mkdir dir="${build.dir}" />
+      <mkdir dir="${dist.dir}" />
+   </target>
+   
     <!--
         Assemble the configuration and resource files in a JAR file structure. This mechanism 
         was introduced in Alfresco 3.3 and allows Share extensions containing web scripts, Surf 
@@ -105,15 +119,19 @@
         <copy todir="${build.jar.dir}/META-INF" includeEmptyDirs="false">
             <fileset dir="${res.dir}" includes="${build.res.includes}" excludes="${build.res.excludes}" />
         </copy>
+        <!-- Minify JS -->
+        <yuicompress fromdir="${res.dir}" todir="${build.jar.dir}/META-INF" >
+           <include name="**/*.js" />
+        </yuicompress>
     </target>
-	
-	<!-- Build the JAR file -->
+   
+   <!-- Build the JAR file -->
     <target name="dist-jar" depends="clean, prepare, build-jar" 
-    	description="Build a JAR file containing configuration and resource files">
-    	<jar destfile="${dist.dir}/${jar.name}">
-    		<fileset dir="${build.jar.dir}" />
-    	</jar>
-	</target>
+      description="Build a JAR file containing configuration and resource files">
+      <jar destfile="${dist.dir}/${jar.name}">
+         <fileset dir="${build.jar.dir}" />
+      </jar>
+   </target>
     
     <!--
         Assemble the configuration and resource files in a file structure suitable for deploying
@@ -139,11 +157,15 @@
         In version 3.3 and above the JAR file mechanism is recommended as an alternative.
     -->
     <target name="build-zip-tomcat" depends="build-zip-prepare,build-zip-shared,build-zip-shared-translate"
-    	description="Assemble the configuration and resource files for a Tomcat deployment structure">
-    	<!-- Copy web assets -->
+      description="Assemble the configuration and resource files for a Tomcat deployment structure">
+      <!-- Copy web assets -->
         <copy todir="${build.zip.dir}/webapps/${build.res.dir.name}">
             <fileset dir="${res.dir}" includes="${build.res.includes}" excludes="${build.res.excludes}" />
         </copy>
+        <!-- Minifies JS -->
+       <yuicompress fromdir="${res.dir}" todir="${build.zip.dir}/webapps/${build.res.dir.name}" >
+                 <include name="**/*.js" />
+         </yuicompress>
     </target>
 
     <target name="build-zip-prepare">
@@ -155,7 +177,7 @@
         <copy todir="${build.zip.dir}/shared/classes">
             <fileset dir="${config.dir}" includes="${config.includes}" excludes="${config.excludes}">
                 <or>
-                	<filename name="alfresco/web-extension/**"/>
+                  <filename name="alfresco/web-extension/**"/>
                     <filename name="alfresco/extension/**"/>
                 </or>
             </fileset>
@@ -201,22 +223,27 @@
         non-complex extensions.
     -->
     <target name="build-amp" description="Assemble the configuration and resource files in an AMP file structure">
-    	
-    	<!-- Copy properties files -->
+      
+      <!-- Copy properties files -->
         <copy todir="${build.amp.dir}" file="${amp.file.properties}" failonerror="true" />
         <copy todir="${build.amp.dir}" file="${amp.file.mappings}" failonerror="true" />
-    	
-    	<!-- Copy config files -->
+      
+      <!-- Copy config files -->
         <mkdir dir="${build.amp.dir}/config" />
         <copy todir="${build.amp.dir}/config">
             <fileset dir="${config.dir}" includes="${config.includes}" excludes="${config.excludes}" />
         </copy>
-    	
-    	<!-- Copy resource files -->
+      
+      <!-- Copy resource files -->
         <mkdir dir="${build.amp.dir}/web" />
         <copy todir="${build.amp.dir}/web">
             <fileset dir="${res.dir}" includes="${build.res.includes}" excludes="${build.res.excludes}" />
         </copy>
+
+       <!-- Minify JS -->
+       <yuicompress fromdir="${res.dir}" todir="${build.amp.dir}/web" >
+          <include name="**/*.js" />
+       </yuicompress>
     </target>
     
     <!-- Build the AMP file -->
@@ -286,5 +313,5 @@
             path="${webapp.share.path}"/>
     </target>
     -->
-	
+   
 </project>

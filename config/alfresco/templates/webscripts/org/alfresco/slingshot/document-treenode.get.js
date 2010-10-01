@@ -32,7 +32,7 @@ function getTreeNode()
       }
 
       // Look for folders in the pathNode
-      for each (item in parsedArgs.parentNode.children)
+      for each (item in parsedArgs.pathNode.children)
       {
          if (item.isSubType("cm:folder") && !(item.type in ignoredTypes))
          {
@@ -56,14 +56,22 @@ function getTreeNode()
                hasSubfolders: false
             });
          }
+         
+         if (maxItems !== -1 && items.length > maxItems)
+         {
+            items.pop();
+            resultsTrimmed = true;
+            break;
+         }
       }
    
       items.sort(sortByName);
    
       return (
       {
-         "parentNode": parsedArgs.parentNode,
-         "items": items
+         parent: parsedArgs.pathNode,
+         resultsTrimmed: resultsTrimmed,
+         items: items
       });
    }
    catch(e)
