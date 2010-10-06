@@ -34,7 +34,7 @@ directory.
 
     ant clean dist-jar
 
-The command should build a JAR file named share-media-preview.jar
+The command should build a JAR file named media-preview.jar
 in the 'dist' directory within your project.
 
 To deploy the dashlet files into a local Tomcat instance for testing, you can 
