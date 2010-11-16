@@ -57,6 +57,13 @@
 								<value>${ffmpeg.exe} ${opts} ${infile_opts} -i '${source}' ${outfile_opts} '${target}' 2> /dev/null</value>
 		            	</list>
          			</entry>
+         			<entry key="Mac OS X">
+		            	<list>
+								<value>sh</value>
+								<value>-c</value>
+								<value>${ffmpeg.exe} ${opts} ${infile_opts} -i '${source}' ${outfile_opts} '${target}' 2> /dev/null</value>
+		            	</list>
+         			</entry>
          		</map>
          	</property>
             <property name="waitForCompletion">
@@ -168,6 +175,13 @@
 		            	</list>
          			</entry>
          			<entry key="Linux">
+		            	<list>
+							<value>sh</value>
+							<value>-c</value>
+							<value>${ffmpeg.exe} ${opts} ${infile_opts} -i '${source}' ${outfile_opts} -vpre ${vpre} '${target}' 2> /dev/null</value>
+		            	</list>
+         			</entry>
+         			<entry key="Mac OS X">
 		            	<list>
 							<value>sh</value>
 							<value>-c</value>
@@ -287,6 +301,13 @@
 								<value>${ffmpeg.exe} ${opts} ${infile_opts} -i '${source}' ${outfile_opts} '${target}' 2> /dev/null</value>
 		            	</list>
          			</entry>
+         			<entry key="Mac OS X">
+		            	<list>
+								<value>sh</value>
+								<value>-c</value>
+								<value>${ffmpeg.exe} ${opts} ${infile_opts} -i '${source}' ${outfile_opts} '${target}' 2> /dev/null</value>
+		            	</list>
+         			</entry>
          		</map>
          	</property>
             <property name="waitForCompletion">
@@ -400,6 +421,13 @@
                      </list>
                   </entry>
                   <entry key="Linux">
+                     <list>
+	                     <value>sh</value>
+	                     <value>-c</value>
+	                     <value>${ffmpeg.exe} ${opts} ${infile_opts} -i '${source}' ${outfile_opts} '${target}' 2> /dev/null</value>
+                     </list>
+                  </entry>
+                  <entry key="Mac OS X">
                      <list>
 	                     <value>sh</value>
 	                     <value>-c</value>
