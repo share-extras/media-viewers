@@ -120,7 +120,7 @@
             <fileset dir="${res.dir}" includes="${build.res.includes}" excludes="${build.res.excludes}" />
         </copy>
         <!-- Minify JS -->
-        <yuicompress fromdir="${res.dir}" todir="${build.jar.dir}/META-INF" >
+        <yuicompress warn="false" fromdir="${res.dir}" todir="${build.jar.dir}/META-INF" excludes="**/*-min.js" >
            <include name="**/*.js" />
         </yuicompress>
     </target>
@@ -163,7 +163,7 @@
             <fileset dir="${res.dir}" includes="${build.res.includes}" excludes="${build.res.excludes}" />
         </copy>
         <!-- Minifies JS -->
-       <yuicompress fromdir="${res.dir}" todir="${build.zip.dir}/webapps/${build.res.dir.name}" >
+       <yuicompress warn="false" fromdir="${res.dir}" todir="${build.zip.dir}/webapps/${build.res.dir.name}" excludes="**/*-min.js" >
                  <include name="**/*.js" />
          </yuicompress>
     </target>
@@ -241,7 +241,7 @@
         </copy>
 
        <!-- Minify JS -->
-       <yuicompress fromdir="${res.dir}" todir="${build.amp.dir}/web" >
+       <yuicompress warn="false" fromdir="${res.dir}" todir="${build.amp.dir}/web" excludes="**/*-min.js" >
           <include name="**/*.js" />
        </yuicompress>
     </target>
