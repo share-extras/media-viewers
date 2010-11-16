@@ -25,7 +25,17 @@
                         <value>${ffmpeg.exe} -version</value>
                      </list>
                   </entry>
+                  <entry key="Mac OS X">
+                     <list>
+                        <value>sh</value>
+                        <value>-c</value>
+                        <value>${ffmpeg.exe} -version</value>
+                     </list>
+                  </entry>
                </map>
+            </property>
+            <property name="errorCodes">
+               <value>127</value>
             </property>
          </bean>
       </property>
@@ -131,7 +141,17 @@
                         <value>${ffmpeg.exe} -version</value>
                      </list>
                   </entry>
+                  <entry key="Mac OS X">
+                     <list>
+                        <value>sh</value>
+                        <value>-c</value>
+                        <value>${ffmpeg.exe} -version</value>
+                     </list>
+                  </entry>
                </map>
+            </property>
+            <property name="errorCodes">
+               <value>127</value>
             </property>
          </bean>
       </property>
@@ -235,7 +255,17 @@
                         <value>${ffmpeg.exe} -version</value>
                      </list>
                   </entry>
+                  <entry key="Mac OS X">
+                     <list>
+                        <value>sh</value>
+                        <value>-c</value>
+                        <value>${ffmpeg.exe} -version</value>
+                     </list>
+                  </entry>
                </map>
+            </property>
+            <property name="errorCodes">
+               <value>127</value>
             </property>
          </bean>
       </property>
@@ -344,7 +374,17 @@
                         <value>${ffmpeg.exe} -version</value>
                      </list>
                   </entry>
+                  <entry key="Mac OS X">
+                     <list>
+                        <value>sh</value>
+                        <value>-c</value>
+                        <value>${ffmpeg.exe} -version</value>
+                     </list>
+                  </entry>
                </map>
+            </property>
+            <property name="errorCodes">
+               <value>127</value>
             </property>
          </bean>
       </property>
