@@ -2,73 +2,84 @@
 <!DOCTYPE beans PUBLIC '-//SPRING//DTD BEAN//EN' 'http://www.springframework.org/dtd/spring-beans.dtd'>
  
 <beans>
+ <!-- To decide if FFMpeg is present -->
+ <bean id="ffmpeg.present" class="org.alfresco.util.exec.RuntimeExec">
+    <property name="commandsAndArguments">
+       <map>
+          <entry key="Windows.*">
+             <list>
+                <value>cmd</value>
+                <value>/C</value>
+                <value>${ffmpeg.exe} -version</value>
+             </list>
+          </entry>
+          <entry key="Linux">
+             <list>
+                <value>sh</value>
+                <value>-c</value>
+                <value>${ffmpeg.exe} -version</value>
+             </list>
+          </entry>
+          <entry key="Mac OS X">
+             <list>
+                <value>sh</value>
+                <value>-c</value>
+                <value>${ffmpeg.exe} -version</value>
+             </list>
+          </entry>
+       </map>
+    </property>
+    <property name="errorCodes">
+       <value>127</value>
+    </property>
+ </bean>
+
+ <!-- Default FFMpeg execution -->
+ <bean id="ffmpeg.transform" class="org.alfresco.util.exec.RuntimeExec" abstract="true">
+    <property name="commandsAndArguments">
+       <map>
+          <entry key="Windows.*">
+             <list>
+                <value>cmd</value>
+                <value>/C</value>
+                <value>${ffmpeg.exe} ${opts} ${infile_opts} -i "${source}" ${outfile_opts} "${target}" 2> NUL</value>
+             </list>
+          </entry>
+          <entry key="Linux">
+             <list>
+                <value>sh</value>
+                <value>-c</value>
+                <value>${ffmpeg.exe} ${opts} ${infile_opts} -i '${source}' ${outfile_opts} '${target}' 2> /dev/null</value>
+             </list>
+          </entry>
+          <entry key="Mac OS X">
+             <list>
+                <value>sh</value>
+                <value>-c</value>
+                <value>${ffmpeg.exe} ${opts} ${infile_opts} -i '${source}' ${outfile_opts} '${target}' 2> /dev/null</value>
+             </list>
+          </entry>
+       </map>
+    </property>
+    <property name="waitForCompletion">
+       <value>true</value>
+    </property>
+    <property name="defaultProperties">
+        <props>
+            <prop key="opts">-y</prop>
+            <prop key="infile_opts"></prop>
+            <prop key="outfile_opts">-f flv</prop>
+        </props>
+    </property>
+ </bean>
 
    <!-- Content Transformations -->
 
    <!-- Generic FFmpeg transformation worker -->
    <bean id="transformer.worker.ffmpeg.flv" class="org.alfresco.repo.content.transform.RuntimeExecutableContentTransformerWorker">
-      <property name="checkCommand">
-         <bean class="org.alfresco.util.exec.RuntimeExec">
-            <property name="commandsAndArguments">
-               <map>
-                  <entry key="Windows.*">
-                     <list>
-                        <value>cmd</value>
-                        <value>/C</value>
-                        <value>${ffmpeg.exe} -version</value>
-                     </list>
-                  </entry>
-                  <entry key="Linux">
-                     <list>
-                        <value>sh</value>
-                        <value>-c</value>
-                        <value>${ffmpeg.exe} -version</value>
-                     </list>
-                  </entry>
-                  <entry key="Mac OS X">
-                     <list>
-                        <value>sh</value>
-                        <value>-c</value>
-                        <value>${ffmpeg.exe} -version</value>
-                     </list>
-                  </entry>
-               </map>
-            </property>
-            <property name="errorCodes">
-               <value>127</value>
-            </property>
-         </bean>
-      </property>
+      <property name="checkCommand" ref="ffmpeg.present" />
       <property name="transformCommand">
-         <bean class="org.alfresco.util.exec.RuntimeExec">
-         	<property name="commandsAndArguments">
-         		<map>
-         			<entry key="Windows.*">
-		            	<list>
-								<value>cmd</value>
-								<value>/C</value>
-								<value>${ffmpeg.exe} ${opts} ${infile_opts} -i "${source}" ${outfile_opts} "${target}" 2> NUL</value>
-		            	</list>
-         			</entry>
-         			<entry key="Linux">
-		            	<list>
-								<value>sh</value>
-								<value>-c</value>
-								<value>${ffmpeg.exe} ${opts} ${infile_opts} -i '${source}' ${outfile_opts} '${target}' 2> /dev/null</value>
-		            	</list>
-         			</entry>
-         			<entry key="Mac OS X">
-		            	<list>
-								<value>sh</value>
-								<value>-c</value>
-								<value>${ffmpeg.exe} ${opts} ${infile_opts} -i '${source}' ${outfile_opts} '${target}' 2> /dev/null</value>
-		            	</list>
-         			</entry>
-         		</map>
-         	</property>
-            <property name="waitForCompletion">
-            	<value>true</value>
-            </property>
+         <bean parent="ffmpeg.transform">
             <property name="defaultProperties">
                 <props>
                     <prop key="opts">-y</prop>
@@ -80,7 +91,7 @@
       </property>
       <property name="explicitTransformations">
          <list>
-         	<!-- Transform to FLV -->
+            <!-- Transform to FLV -->
             <bean class="org.alfresco.repo.content.transform.ExplictTransformationDetails" >
                 <property name="sourceMimetype"><value>video/mpeg</value></property>
                 <property name="targetMimetype"><value>video/x-flv</value></property>
@@ -130,74 +141,14 @@
 
    <!-- Generic FFmpeg transformation worker -->
    <bean id="transformer.worker.ffmpeg.mp4" class="org.alfresco.repo.content.transform.RuntimeExecutableContentTransformerWorker">
-      <property name="checkCommand">
-         <bean class="org.alfresco.util.exec.RuntimeExec">
-            <property name="commandsAndArguments">
-               <map>
-                  <entry key="Windows.*">
-                     <list>
-                        <value>cmd</value>
-                        <value>/C</value>
-                        <value>${ffmpeg.exe} -version</value>
-                     </list>
-                  </entry>
-                  <entry key="Linux">
-                     <list>
-                        <value>sh</value>
-                        <value>-c</value>
-                        <value>${ffmpeg.exe} -version</value>
-                     </list>
-                  </entry>
-                  <entry key="Mac OS X">
-                     <list>
-                        <value>sh</value>
-                        <value>-c</value>
-                        <value>${ffmpeg.exe} -version</value>
-                     </list>
-                  </entry>
-               </map>
-            </property>
-            <property name="errorCodes">
-               <value>127</value>
-            </property>
-         </bean>
-      </property>
+      <property name="checkCommand" ref="ffmpeg.present" />
       <property name="transformCommand">
-         <bean class="org.alfresco.util.exec.RuntimeExec">
-         	<property name="commandsAndArguments">
-         		<map>
-         			<entry key="Windows.*">
-		            	<list>
-								<value>cmd</value>
-								<value>/C</value>
-								<!-- -vpre does not work on Windows - see https://roundup.ffmpeg.org/issue659 -->
-								<value>${ffmpeg.exe} ${opts} ${infile_opts} -i "${source}" ${outfile_opts} -fpre "${ffmpeg.base}\share\ffmpeg\libx264-${vpre}.ffpreset" "${target}" 2> NUL</value>
-		            	</list>
-         			</entry>
-         			<entry key="Linux">
-		            	<list>
-							<value>sh</value>
-							<value>-c</value>
-							<value>${ffmpeg.exe} ${opts} ${infile_opts} -i '${source}' ${outfile_opts} -vpre ${vpre} '${target}' 2> /dev/null</value>
-		            	</list>
-         			</entry>
-         			<entry key="Mac OS X">
-		            	<list>
-							<value>sh</value>
-							<value>-c</value>
-							<value>${ffmpeg.exe} ${opts} ${infile_opts} -i '${source}' ${outfile_opts} -vpre ${vpre} '${target}' 2> /dev/null</value>
-		            	</list>
-         			</entry>
-         		</map>
-         	</property>
-            <property name="waitForCompletion">
-            	<value>true</value>
-            </property>
+         <bean parent="ffmpeg.transform">
             <property name="defaultProperties">
                 <props>
                     <prop key="opts">-y</prop>
                     <prop key="infile_opts"></prop>
-                    <prop key="outfile_opts">-f mp4 -ar 44100 -ab 96k -vcodec libx264 -crf 25 -g 250 -r 25</prop>
+                    <prop key="outfile_opts">-f mp4 -ar 44100 -ab 96k -vcodec libx264 -crf 25 -g 250 -r 25 -vpre medium</prop>
                     <prop key="vpre">medium</prop>
                 </props>
             </property>
@@ -205,7 +156,7 @@
       </property>
       <property name="explicitTransformations">
          <list>
-         	<!-- Transform to MP4 -->
+            <!-- Transform to MP4 -->
             <bean class="org.alfresco.repo.content.transform.ExplictTransformationDetails" >
                 <property name="sourceMimetype"><value>video/mpeg</value></property>
                 <property name="targetMimetype"><value>video/mp4</value></property>
@@ -251,68 +202,9 @@
 
    <!-- Video Thumbnails FFmpeg transformation worker -->
    <bean id="transformer.worker.ffmpeg.thumbnail" class="org.alfresco.repo.content.transform.RuntimeExecutableContentTransformerWorker">
-      <property name="checkCommand">
-         <bean class="org.alfresco.util.exec.RuntimeExec">
-            <property name="commandsAndArguments">
-               <map>
-                  <entry key="Windows.*">
-                     <list>
-                        <value>cmd</value>
-                        <value>/C</value>
-                        <value>${ffmpeg.exe} -version</value>
-                     </list>
-                  </entry>
-                  <entry key="Linux">
-                     <list>
-                        <value>sh</value>
-                        <value>-c</value>
-                        <value>${ffmpeg.exe} -version</value>
-                     </list>
-                  </entry>
-                  <entry key="Mac OS X">
-                     <list>
-                        <value>sh</value>
-                        <value>-c</value>
-                        <value>${ffmpeg.exe} -version</value>
-                     </list>
-                  </entry>
-               </map>
-            </property>
-            <property name="errorCodes">
-               <value>127</value>
-            </property>
-         </bean>
-      </property>
+      <property name="checkCommand" ref="ffmpeg.present" />
       <property name="transformCommand">
-         <bean class="org.alfresco.util.exec.RuntimeExec">
-         	<property name="commandsAndArguments">
-         		<map>
-         			<entry key="Windows.*">
-		            	<list>
-								<value>cmd</value>
-								<value>/C</value>
-								<value>${ffmpeg.exe} ${opts} ${infile_opts} -i "${source}" ${outfile_opts} "${target}" 2> NUL</value>
-		            	</list>
-         			</entry>
-         			<entry key="Linux">
-		            	<list>
-								<value>sh</value>
-								<value>-c</value>
-								<value>${ffmpeg.exe} ${opts} ${infile_opts} -i '${source}' ${outfile_opts} '${target}' 2> /dev/null</value>
-		            	</list>
-         			</entry>
-         			<entry key="Mac OS X">
-		            	<list>
-								<value>sh</value>
-								<value>-c</value>
-								<value>${ffmpeg.exe} ${opts} ${infile_opts} -i '${source}' ${outfile_opts} '${target}' 2> /dev/null</value>
-		            	</list>
-         			</entry>
-         		</map>
-         	</property>
-            <property name="waitForCompletion">
-            	<value>true</value>
-            </property>
+         <bean parent="ffmpeg.transform">
             <property name="defaultProperties">
                 <props>
                     <prop key="opts">-y</prop>
@@ -377,68 +269,9 @@
 
    <!-- Generic MP3 transformation worker -->
    <bean id="transformer.worker.ffmpeg.mp3" class="org.alfresco.repo.content.transform.RuntimeExecutableContentTransformerWorker">
-      <property name="checkCommand">
-         <bean class="org.alfresco.util.exec.RuntimeExec">
-            <property name="commandsAndArguments">
-               <map>
-                  <entry key="Windows.*">
-                     <list>
-                        <value>cmd</value>
-                        <value>/C</value>
-                        <value>${ffmpeg.exe} -version</value>
-                     </list>
-                  </entry>
-                  <entry key="Linux">
-                     <list>
-                        <value>sh</value>
-                        <value>-c</value>
-                        <value>${ffmpeg.exe} -version</value>
-                     </list>
-                  </entry>
-                  <entry key="Mac OS X">
-                     <list>
-                        <value>sh</value>
-                        <value>-c</value>
-                        <value>${ffmpeg.exe} -version</value>
-                     </list>
-                  </entry>
-               </map>
-            </property>
-            <property name="errorCodes">
-               <value>127</value>
-            </property>
-         </bean>
-      </property>
+      <property name="checkCommand" ref="ffmpeg.present" />
       <property name="transformCommand">
-         <bean class="org.alfresco.util.exec.RuntimeExec">
-            <property name="commandsAndArguments">
-               <map>
-                  <entry key="Windows.*">
-                     <list>
-	                     <value>cmd</value>
-	                     <value>/C</value>
-	                     <value>${ffmpeg.exe} ${opts} ${infile_opts} -i "${source}" ${outfile_opts} "${target}" 2> NUL</value>
-                     </list>
-                  </entry>
-                  <entry key="Linux">
-                     <list>
-	                     <value>sh</value>
-	                     <value>-c</value>
-	                     <value>${ffmpeg.exe} ${opts} ${infile_opts} -i '${source}' ${outfile_opts} '${target}' 2> /dev/null</value>
-                     </list>
-                  </entry>
-                  <entry key="Mac OS X">
-                     <list>
-	                     <value>sh</value>
-	                     <value>-c</value>
-	                     <value>${ffmpeg.exe} ${opts} ${infile_opts} -i '${source}' ${outfile_opts} '${target}' 2> /dev/null</value>
-                     </list>
-                  </entry>
-               </map>
-            </property>
-            <property name="waitForCompletion">
-               <value>true</value>
-            </property>
+         <bean parent="ffmpeg.transform">
             <property name="defaultProperties">
                 <props>
                     <prop key="opts">-y</prop>
@@ -512,47 +345,47 @@
    
     <!-- Thumbnail Register -->
     <bean id="thumbnailRegistry" class="org.alfresco.repo.thumbnail.ThumbnailRegistry">
-    	<property name="contentService" ref="ContentService"/>
-    	<property name="renditionService" ref="renditionService" />
-    	<property name="transactionService" ref="TransactionService" />
-    	<property name="thumbnailDefinitions">
-    		<list>
-    		
-    		    <!-- FLV preview thumbnail options -->
-				<bean class="org.alfresco.repo.thumbnail.ThumbnailDefinition">
-					<property name="name" value="flvpreview" />
-					<property name="mimetype" value="video/x-flv"/>
-					<property name="transformationOptions">
-	    				<bean class="org.alfresco.repo.content.transform.RuntimeExecutableContentTransformerOptions">
-	    					<property name="propertyValues">
-	    						<props>
-	    							<prop key="outfile_opts">-f flv -ab 56 -ar 44100 -b 200 -r 15 -s 320x240</prop>
-	    						</props>
-	    					</property>
-	    				</bean>
-					</property>
+        <property name="contentService" ref="ContentService"/>
+        <property name="renditionService" ref="renditionService" />
+        <property name="transactionService" ref="TransactionService" />
+        <property name="thumbnailDefinitions">
+            <list>
+            
+                <!-- FLV preview thumbnail options -->
+                <bean class="org.alfresco.repo.thumbnail.ThumbnailDefinition">
+                    <property name="name" value="flvpreview" />
+                    <property name="mimetype" value="video/x-flv"/>
+                    <property name="transformationOptions">
+                        <bean class="org.alfresco.repo.content.transform.RuntimeExecutableContentTransformerOptions">
+                            <property name="propertyValues">
+                                <props>
+                                    <prop key="outfile_opts">-f flv -ab 56 -ar 44100 -b 200 -r 15 -s 320x240</prop>
+                                </props>
+                            </property>
+                        </bean>
+                    </property>
                <property name="runAs" value="System"/>
-				</bean>
-    		
-    		    <!-- H264 preview thumbnail options -->
-				<bean class="org.alfresco.repo.thumbnail.ThumbnailDefinition">
-					<property name="name" value="h264preview" />
-					<property name="mimetype" value="video/mp4"/>
-					<property name="transformationOptions">
-	    				<bean class="org.alfresco.repo.content.transform.RuntimeExecutableContentTransformerOptions">
-	    					<property name="propertyValues">
-	    						<props>
-	    						   <!--
-	    							<prop key="outfile_opts">-f mpeg4 -acodec aac -ab 128kb -vcodec mpeg4 -b 1200kb -mbd 2 -flags +4mv+trell -aic 2 -cmp 2 -subcmp 2 -s 320x180</prop>
-	    							-->
+                </bean>
+            
+                <!-- H264 preview thumbnail options -->
+                <bean class="org.alfresco.repo.thumbnail.ThumbnailDefinition">
+                    <property name="name" value="h264preview" />
+                    <property name="mimetype" value="video/mp4"/>
+                    <property name="transformationOptions">
+                        <bean class="org.alfresco.repo.content.transform.RuntimeExecutableContentTransformerOptions">
+                            <property name="propertyValues">
+                                <props>
+                                   <!--
+                                    <prop key="outfile_opts">-f mpeg4 -acodec aac -ab 128kb -vcodec mpeg4 -b 1200kb -mbd 2 -flags +4mv+trell -aic 2 -cmp 2 -subcmp 2 -s 320x180</prop>
+                                    -->
                            <prop key="outfile_opts">-f mp4 -ar 44100 -ab 96k -vcodec libx264 -crf 25 -g 250 -r 25</prop>
                            <prop key="vpre">medium</prop>
-	    						</props>
-	    					</property>
-	    				</bean>
-					</property>
+                                </props>
+                            </property>
+                        </bean>
+                    </property>
                <property name="runAs" value="System"/>
-				</bean>
+                </bean>
          
              <!-- MP3 preview thumbnail options -->
             <bean class="org.alfresco.repo.thumbnail.ThumbnailDefinition">
@@ -569,46 +402,46 @@
                </property>
                <property name="runAs" value="System"/>
             </bean>
-				
-    		   <!-- Small image thumbnail options -->
-				<bean class="org.alfresco.repo.thumbnail.ThumbnailDefinition">
-					<property name="name" value="medium" />
-					<property name="mimetype" value="image/jpeg"/>
-					<property name="transformationOptions">
-	    				<bean class="org.alfresco.repo.content.transform.magick.ImageTransformationOptions">
-	    					<property name="resizeOptions">
-	    						<bean class="org.alfresco.repo.content.transform.magick.ImageResizeOptions">
-	    							<property name="width" value="100"/>
-	    							<property name="height" value="100"/>
-	    							<property name="maintainAspectRatio" value="true"/>
-	    							<property name="resizeToThumbnail" value="true" />
-	    						</bean>	
-	    					</property>
-	    				</bean>
-					</property>
-					<property name="placeHolderResourcePath" value="alfresco/thumbnail/thumbnail_placeholder_medium.jpg" />
-					<property name="runAs" value="System"/>
-				</bean>
+                
+               <!-- Small image thumbnail options -->
+                <bean class="org.alfresco.repo.thumbnail.ThumbnailDefinition">
+                    <property name="name" value="medium" />
+                    <property name="mimetype" value="image/jpeg"/>
+                    <property name="transformationOptions">
+                        <bean class="org.alfresco.repo.content.transform.magick.ImageTransformationOptions">
+                            <property name="resizeOptions">
+                                <bean class="org.alfresco.repo.content.transform.magick.ImageResizeOptions">
+                                    <property name="width" value="100"/>
+                                    <property name="height" value="100"/>
+                                    <property name="maintainAspectRatio" value="true"/>
+                                    <property name="resizeToThumbnail" value="true" />
+                                </bean> 
+                            </property>
+                        </bean>
+                    </property>
+                    <property name="placeHolderResourcePath" value="alfresco/thumbnail/thumbnail_placeholder_medium.jpg" />
+                    <property name="runAs" value="System"/>
+                </bean>
 
             <!-- Slingshot Document Library image thumbnail options -->
-				<bean class="org.alfresco.repo.thumbnail.ThumbnailDefinition">
-					<property name="name" value="doclib" />
-					<property name="mimetype" value="image/png"/>
-					<property name="transformationOptions">
-	    				<bean class="org.alfresco.repo.content.transform.magick.ImageTransformationOptions">
-	    					<property name="resizeOptions">
-	    						<bean class="org.alfresco.repo.content.transform.magick.ImageResizeOptions">
-	    							<property name="width" value="100"/>
-	    							<property name="height" value="100"/>
-	    							<property name="maintainAspectRatio" value="true"/>
-	    							<property name="resizeToThumbnail" value="true" />
-	    						</bean>	
-	    					</property>
-	    				</bean>
-					</property>
-					<property name="placeHolderResourcePath" value="alfresco/thumbnail/thumbnail_placeholder_doclib.png" />
-					<property name="runAs" value="System"/>
-				</bean>
+                <bean class="org.alfresco.repo.thumbnail.ThumbnailDefinition">
+                    <property name="name" value="doclib" />
+                    <property name="mimetype" value="image/png"/>
+                    <property name="transformationOptions">
+                        <bean class="org.alfresco.repo.content.transform.magick.ImageTransformationOptions">
+                            <property name="resizeOptions">
+                                <bean class="org.alfresco.repo.content.transform.magick.ImageResizeOptions">
+                                    <property name="width" value="100"/>
+                                    <property name="height" value="100"/>
+                                    <property name="maintainAspectRatio" value="true"/>
+                                    <property name="resizeToThumbnail" value="true" />
+                                </bean> 
+                            </property>
+                        </bean>
+                    </property>
+                    <property name="placeHolderResourcePath" value="alfresco/thumbnail/thumbnail_placeholder_doclib.png" />
+                    <property name="runAs" value="System"/>
+                </bean>
                 
                 <!-- Web Preview thumbnail options -->
                 <bean class="org.alfresco.repo.thumbnail.ThumbnailDefinition">
@@ -621,26 +454,26 @@
                     </property>
                     <property name="runAs" value="System"/>
                 </bean>
-    		
-	             <!-- Image preview thumbnail options -->
-	             <bean class="org.alfresco.repo.thumbnail.ThumbnailDefinition">
-	                <property name="name" value="imgpreview" />
-	                <property name="mimetype" value="image/png"/>
-	                <property name="transformationOptions">
-	                   <bean class="org.alfresco.repo.content.transform.magick.ImageTransformationOptions">
-	                      <property name="resizeOptions">
-	                         <bean class="org.alfresco.repo.content.transform.magick.ImageResizeOptions">
-	                            <property name="width" value="480"/>
-	                            <property name="height" value="480"/>
-	                            <property name="maintainAspectRatio" value="true"/>
-	                            <property name="resizeToThumbnail" value="true" />
-	                         </bean>
-	                      </property>
-	                   </bean>
-	                </property>
-	                <property name="placeHolderResourcePath" value="alfresco/thumbnail/thumbnail_placeholder_imgpreview.png" />
-	                <property name="runAs" value="System"/>
-	             </bean>
+            
+                 <!-- Image preview thumbnail options -->
+                 <bean class="org.alfresco.repo.thumbnail.ThumbnailDefinition">
+                    <property name="name" value="imgpreview" />
+                    <property name="mimetype" value="image/png"/>
+                    <property name="transformationOptions">
+                       <bean class="org.alfresco.repo.content.transform.magick.ImageTransformationOptions">
+                          <property name="resizeOptions">
+                             <bean class="org.alfresco.repo.content.transform.magick.ImageResizeOptions">
+                                <property name="width" value="480"/>
+                                <property name="height" value="480"/>
+                                <property name="maintainAspectRatio" value="true"/>
+                                <property name="resizeToThumbnail" value="true" />
+                             </bean>
+                          </property>
+                       </bean>
+                    </property>
+                    <property name="placeHolderResourcePath" value="alfresco/thumbnail/thumbnail_placeholder_imgpreview.png" />
+                    <property name="runAs" value="System"/>
+                 </bean>
          
                 <!-- Image preview thumbnail options -->
                 <bean class="org.alfresco.repo.thumbnail.ThumbnailDefinition">
@@ -685,8 +518,8 @@
                     <property name="placeHolderResourcePath" value="alfresco/thumbnail/thumbnail_placeholder_avatar.png" />
                     <property name="runAs" value="System"/>
                 </bean>
-    		   </list>
-    	  </property>
+               </list>
+          </property>
         <property name="thumbnailRenditionConvertor" ref="thumbnailRenditionConvertor" />
     </bean>
     
