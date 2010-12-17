@@ -149,7 +149,6 @@
                     <prop key="opts">-y</prop>
                     <prop key="infile_opts"></prop>
                     <prop key="outfile_opts">-f mp4 -ar 44100 -ab 96k -vcodec libx264 -crf 25 -g 250 -r 25 -vpre medium</prop>
-                    <prop key="vpre">medium</prop>
                 </props>
             </property>
          </bean>
