@@ -286,7 +286,8 @@
                   
                   var region = Dom.getRegion(this.widgets.shadowSfwDivEl.get("id")),
                      swfId = "VideoPreviewer_" + this.id,
-                     so = new YAHOO.deconcept.SWFObject(Alfresco.constants.URL_CONTEXT + "res/components/preview/player_flv_maxi.swf",
+                     argsNoCache = (YAHOO.env.ua.ie > 0) ? "?noCacheToken=" + new Date().getTime() : "",
+                     so = new YAHOO.deconcept.SWFObject(Alfresco.constants.URL_CONTEXT + "res/components/preview/player_flv_maxi.swf" + argsNoCache,
                         swfId, "100%", "100%", "6.0.0");
                   
                   so.addVariable("fileName", this.options.name);
