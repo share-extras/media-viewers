@@ -24,7 +24,7 @@
    new Alfresco.widget.DashletResizer("${args.htmlid}", "${instance.object.id}");
 //]]></script>
 <div class="dashlet video">
-   <div class="title"><#if node??>${node.title!node.name}<#else>${msg("header.video")}</#if></div>
+   <div class="title"><#if node??><a href="${url.context}/page/site/${page.url.templateArgs.site!''}/document-details?nodeRef=${args.nodeRef!''}">${node.title!node.name}</a><#else>${msg("header.video")}</#if></div>
    <div class="toolbar">
       <a id="${args.htmlid}-configVideo-link" href="#" class="theme-color-1">${msg("link.configure")}</a>
    </div>
