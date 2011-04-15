@@ -8,29 +8,23 @@
        <map>
           <entry key="Windows.*">
              <list>
-                <value>cmd</value>
-                <value>/C</value>
-                <value>${ffmpeg.exe} -version</value>
+                <value>${ffmpeg.exe}</value>
+                <value>-version</value>
              </list>
           </entry>
           <entry key="Linux">
              <list>
-                <value>sh</value>
-                <value>-c</value>
-                <value>${ffmpeg.exe} -version</value>
+                <value>${ffmpeg.exe}</value>
+                <value>-version</value>
              </list>
           </entry>
           <entry key="Mac OS X">
              <list>
-                <value>sh</value>
-                <value>-c</value>
-                <value>${ffmpeg.exe} -version</value>
+                <value>${ffmpeg.exe}</value>
+                <value>-version</value>
              </list>
           </entry>
        </map>
-    </property>
-    <property name="errorCodes">
-       <value>127</value>
     </property>
  </bean>
 
@@ -40,36 +34,41 @@
        <map>
           <entry key="Windows.*">
              <list>
-                <value>cmd</value>
-                <value>/C</value>
-                <value>${ffmpeg.exe} ${opts} ${infile_opts} -i "${source}" ${outfile_opts} "${target}" 2> NUL</value>
+                <value>${ffmpeg.exe}</value>
+                <value>SPLIT:${opts}</value>
+                <value>SPLIT:${infile_opts}</value>
+                <value>-i</value>
+                <value>${source}</value>
+                <value>SPLIT:${outfile_opts}</value>
+                <value>${target}</value>
              </list>
           </entry>
           <entry key="Linux">
              <list>
-                <value>sh</value>
-                <value>-c</value>
-                <value>${ffmpeg.exe} ${opts} ${infile_opts} -i '${source}' ${outfile_opts} '${target}' 2> /dev/null</value>
+                <value>${ffmpeg.exe}</value>
+                <value>SPLIT:${opts}</value>
+                <value>SPLIT:${infile_opts}</value>
+                <value>-i</value>
+                <value>${source}</value>
+                <value>SPLIT:${outfile_opts}</value>
+                <value>${target}</value>
              </list>
           </entry>
           <entry key="Mac OS X">
              <list>
-                <value>sh</value>
-                <value>-c</value>
-                <value>${ffmpeg.exe} ${opts} ${infile_opts} -i '${source}' ${outfile_opts} '${target}' 2> /dev/null</value>
+                <value>${ffmpeg.exe}</value>
+                <value>SPLIT:${opts}</value>
+                <value>SPLIT:${infile_opts}</value>
+                <value>-i</value>
+                <value>${source}</value>
+                <value>SPLIT:${outfile_opts}</value>
+                <value>${target}</value>
              </list>
           </entry>
        </map>
     </property>
     <property name="waitForCompletion">
        <value>true</value>
-    </property>
-    <property name="defaultProperties">
-        <props>
-            <prop key="opts">-y</prop>
-            <prop key="infile_opts"></prop>
-            <prop key="outfile_opts">-f flv</prop>
-        </props>
     </property>
  </bean>
 
