@@ -1,0 +1,49 @@
+div.odf-preview.shadow
+{
+   margin-left: -10px;
+   border-right: 1px solid #CCCCCC;
+   border-bottom: 1px solid #CCCCCC;
+}
+
+div.odf-preview.shadow span,
+div.odf-preview.shadow div
+{
+   color: #000000;
+}
+
+div.odf-preview.shadow .hd
+{
+   background-color: #FAFAFA;    
+   height: 40px;
+   line-height: 40px;
+}                                     
+
+div.odf-preview.shadow img,
+div.odf-preview.shadow span,
+div.odf-preview.shadow input
+{
+   vertical-align: middle;
+}
+
+div.odf-preview.shadow .bd
+{
+   text-align: center;
+}
+
+div.odf-preview.real.no-content
+{
+   visibility: hidden;
+}
+
+.odf-preview-content
+{
+	overflow: scroll;
+	width: 100%;
+	height: 40em;
+	border-top: 1px solid #c0c0c0;
+}
+
+.odf-preview-container 
+{
+	background: #999999;
+}

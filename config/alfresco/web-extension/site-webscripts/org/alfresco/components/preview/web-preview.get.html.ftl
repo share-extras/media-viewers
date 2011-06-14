@@ -32,6 +32,20 @@ new Alfresco.AudioPreview("${args.htmlid}").setOptions(
    ${messages}
       );
 //]]></script>
+<#elseif node.mimeType == "application/vnd.oasis.opendocument.text">
+<#assign baseClass="odf-preview">
+<script type="text/javascript">//<![CDATA[
+new Alfresco.WebODFPreview("${args.htmlid}").setOptions(
+{
+   nodeRef: "${node.nodeRef}",
+   name: "${node.name?js_string}",
+   icon: "${node.icon}",
+   mimeType: "${node.mimeType}",
+   size: "${node.size}"
+}).setMessages(
+   ${messages}
+      );
+//]]></script>
 <#else>
 <script type="text/javascript">//<![CDATA[
 new Alfresco.WebPreview("${args.htmlid}").setOptions(
@@ -57,7 +71,7 @@ new Alfresco.WebPreview("${args.htmlid}").setOptions(
          </h4>
       </div>
    </div>
-   <div class="bd">
+   <div class="bd" id="${args.htmlid}-bd">
       <div id="${args.htmlid}-shadow-swf-div" class="preview-swf">
          <div id="${args.htmlid}-swfPlayerMessage-div">${msg("label.preparingPreviewer")}</div>
       </div>
