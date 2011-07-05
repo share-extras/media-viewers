@@ -1,29 +1,4 @@
 /**
- * Copyright (C) 2005-2008 Alfresco Software Limited.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
-
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
-
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-
- * As a special exception to the terms and conditions of version 2.0 of 
- * the GPL, you may redistribute this Program in connection with Free/Libre 
- * and Open Source Software ("FLOSS") applications as described in Alfresco's 
- * FLOSS exception.  You should have recieved a copy of the text describing 
- * the FLOSS exception, and it is also available here: 
- * http://www.alfresco.com/legal/licensing
- */
- 
-/**
  * Alfresco.dashlet.VideoWidget
  *
  * Displays a user-selected video file on a user's dashboard
@@ -38,6 +13,13 @@
       Event = YAHOO.util.Event;
 
    /**
+    * Alfresco Slingshot aliases
+    */
+    var $html = Alfresco.util.encodeHTML,
+       $combine = Alfresco.util.combinePaths,
+       $hasEventInterest = Alfresco.util.hasEventInterest;
+
+   /**
     * VideoWidget constructor.
     * 
     * @param {String} htmlId The HTML id of the parent element
@@ -50,6 +32,12 @@
       
       // Initialise prototype properties
       this.configDialog = null;
+      
+      // Decoupled event listeners
+      if (htmlId != "null")
+      {
+         YAHOO.Bubbling.on("renderCurrentValue", this.onDocumentsSelected, this);
+      }
       
       return this;
    };
@@ -125,8 +113,12 @@
        *
        * @method onReady
        */
-      onReady: function RF_onReady()
+      onReady: function VideoWidget_onReady()
       {
+         // Cache widget refs
+         this.widgets.pathField = Dom.get(parent.id + "-pathField"); 
+         this.widgets.nodeField = Dom.get(parent.id + "-nodeRef");
+         
          // Add click handler to config feed link that will be visible if user is site manager.
          var configVideoLink = Dom.get(this.id + "-configVideo-link");
          if (configVideoLink)
@@ -145,14 +137,14 @@
                nodeRef: this.options.nodeRef,
                name: "",
                icon: "",
-               mimeType: "video/mp4",
-               previews: [ "h264preview", "imgpreview", "imgpreviewfull" ],
-               availablePreviews: [ "h264preview", "imgpreview", "imgpreviewfull" ],
-               size: "78843"
+               mimeType: this.options.mimeType,
+               previews: this.options.previews,
+               availablePreviews: this.options.availablePreviews,
+               size: this.options.size
             }).setMessages(
                   Alfresco.messages.scope[this.name]
              );
-             */
+            */
          }
          else
          {
@@ -168,7 +160,7 @@
        * @method onConfigFeedClick
        * @param e The click event
        */
-      onConfigVideoClick: function RF_onConfigVideoClick(e)
+      onConfigVideoClick: function VideoWidget_onConfigVideoClick(e)
       {
          var actionUrl = Alfresco.constants.URL_SERVICECONTEXT + "modules/dashlet/config/" + encodeURIComponent(this.options.componentId);
          
@@ -181,12 +173,15 @@
                width: "50em",
                templateUrl: Alfresco.constants.URL_SERVICECONTEXT + "modules/video/config", actionUrl: actionUrl,
                site: this.options.site,
-               nodeName: this.options.name,
-               nodeRef: this.options.nodeRef,
                onSuccess:
                {
                   fn: function VideoWidget_onConfigFeed_callback(response)
                   {
+                      if (this.widgets.picker && this.widgets.picker.options.currentValue)
+                	  {
+                          Dom.get(this.configDialog.id + "-nodeRef").value = 
+                              this.widgets.picker.options.currentValue;
+                	  }
                   },
                   scope: this
                },
@@ -194,139 +189,20 @@
                {
                   fn: function VideoWidget_doSetupForm_callback(form)
                   {
-                     Dom.get(this.configDialog.id + "-nodeRef").value = this.configDialog.options.nodeRef;
-                     Dom.get(this.configDialog.id + "-video").innerHTML = this.configDialog.options.nodeName;
+                     Dom.get(this.configDialog.id + "-nodeRef").value = this.options.nodeRef;
+                     Dom.get(this.configDialog.id + "-video").innerHTML = this.options.name;
                      
-                     var browseButton = Alfresco.util.createYUIButton(this.configDialog, "browse-button", function()
+                     // Set up file picker
+                     if (!this.widgets.picker)
                      {
-                        if (!this.browsePanel) 
-                        {
-                           this.hide();
-                           Alfresco.util.Ajax.request(
-                           {
-                              url: Alfresco.constants.URL_SERVICECONTEXT + "modules/video/browse-file",
-                              dataObj: 
-                              {
-                                 site: this.options.site
-                              },
-                              successCallback: 
-                              {
-                                 fn: function(response)
-                                 {
-                                    var containerDiv = document.createElement("div");
-                                    containerDiv.innerHTML = response.serverResponse.responseText;
-                                    var panelDiv = Dom.getFirstChild(containerDiv);
-                                    this.browsePanel = Alfresco.util.createYUIPanel(panelDiv);
-                                    var parentDialog = this;
-                                    var selectedDocName = "",
-                                       selectedNodeRef = Dom.get(parentDialog.id + "-nodeRef").value;
-                                    
-                                    var ok = Alfresco.util.createYUIButton(this.browsePanel, "ok", function()
-                                    {
-                                       parentDialog.options.nodeRef = selectedNodeRef;
-                                       parentDialog.options.nodeName = selectedDocName;
-                                       
-                                       parentDialog.browsePanel.hide();
-                                       parentDialog.show();
-                                    });
-                                    ok.set("disabled", true);
-                                    
-                                    Alfresco.util.createYUIButton(this.browsePanel, "cancel", function()
-                                    {
-                                       parentDialog.browsePanel.hide();
-                                       parentDialog.show();
-                                    });
-                                    
-                                    Alfresco.util.createTwister("twister");
-                                    var tree = new YAHOO.widget.TreeView("treeview");
-                                    tree.setDynamicLoad(function(node, fnLoadComplete)
-                                    {
-                                       var nodePath = node.data.path;
-                                       var uri = Alfresco.constants.PROXY_URI + "slingshot/doclib/doc-treenode/site/" + $combine(encodeURIComponent(parentDialog.options.site), encodeURIComponent("documentLibrary"), Alfresco.util.encodeURIPath(nodePath), "?mimetype=video/");
-                                       var callback = 
-                                       {
-                                          success: function(oResponse)
-                                          {
-                                             var results = YAHOO.lang.JSON.parse(oResponse.responseText), item, treeNode;
-                                             if (results.items) 
-                                             {
-                                                for (var i = 0, j = results.items.length; i < j; i++) 
-                                                {
-                                                   item = results.items[i];
-                                                   item.path = $combine(nodePath, item.name);
-                                                   treeNode = _buildTreeNode(item, node, false);
-                                                   if (!item.hasChildren || item.type == "cm:content") 
-                                                   {
-                                                      treeNode.isLeaf = true;
-                                                   }
-                                                   if (item.type == "cm:content")
-                                                   {
-                                                      treeNode.hasIcon = false;
-                                                      treeNode.enableHighlight = true;
-                                                      treeNode.labelStyle = "icon-gen";
-                                                   }
-                                                }
-                                             }
-                                             oResponse.argument.fnLoadComplete();
-                                          },
-                                          
-                                          failure: function(oResponse)
-                                          {
-                                             Alfresco.logger.error("", oResponse);
-                                          },
-                                          
-                                          argument: 
-                                          {
-                                             "node": node,
-                                             "fnLoadComplete": fnLoadComplete
-                                          },
-                                          
-                                          scope: this
-                                       };
-                                       
-                                       YAHOO.util.Connect.asyncRequest('GET', uri, callback);
-                                    });
-                                    
-                                    tree.subscribe("clickEvent", function(args)
-                                    {
-                                       if (args.node.data.nodeType == "cm:content")
-                                       {
-                                          selectedNodeRef = args.node.data.nodeRef;
-                                          selectedDocName = args.node.label;
-                                          args.node.highlight();
-                                          ok.set("disabled", false);
-                                       }
-                                    });
-                                    
-                                    tree.singleNodeHighlight = true;
-                                    
-                                    tree.subscribe("collapseComplete", function(node)
-                                    {
-                                       // Do nothing
-                                    });
-                                    
-                                    var tempNode = _buildTreeNode(
-                                    {
-                                       name: "documentLibrary",
-                                       path: "/",
-                                       nodeRef: ""
-                                    }, tree.getRoot(), false);
-                                    
-                                    tree.render();
-                                    this.browsePanel.show();
-                                 },
-                                 scope: this
-                              },
-                              failureMessage: "Could not load dialog template from '" + Alfresco.constants.URL_SERVICECONTEXT + "modules/video/browse-file" + "'.",
-                              scope: this,
-                              execScripts: true
-                           });
-                        }
-                        else 
-                        {
-                           this.hide();
-                           this.browsePanel.show();
-                        }
+                        this.widgets.picker = new Alfresco.module.DocumentPicker(this.configDialog.id + "-filePicker");
+                     }
+                     this.widgets.picker.setOptions(
+                     {
+                        currentValue: this.options.nodeRef,
+                        itemFamily: "node",
+                        multipleSelectMode: false,
+                        mandatory: true
                      });
                   },
                   scope: this
@@ -337,40 +213,41 @@
          {
             this.configDialog.setOptions(
             {
-               actionUrl: actionUrl,
-               nodeName: this.options.name,
-               nodeRef: this.options.nodeRef
+               actionUrl: actionUrl
             });
          }
          this.configDialog.show();
+      },
+ 
+      /**
+       * Files selected in document picker
+       * 
+       * @method onDocumentsSelected
+       * @param layer
+       *            {object} Event fired
+       * @param args
+       *            {array} Event parameters (depends on event type)
+       */
+      onDocumentsSelected: function VideoWidget_onDocumentsSelected(layer, args)
+      {
+          // Check the event is directed towards this instance
+          if ($hasEventInterest(this.widgets.picker, args))
+          {
+              var obj = args[1];
+              if (obj !== null)
+              {
+                  var items = this.widgets.picker.currentValueMeta;
+                  if (items && items.length == 1)
+                  {
+                      this.options.nodeRef = items[0].nodeRef;
+                      this.options.name = items[0].name;
+
+                      Dom.get(this.configDialog.id + "-nodeRef").value = this.options.nodeRef;
+                      Dom.get(this.configDialog.id + "-video").innerHTML = this.options.name;
+                  }
+              }
+          }
       }
    });
 
 })();
-
-/**
- * Alfresco Slingshot aliases
- */
-var $html = Alfresco.util.encodeHTML,
-   $combine = Alfresco.util.combinePaths;
-
-/**
- * Build a tree node using passed-in data
- *
- * @method _buildTreeNode
- * @param p_oData {object} Object literal containing required data for new node
- * @param p_oParent {object} Optional parent node
- * @param p_expanded {object} Optional expanded/collaped state flag
- * @return {YAHOO.widget.TextNode} The new tree node
-*/
-function _buildTreeNode(p_oData, p_oParent, p_expanded)
-{
-   return new YAHOO.widget.TextNode(
-   {
-      label: $html(p_oData.name),
-      path: p_oData.path,
-      nodeRef: p_oData.nodeRef,
-      nodeType: p_oData.type,
-      description: p_oData.description
-   }, p_oParent, p_expanded);
-}

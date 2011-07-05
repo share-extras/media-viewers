@@ -6,8 +6,11 @@
             <div class="yui-u first"><label for="${args.htmlid}-video">${msg("label.video")}:</label></div>
             <div class="yui-u" >
                <span id="${args.htmlid}-video" class="video-name"></span>
-               <input type="button" id="${args.htmlid}-browse-button" value="${msg("label.browse")}" />
+               <div id="${args.htmlid}-filePicker">
+                  <button type="button" name="-" id="${args.htmlid}-filePicker-showPicker-button">${msg("label.browse")}</button>
+               </div>
                <input type="hidden" name="nodeRef" id="${args.htmlid}-nodeRef" />
+               <input type="hidden" name="pathField" id="${args.htmlid}-pathField" />
             </div>
          </div>
          <div class="bdft">
