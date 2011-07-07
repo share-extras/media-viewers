@@ -5,22 +5,13 @@
       "site": "${page.url.templateArgs.site!""}", 
       "nodeRef": "<#if args.nodeRef?exists>${args.nodeRef}<#else></#if>", 
       "name": "<#if node??>${node.name}</#if>",
-      "title": "<#if node??>${node.title}</#if>"
+      "title": "<#if node??>${node.title}</#if>",
+      "icon": "<#if node??>${node.icon}</#if>",
+      "mimeType": "<#if node??>${node.mimeType}</#if>",
+      "previews": [<#if node??><#list node.previews as p>"${p}"<#if (p_has_next)>, </#if></#list></#if>],
+      "availablePreviews": [<#if node??><#list node.generatedPreviews as p>"${p.thumbnailName}"<#if (p_has_next)>, </#if></#list></#if>],
+      "size": "<#if node??>${node.size}</#if>"
    }).setMessages(${messages});
-   <#if node??>
-   new Alfresco.VideoPreview("${args.htmlid}-preview").setOptions(
-   {
-      nodeRef: "${args.nodeRef}",
-      name: "${node.name?js_string}",
-      icon: "${node.icon}",
-      mimeType: "${node.mimeType}",
-      previews: [<#list node.previews as p>"${p}"<#if (p_has_next)>, </#if></#list>],
-      availablePreviews: [<#list node.generatedPreviews as p>"${p.thumbnailName}"<#if (p_has_next)>, </#if></#list>],
-      size: "${node.size}"
-   }).setMessages(
-      ${messages}
-         );
-   </#if>
    new Alfresco.widget.DashletResizer("${args.htmlid}", "${instance.object.id}");
 //]]></script>
 <div class="dashlet video">

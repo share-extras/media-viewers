@@ -28,7 +28,7 @@
     */
    Alfresco.dashlet.VideoWidget = function(htmlId)
    {
-      Alfresco.dashlet.VideoWidget.superclass.constructor.call(this, "Alfresco.dashlet.VideoWidget", htmlId, ["button", "container", "datatable", "datasource", "treeview"]);
+      Alfresco.dashlet.VideoWidget.superclass.constructor.call(this, "Alfresco.dashlet.VideoWidget", htmlId, ["button", "container", "datatable", "datasource", "uploader"]);
       
       // Initialise prototype properties
       this.configDialog = null;
@@ -130,13 +130,13 @@
          {
             Dom.get(this.id + "-preview").style.display = "block";
             
-            // Unfortunately this seems to render the Flash movie below the shadow div
-            /*
+            // This used to render the Flash movie below the shadow div, but no longer does (on 3.4)
+            // TODO test on 3.3
             new Alfresco.VideoPreview(this.id + "-preview").setOptions(
             {
                nodeRef: this.options.nodeRef,
-               name: "",
-               icon: "",
+               name: this.options.name,
+               icon: "/components/images/generic-file-32.png",
                mimeType: this.options.mimeType,
                previews: this.options.previews,
                availablePreviews: this.options.availablePreviews,
@@ -144,7 +144,6 @@
             }).setMessages(
                   Alfresco.messages.scope[this.name]
              );
-            */
          }
          else
          {
