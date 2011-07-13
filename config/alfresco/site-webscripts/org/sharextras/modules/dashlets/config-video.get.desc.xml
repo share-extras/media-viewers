@@ -1,6 +1,6 @@
 <webscript>
   <shortname>config-video</shortname>
   <description>Configuration dialog for video site dashlet</description>
-  <url>/modules/video/config/{siteId}</url>
-  <url>/modules/video/config?htmlid={siteId}</url>
+  <url>/extras/modules/video/config/{siteId}</url>
+  <url>/extras/modules/video/config?htmlid={siteId}</url>
 </webscript>

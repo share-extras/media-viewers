@@ -273,7 +273,7 @@
          {
             this.configDialog = new Alfresco.module.SimpleDialog(this.id + "-configDialog").setOptions(
             {
-               templateUrl: Alfresco.constants.URL_SERVICECONTEXT + "modules/video/config", actionUrl: actionUrl,
+               templateUrl: Alfresco.constants.URL_SERVICECONTEXT + "extras/modules/video/config", actionUrl: actionUrl,
                site: this.options.site,
                onSuccess:
                {
