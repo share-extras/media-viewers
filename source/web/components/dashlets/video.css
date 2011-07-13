@@ -36,7 +36,8 @@
 	vertical-align: super;
 }
 
-div.video-preview, div.video-widget-msg
+/*div.video-preview, */
+div.video-widget-msg
 {
 	display: none;
 }
@@ -78,7 +79,9 @@ div.video-preview.shadow .bd .preview-swf
 
 div.video-preview.shadow .bd .preview-swf div
 {
-   padding-top: 10px;
+   padding-top: 8px;
+   padding-left: 8px;
+   padding-right: 8px;
 }
 
 div.video-preview.shadow .bd .preview-swf.has-content

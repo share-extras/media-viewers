@@ -108,6 +108,14 @@
       configDialog: null,
       
       /**
+       * Video previewer object
+       *
+       * @property videoPreview
+       * @type object
+       */
+      videoPreview: null,
+      
+      /**
        * Fired by YUI when parent element is available for scripting.
        * Component initialisation, including instantiation of YUI widgets and event listener binding.
        *
@@ -126,30 +134,126 @@
             Event.addListener(configVideoLink, "click", this.onConfigVideoClick, this, true);            
          }
          
-         if (this.options.nodeRef != null && this.options.nodeRef != "")
-         {
-            Dom.get(this.id + "-preview").style.display = "block";
-            
-            // This used to render the Flash movie below the shadow div, but no longer does (on 3.4)
-            // TODO test on 3.3
-            new Alfresco.VideoPreview(this.id + "-preview").setOptions(
-            {
-               nodeRef: this.options.nodeRef,
-               name: this.options.name,
-               icon: "/components/images/generic-file-32.png",
-               mimeType: this.options.mimeType,
-               previews: this.options.previews,
-               availablePreviews: this.options.availablePreviews,
-               size: this.options.size
-            }).setMessages(
-                  Alfresco.messages.scope[this.name]
-             );
-         }
-         else
-         {
-            Dom.get(this.id + "-msg").innerHTML = this.msg("message.noVideo");
-            Dom.get(this.id + "-msg").style.display = "block";
-         }
+         // Set up the title
+         this._setupTitle();
+         
+         // Set up the message area
+         this._setupMessage();
+         
+         // Set up the preview area with default parameters (i.e. do not load data)
+         this._setupPreview();
+      },
+      
+      /**
+       * Set up the dashlet title
+       *
+       * @method _setupTitle
+       */
+      _setupTitle: function VideoWidget__setupTitle()
+      {
+          if (this.options.nodeRef != "" && this.options.name != "")
+          {
+              Dom.get(this.id + "-title").innerHTML = "<a href=\"" + Alfresco.constants.URL_PAGECONTEXT + 
+                  "site/" + this.options.site + "/document-details?nodeRef=" + this.options.nodeRef + "\">" +
+                  this.options.name + "</a>";
+          }
+          else
+          {
+             Dom.get(this.id + "-title").innerHTML = this.msg("header.video");
+          }
+      },
+      
+      /**
+       * Set up the dashlet message area
+       *
+       * @method _setupMessage
+       */
+      _setupMessage: function VideoWidget__setupMessage()
+      {
+          if (this.options.nodeRef != null && this.options.nodeRef != "")
+          {
+              Dom.setStyle(this.id + "-msg", "display", "none");
+          }
+          else
+          {
+             Dom.get(this.id + "-msg").innerHTML = this.msg("message.noVideo");
+             Dom.setStyle(this.id + "-msg", "display", "block");
+          }
+      },
+      
+      /**
+       * Set up the dashlet preview area
+       *
+       * @method _setupPreview
+       * @param loadData {boolean} true if node metadata should be loaded using XHR, false otherwise.
+       * This allows the size and mimetype of new nodes to be determined. Default is false.
+       * @private
+       */
+      _setupPreview: function VideoWidget__setupPreview(loadData)
+      {
+          if (this.options.nodeRef != null && this.options.nodeRef != "")
+          {
+              Dom.setStyle(this.id + "-preview", "display", "block");
+          }
+          else
+          {
+             Dom.setStyle(this.id + "-preview", "display", "none");
+          }
+          
+          if (this.videoPreview == null)
+          {
+              // Set up the video previewer
+              // This used to render the Flash movie below the shadow div, but no longer does (on 3.4)
+              // TODO test on 3.3
+              this.videoPreview = new Alfresco.VideoPreview(this.id + "-preview").setOptions(
+              {
+                 nodeRef: this.options.nodeRef,
+                 name: this.options.name,
+                 icon: "/components/images/generic-file-32.png",
+                 mimeType: this.options.mimeType,
+                 size: this.options.size
+              }).setMessages(
+                    Alfresco.messages.scope[this.name]
+              );
+          }
+          
+          // Reload data via XHR if requested
+          if (typeof(loadData) != "undefined" && loadData === true)
+          {
+              Alfresco.util.Ajax.jsonGet(
+              {
+                 url: Alfresco.constants.PROXY_URI + "api/metadata?nodeRef=" + this.options.nodeRef,
+                 successCallback:
+                 {
+                     fn: function VP__loadDocumentDetails(p_response, p_obj)
+                     {
+                         // Get the document details
+                         var documentDetails = {},
+                             mcns = "{http://www.alfresco.org/model/content/1.0}",
+                             content = p_response.json.properties[mcns + "content"];
+                         documentDetails.fileName = p_response.json.properties[mcns + "name"];
+                         documentDetails.mimeType = p_response.json.mimetype;
+                         if (content)
+                         {
+                            var size = content.substring(content.indexOf("size=") + 5);
+                            size = size.substring(0, size.indexOf("|"));
+                            documentDetails.size = size;
+                         }
+                         else
+                         {
+                             documentDetails.size = "0";
+                         }
+                         // Notify the previewer via Bubbling
+                         YAHOO.Bubbling.fire("documentDetailsAvailable", {
+                             documentDetails: documentDetails
+                         });
+                     },
+                     scope: this
+                 },
+                 failureMessage: "Failed to load document details for " + this.options.nodeRef,
+                 noReloadOnAuthFailure: true
+              });
+          }
       },
 
       /**
@@ -169,18 +273,32 @@
          {
             this.configDialog = new Alfresco.module.SimpleDialog(this.id + "-configDialog").setOptions(
             {
-               width: "50em",
                templateUrl: Alfresco.constants.URL_SERVICECONTEXT + "modules/video/config", actionUrl: actionUrl,
                site: this.options.site,
                onSuccess:
                {
                   fn: function VideoWidget_onConfigFeed_callback(response)
                   {
-                      if (this.widgets.picker && this.widgets.picker.options.currentValue)
-                	  {
-                          Dom.get(this.configDialog.id + "-nodeRef").value = 
-                              this.widgets.picker.options.currentValue;
-                	  }
+                      // Update options from the submitted form fields
+                      this.options.nodeRef = Dom.get(this.configDialog.id + "-nodeRef").value;
+                      this.options.name = Dom.get(this.configDialog.id + "-video").innerHTML;
+                      
+                      if (this.videoPreview.options.nodeRef != this.options.nodeRef)
+                      {
+                          // Update the previewer's nodeRef
+                          this.videoPreview.options.nodeRef = this.options.nodeRef;
+                          
+                          // Update dashlet title and message area
+                          this._setupTitle();
+                          this._setupMessage();
+
+                          /*
+                           * Since we only have limited data on the node from the picker (e.g. mimetype
+                           * and size are missing), we need to retrieve this via XHR. We then notify the
+                           * previewer and it does the rest.
+                           */
+                          this._setupPreview(true);
+                      }
                   },
                   scope: this
                },
@@ -238,11 +356,12 @@
                   var items = this.widgets.picker.currentValueMeta;
                   if (items && items.length == 1)
                   {
-                      this.options.nodeRef = items[0].nodeRef;
-                      this.options.name = items[0].name;
-
-                      Dom.get(this.configDialog.id + "-nodeRef").value = this.options.nodeRef;
-                      Dom.get(this.configDialog.id + "-video").innerHTML = this.options.name;
+                      // Check value has changed, if so then update the form
+                      if (this.options.nodeRef != items[0].nodeRef)
+                      {
+                          Dom.get(this.configDialog.id + "-nodeRef").value = items[0].nodeRef;
+                          Dom.get(this.configDialog.id + "-video").innerHTML = items[0].name;
+                      }
                   }
               }
           }

@@ -1,23 +1,4 @@
 /**
- * Copyright (C) 2005-2010 Alfresco Software Limited.
- *
- * This file is part of Alfresco
- *
- * Alfresco is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Alfresco is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with Alfresco. If not, see <http://www.gnu.org/licenses/>.
- */
-
-/**
  * VideoPreview component. 
  *
  * @namespace Alfresco
@@ -100,24 +81,26 @@
           * @property mimeType
           * @type string
           */
-         mimeType: "",
-
-         /**
-          * A list of previews available for this component
-          *
-          * @property previews
-          * @type Array
-          */
-         previews: [],
-
-         /**
-          * A list of previews which have already been generated for this component
-          *
-          * @property generatedPreviews
-          * @type Array
-          */
-         availablePreviews: []
+         mimeType: ""
       },
+
+      /**
+       * A list of previews available for this component
+       *
+       * @property previews
+       * @type Array
+       * @default null
+       */
+      previews: null,
+
+      /**
+       * A list of previews which have already been generated for this component
+       *
+       * @property generatedPreviews
+       * @type Array
+       * @default null
+       */
+      availablePreviews: null,
 
       /**
        * Fired by YUILoaderHelper when required component script files have
@@ -155,10 +138,69 @@
        *
        * @method onReady
        */
-      onReady: function WP_onReady()
+      onReady: function VP_onReady()
       {
-         // Setup web preview
-         this._setupVideoPreview(false);
+          // Save a reference to the HTMLElement displaying texts so we can alter the texts later
+          this.widgets.swfPlayerMessage = Dom.get(this.id + "-swfPlayerMessage-div");
+          this.widgets.titleText = Dom.get(this.id + "-title-span");
+          this.widgets.titleImg = Dom.get(this.id + "-title-img");
+          
+          if (this.options.nodeRef != "")
+          {
+              this._load();
+          }
+      },
+      
+      /**
+       * Load video metadata
+       * 
+       * @method _load
+       * @private
+       */
+      _load: function VP__load()
+      {
+          // Load thumbnail definitions
+          Alfresco.util.Ajax.jsonGet(
+          {
+             url: Alfresco.constants.PROXY_URI + "api/node/" + this.options.nodeRef.replace(":/", "") + "/content/thumbnaildefinitions",
+             successCallback:
+             {
+                fn: function VP_onLoadThumbnailDefinitions(p_resp, p_obj)
+                {
+                    this.previews = p_resp.json;
+
+                    // Load available thumbnail definitions, i.e. which thumbnails have been generated already
+                    Alfresco.util.Ajax.jsonGet(
+                    {
+                       url: Alfresco.constants.PROXY_URI + "api/node/" + this.options.nodeRef.replace(":/", "") + "/content/thumbnails",
+                       successCallback:
+                       {
+                          fn: function VP_onLoadThumbnails(p_resp, p_obj)
+                          {
+                              var thumbnails = [];
+                              for (var i = 0; i < p_resp.json.length; i++)
+                              {
+                                  thumbnails.push(p_resp.json[i].thumbnailName);
+                              }
+                              this.availablePreviews = thumbnails;
+                              this._setupVideoPreview(false);
+                          },
+                          scope: this,
+                          obj:
+                          {
+                          }
+                       },
+                       failureMessage: "Could not load thumbnails list"
+                    });
+                },
+                scope: this,
+                obj:
+                {
+                }
+             },
+             failureMessage: "Could not load thumbnail definitions list"
+          });
+          
       },
 
       /**
@@ -200,7 +242,7 @@
          // Setup previewer
          if (refresh)
          {
-            this._setupVideoPreview();
+            this._load();
          }
       },
 
@@ -219,19 +261,22 @@
       },
 
       /**
-       * Will setup the
+       * Set up the Flash video preview
        *
        * @method _setupVideoPreview
        * @private
        */
       _setupVideoPreview: function WP__setupVideoPreview()
       {
-         // Save a reference to the HTMLElement displaying texts so we can alter the texts later
-         this.widgets.swfPlayerMessage = Dom.get(this.id + "-swfPlayerMessage-div");
-         this.widgets.titleText = Dom.get(this.id + "-title-span");
-         this.widgets.titleImg = Dom.get(this.id + "-title-img");
+         if (this.previews === null || this.availablePreviews === null)
+         {
+            return;
+         }
+         
+         // Set 'Preparing Previewer message'
+         this.widgets.swfPlayerMessage.innerHTML = this.msg("label.preparingPreviewer")
 
-         // Set title and icon         
+         // Set preview area title and icon         
          if (this.widgets.titleText)
          {
             this.widgets.titleText.innerHTML = this.options.name;
@@ -258,8 +303,8 @@
             var realSwfDivEl = new Element(document.createElement("div"));
             realSwfDivEl.set("id", this.id + "-real-swf-div");
             realSwfDivEl.setStyle("position", "absolute");
-            realSwfDivEl.addClass("web-preview");
-            realSwfDivEl.addClass("real");            
+            realSwfDivEl.addClass("video-preview");
+            realSwfDivEl.addClass("real");
             realSwfDivEl.appendTo(document.body);
             this.widgets.realSwfDivEl = realSwfDivEl;
          }
@@ -389,7 +434,7 @@
        */
       _getSupportedVideoMimeTypes: function WP__getSupportedVideoMimeTypes()
       {
-         var ps = this.options.previews, 
+         var ps = this.previews, 
             flvpreview = "flvpreview", h264preview = "h264preview", 
             flvmimetype = "video/x-flv", h264mimetype = "video/mp4",
             mimetype = this.options.mimeType,
@@ -415,8 +460,8 @@
        */
       _resolvePreview: function WP__resolvePreview(event)
       {
-         var ps = this.options.previews, videopreview,
-            psa = this.options.availablePreviews, 
+         var ps = this.previews, videopreview,
+            psa = this.availablePreviews, 
             flvpreview = "flvpreview", h264preview = "h264preview",
             imgpreview = "imgpreview", imgpreviewfull = "imgpreviewfull",
             nodeRefAsLink = this.options.nodeRef.replace(":/", ""),
@@ -478,7 +523,7 @@
        */
       _queueVideoThumbnailGeneration: function WP_queueVideoThumbnailGeneration ()
       {
-         var ps = this.options.previews, videopreview,
+         var ps = this.previews, videopreview,
          flvpreview = "flvpreview", h264preview = "h264preview";
          
          videopreview = Alfresco.util.arrayContains(ps, h264preview) ? h264preview : (Alfresco.util.arrayContains(ps, flvpreview) ? flvpreview : null);

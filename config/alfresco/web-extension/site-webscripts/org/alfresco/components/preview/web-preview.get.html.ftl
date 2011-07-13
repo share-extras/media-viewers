@@ -9,8 +9,6 @@ new Alfresco.VideoPreview("${args.htmlid}").setOptions(
    name: "${node.name?js_string}",
    icon: "${node.icon}",
    mimeType: "${node.mimeType}",
-   previews: [<#list node.previews as p>"${p}"<#if (p_has_next)>, </#if></#list>],
-   availablePreviews: [<#list node.generatedPreviews as p>"${p.thumbnailName}"<#if (p_has_next)>, </#if></#list>],
    size: "${node.size}"
 }).setMessages(
    ${messages}
@@ -24,9 +22,7 @@ new Alfresco.AudioPreview("${args.htmlid}").setOptions(
    nodeRef: "${node.nodeRef}",
    name: "${node.name?js_string}",
    icon: "${node.icon}",
-   mimeType: "${node.mimeType}",
-   previews: [<#list node.previews as p>"${p}"<#if (p_has_next)>, </#if></#list>],
-   availablePreviews: [<#list node.generatedPreviews as p>"${p.thumbnailName}"<#if (p_has_next)>, </#if></#list>],
+   mimeType: "${node.mimeType}"
    size: "${node.size}"
 }).setMessages(
    ${messages}
