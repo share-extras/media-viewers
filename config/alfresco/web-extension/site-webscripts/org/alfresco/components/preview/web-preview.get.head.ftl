@@ -7,8 +7,9 @@
 <@script type="text/javascript" src="${page.url.context}/res/extras/components/preview/video-preview.js"></@script>
 <@script type="text/javascript" src="${page.url.context}/res/extras/components/preview/audio-preview.js"></@script>
 <@script type="text/javascript" src="${page.url.context}/js/flash/extMouseWheel.js"></@script>
-<!-- ODF Web Preview -->
+<#-- ODF Web Preview
 <@script type="text/javascript" src="${page.url.context}/res/extras/components/preview/odf-preview.js"></@script>
 <@link rel="stylesheet" type="text/css" href="${page.url.context}/res/extras/components/preview/odf-preview.css" />
 <@script type="text/javascript" src="${page.url.context}/res/extras/modules/webodf/lib/runtime.js"></@script>
 <@link rel="stylesheet" type="text/css" href="${page.url.context}/res/extras/modules/webodf/webodf.css" />
+-->

@@ -28,6 +28,7 @@ new Alfresco.AudioPreview("${args.htmlid}").setOptions(
    ${messages}
       );
 //]]></script>
+<#--
 <#elseif node.mimeType == "application/vnd.oasis.opendocument.text">
 <#assign baseClass="odf-preview">
 <script type="text/javascript">//<![CDATA[
@@ -42,6 +43,7 @@ new Alfresco.WebODFPreview("${args.htmlid}").setOptions(
    ${messages}
       );
 //]]></script>
+-->
 <#else>
 <script type="text/javascript">//<![CDATA[
 new Alfresco.WebPreview("${args.htmlid}").setOptions(
