@@ -1,8 +1,27 @@
 /**
- * VideoPreview component. 
+ * Copyright (C) 2005-2010 Alfresco Software Limited.
+ *
+ * This file is part of Alfresco
+ *
+ * Alfresco is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Alfresco is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with Alfresco. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/**
+ * AudioPreview component. 
  *
  * @namespace Alfresco
- * @class Alfresco.VideoPreview
+ * @class Alfresco.AudioPreview
  */
 (function()
 {
@@ -14,16 +33,16 @@
       Element = YAHOO.util.Element;
 
    /**
-    * VideoPreview constructor.
+    * AudioPreview constructor.
     *
     * @param {string} htmlId The HTML id of the parent element
-    * @return {Alfresco.VideoPreview} The new VideoPreview instance
+    * @return {Alfresco.AudioPreview} The new AudioPreview instance
     * @constructor
     * @private
     */
-   Alfresco.VideoPreview = function(containerId)
+   Alfresco.AudioPreview = function(containerId)
    {
-      Alfresco.VideoPreview.superclass.constructor.call(this, "Alfresco.VideoPreview", containerId, ["button", "container", "datatable", "datasource", "uploader"]);
+      Alfresco.AudioPreview.superclass.constructor.call(this, "Alfresco.AudioPreview", containerId, ["button", "container", "datatable", "datasource", "uploader"]);
 
       /* Decoupled event listeners are added in setOptions */
       YAHOO.Bubbling.on("documentDetailsAvailable", this.onDocumentDetailsAvailable, this);
@@ -32,7 +51,7 @@
       return this;
    };
 
-   YAHOO.extend(Alfresco.VideoPreview, Alfresco.component.Base,
+   YAHOO.extend(Alfresco.AudioPreview, Alfresco.component.Base,
    {
       /**
        * Object container for initialization options
@@ -81,26 +100,24 @@
           * @property mimeType
           * @type string
           */
-         mimeType: ""
+         mimeType: "",
+
+         /**
+          * A list of previews available for this component
+          *
+          * @property previews
+          * @type Array
+          */
+         previews: [],
+
+         /**
+          * A list of previews which have already been generated for this component
+          *
+          * @property generatedPreviews
+          * @type Array
+          */
+         availablePreviews: []
       },
-
-      /**
-       * A list of previews available for this component
-       *
-       * @property previews
-       * @type Array
-       * @default null
-       */
-      previews: null,
-
-      /**
-       * A list of previews which have already been generated for this component
-       *
-       * @property generatedPreviews
-       * @type Array
-       * @default null
-       */
-      availablePreviews: null,
 
       /**
        * Fired by YUILoaderHelper when required component script files have
@@ -138,69 +155,10 @@
        *
        * @method onReady
        */
-      onReady: function VP_onReady()
+      onReady: function WP_onReady()
       {
-          // Save a reference to the HTMLElement displaying texts so we can alter the texts later
-          this.widgets.swfPlayerMessage = Dom.get(this.id + "-swfPlayerMessage-div");
-          this.widgets.titleText = Dom.get(this.id + "-title-span");
-          this.widgets.titleImg = Dom.get(this.id + "-title-img");
-          
-          if (this.options.nodeRef != "")
-          {
-              this._load();
-          }
-      },
-      
-      /**
-       * Load video metadata
-       * 
-       * @method _load
-       * @private
-       */
-      _load: function VP__load()
-      {
-          // Load thumbnail definitions
-          Alfresco.util.Ajax.jsonGet(
-          {
-             url: Alfresco.constants.PROXY_URI + "api/node/" + this.options.nodeRef.replace(":/", "") + "/content/thumbnaildefinitions",
-             successCallback:
-             {
-                fn: function VP_onLoadThumbnailDefinitions(p_resp, p_obj)
-                {
-                    this.previews = p_resp.json;
-
-                    // Load available thumbnail definitions, i.e. which thumbnails have been generated already
-                    Alfresco.util.Ajax.jsonGet(
-                    {
-                       url: Alfresco.constants.PROXY_URI + "api/node/" + this.options.nodeRef.replace(":/", "") + "/content/thumbnails",
-                       successCallback:
-                       {
-                          fn: function VP_onLoadThumbnails(p_resp, p_obj)
-                          {
-                              var thumbnails = [];
-                              for (var i = 0; i < p_resp.json.length; i++)
-                              {
-                                  thumbnails.push(p_resp.json[i].thumbnailName);
-                              }
-                              this.availablePreviews = thumbnails;
-                              this._setupVideoPreview(false);
-                          },
-                          scope: this,
-                          obj:
-                          {
-                          }
-                       },
-                       failureMessage: "Could not load thumbnails list"
-                    });
-                },
-                scope: this,
-                obj:
-                {
-                }
-             },
-             failureMessage: "Could not load thumbnail definitions list"
-          });
-          
+         // Setup web preview
+         this._setupAudioPreview(false);
       },
 
       /**
@@ -242,12 +200,12 @@
          // Setup previewer
          if (refresh)
          {
-            this._load();
+            this._setupAudioPreview();
          }
       },
 
       /**
-       * Because the VideoPreview content is absolutely positioned, components which alter DOM layout can fire
+       * Because the AudioPreview content is absolutely positioned, components which alter DOM layout can fire
        * this event to prompt a recalculation of the absolute coordinates.
        *
        * @method onRecalculatePreviewLayout
@@ -257,34 +215,28 @@
       onRecalculatePreviewLayout: function WP_onRecalculatePreviewLayout(p_layer, p_args)
       {
          // Only if not in maximize view
-         this._positionOver(this.widgets.realSwfDivEl, this.widgets.shadowSfwDivEl);
+         if (this.widgets.realSwfDivEl.getStyle("height") !== "100%")
+         {
+            this._positionOver(this.widgets.realSwfDivEl, this.widgets.shadowSfwDivEl);
+         }
       },
 
       /**
-       * Set up the Flash video preview
+       * Will setup the
        *
-       * @method _setupVideoPreview
+       * @method _setupAudioPreview
        * @private
        */
-      _setupVideoPreview: function WP__setupVideoPreview()
+      _setupAudioPreview: function WP__setupAudioPreview()
       {
-         if (this.previews === null || this.availablePreviews === null)
-         {
-            return;
-         }
-         
-         // Set 'Preparing Previewer message'
-         this.widgets.swfPlayerMessage.innerHTML = this.msg("label.preparingPreviewer")
+         // Save a reference to the HTMLElement displaying texts so we can alter the texts later
+         this.widgets.swfPlayerMessage = Dom.get(this.id + "-swfPlayerMessage-div");
+         this.widgets.titleText = Dom.get(this.id + "-title-span");
+         this.widgets.titleImg = Dom.get(this.id + "-title-img");
 
-         // Set preview area title and icon         
-         if (this.widgets.titleText)
-         {
-            this.widgets.titleText.innerHTML = this.options.name;
-         }
-         if (this.widgets.titleImg)
-         {
-            this.widgets.titleImg.src = Alfresco.constants.URL_CONTEXT + this.options.icon.substring(1);
-         }
+         // Set title and icon         
+         this.widgets.titleText.innerHTML = this.options.name;
+         this.widgets.titleImg.src = Alfresco.constants.URL_CONTEXT + this.options.icon.substring(1);
 
          // Parameter nodeRef is mandatory
          if (this.options.nodeRef === undefined)
@@ -303,8 +255,8 @@
             var realSwfDivEl = new Element(document.createElement("div"));
             realSwfDivEl.set("id", this.id + "-real-swf-div");
             realSwfDivEl.setStyle("position", "absolute");
-            realSwfDivEl.addClass("video-preview");
-            realSwfDivEl.addClass("real");
+            realSwfDivEl.addClass("web-preview");
+            realSwfDivEl.addClass("real");            
             realSwfDivEl.appendTo(document.body);
             this.widgets.realSwfDivEl = realSwfDivEl;
          }
@@ -317,38 +269,31 @@
             this.widgets.realSwfDivEl.addClass("no-content");
             this.widgets.swfPlayerMessage.innerHTML = this.msg("label.noContent");
          }
-         else if (Alfresco.util.hasRequiredFlashPlayer(6, 0, 0))
+         else if (Alfresco.util.hasRequiredFlashPlayer(9, 0, 45))
          {
             // Find the url to the preview
             var previewCtx = this._resolvePreview();
             if (previewCtx)
             {
-               if (previewCtx.videourl)
+               if (previewCtx.audiourl)
                {
                   // Make sure the web previewers real estate is big enough for displaying something
                   this.widgets.shadowSfwDivEl.addClass("has-content");
                   this.widgets.realSwfDivEl.removeClass("no-content");
-                  
-                  var region = Dom.getRegion(this.widgets.shadowSfwDivEl.get("id")),
-                     swfId = "VideoPreviewer_" + this.id,
-                     argsNoCache = (YAHOO.env.ua.ie > 0) ? "?noCacheToken=" + new Date().getTime() : "",
-                     so = new YAHOO.deconcept.SWFObject(Alfresco.constants.URL_CONTEXT + "res/components/preview/player_flv_maxi.swf" + argsNoCache,
-                        swfId, "100%", "100%", "6.0.0");
-                  
+   
+                  // Create flash web preview by using swfobject
+                  var swfId = "AudioPreviewer_" + this.id;
+                  var so = new YAHOO.deconcept.SWFObject(Alfresco.constants.URL_CONTEXT + "res/extras/components/preview/player_mp3_maxi.swf",
+                        swfId, "100%", "100%", "9.0.45");
                   so.addVariable("fileName", this.options.name);
-                  so.addVariable("flv", previewCtx.videourl);
-                  if (previewCtx.imageurl != null)
-                  {
-                     so.addVariable("startimage", previewCtx.imageurl);
-                  }
-                  so.addVariable("showfullscreen", 1);
-                  so.addVariable("showiconplay", 1);
-                  so.addVariable("showplayer", "always");
+                  so.addVariable("mp3", previewCtx.audiourl);
+                  so.addVariable("title", this.msg("preview.preparingAudio"));
                   so.addVariable("showvolume", 1);
-                  so.addVariable("showtime", 1);
-                  so.addVariable("playercolor", "e1e3e5");
-                  so.addVariable("margin", "0");
-                  so.addVariable("buttoncolor", "000000");
+                  so.addVariable("bgcolor1", "e1e3e5");
+                  so.addVariable("bgcolor2", "999999");
+                  so.addVariable("slidercolor1", "999999");
+                  so.addVariable("slidercolor2", "666666");
+                  so.addVariable("buttoncolor", "333333");
                   so.addVariable("buttonovercolor", "0088de");
                   so.addVariable("sliderovercolor", "0088de");
                   so.addParam("allowScriptAccess", "sameDomain");
@@ -392,15 +337,15 @@
                }
                else
                {
-                  // Video rendition is not yet ready, or could not be generated
+                  // Audio rendition is not yet ready, or could not be generated
                   // TODO Fire off a request to queue the rendition generation
-                  this._queueVideoThumbnailGeneration();
+                  this._queueAudioThumbnailGeneration();
                   
                   // Shrink the web previewers real estate and tell user that the node has nothing to display
                   this.widgets.shadowSfwDivEl.removeClass("has-content");
                   this.widgets.realSwfDivEl.addClass("no-content");
                   var url = Alfresco.constants.PROXY_URI + "api/node/content/" + this.options.nodeRef.replace(":/", "") + "/" + encodeURIComponent(this.options.name) + "?a=true";
-                  this.widgets.swfPlayerMessage.innerHTML = this.msg("label.noVideoAvailable", url);
+                  this.widgets.swfPlayerMessage.innerHTML = this.msg("label.noAudioAvailable", url);
                   //this.widgets.swfPlayerMessage.style.backgroundImage = "url('" + previewCtx.imageurl + "')";
                   //this.widgets.swfPlayerMessage.style.height = "200px";
                }
@@ -425,80 +370,49 @@
          // Place the real flash preview div on top of the shadow div
          this._positionOver(this.widgets.realSwfDivEl, this.widgets.shadowSfwDivEl);
       },
-      
-      /**
-       * Return mime types supported by the video previewer for this file
-       * 
-       * @method _getSupportedVideoMimeTypes
-       * @return Array containing the video MIME types supported by the Flash video player for this file, in order of preference
-       */
-      _getSupportedVideoMimeTypes: function WP__getSupportedVideoMimeTypes()
-      {
-         var ps = this.previews, 
-            flvpreview = "flvpreview", h264preview = "h264preview", 
-            flvmimetype = "video/x-flv", h264mimetype = "video/mp4",
-            mimetype = this.options.mimeType,
-            mimetypes = [];
-         
-         // Require Flash player 9.0.115 (9 beta 3) for h264 video
-         if ((Alfresco.util.arrayContains(ps, h264preview) || mimetype == h264mimetype) && Alfresco.util.hasRequiredFlashPlayer(9, 0, 115))
-         {
-            mimetypes.push(h264mimetype);
-         }
-         if ((Alfresco.util.arrayContains(ps, flvpreview) || mimetype == flvmimetype) && Alfresco.util.hasRequiredFlashPlayer(6, 0, 0))
-         {
-            mimetypes.push(flvmimetype);
-         }
-         return mimetypes;
-      },
 
       /**
-       * Helper method for deciding what previews to use to display the video content plus a still image from the video
+       * Helper method for deciding what preview to use, if any
        *
        * @method _resolvePreview
-       * @return An object with two properties - 'videourl' contains the video content URL to use, 'imageurl' contains the still image URL. Either or both properties may be null if no appropriate thumbnail definitions can be found
+       * @return the name of the preview to use or null if none is appropriate
        */
       _resolvePreview: function WP__resolvePreview(event)
       {
-         var ps = this.previews, videopreview,
-            psa = this.availablePreviews, 
+         var ps = this.options.previews, audiopreview,
+            psa = this.options.availablePreviews, 
             flvpreview = "flvpreview", h264preview = "h264preview",
-            imgpreview = "imgpreview", imgpreviewfull = "imgpreviewfull",
+            imgpreview = "imgpreviewfull",
             nodeRefAsLink = this.options.nodeRef.replace(":/", ""),
-            videourl, imageurl;
+            argsNoCache = "?c=force&noCacheToken=" + new Date().getTime(),
+            audiourl, imageurl;
 
-         // Static image to display before the user clicks 'play'
-         imageurl = Alfresco.util.arrayContains(ps, imgpreviewfull) ? 
-               this._getContentURL(nodeRefAsLink, imgpreviewfull) : 
-               (Alfresco.util.arrayContains(ps, imgpreview) ? this._getContentURL(nodeRefAsLink, imgpreview) : null);
+         imageurl = Alfresco.constants.PROXY_URI + "api/node/" + nodeRefAsLink + "/content/thumbnails/" + imgpreview + argsNoCache;
          
-         var supportedtypes = this._getSupportedVideoMimeTypes();
-         
-         // Permissively allow the content item itself to be returned if supported - strict compliance would imply we always return the preferred thumbnail format
-         if (Alfresco.util.arrayContains(supportedtypes, this.options.mimeType))
+         if (this.options.mimeType.match(/^audio\/x-mpeg$/))         
          {
             /* The content matches an image mimetype that the player can handle without a preview */
-            videourl = this._getContentURL(nodeRefAsLink, null);
+            audiourl = Alfresco.constants.PROXY_URI + "api/node/" + nodeRefAsLink + "/content" + argsNoCache;
             return (
             {
-               videourl: videourl,
+               audiourl: audiourl,
                imageurl: imageurl
             });
          }
          else
-         {
-            // Always use the preferred thumbnail format, even if less-preferred formats are available and have been generated already
-            videopreview = supportedtypes.length > 0 ? (supportedtypes[0] == "video/mp4" ? h264preview : (supportedtypes[0] == "video/x-flv" ? flvpreview : null)) : null;
-            
-            if (videopreview !== null) // Can the content can be previewed?
             {
-               if (Alfresco.util.arrayContains(psa, videopreview)) // Is a video preview available (i.e already generated)?
+            audiopreview = Alfresco.util.arrayContains(ps, h264preview) ? h264preview : (Alfresco.util.arrayContains(ps, flvpreview) ? flvpreview : null);
+            audiopreviewavail = Alfresco.util.arrayContains(psa, h264preview) ? h264preview : (Alfresco.util.arrayContains(psa, flvpreview) ? flvpreview : null);
+   
+            if (audiopreview !== null) // Can the content can be previewed?
+            {
+               if (audiopreviewavail !== null) // Is a audiourl preview available (i.e already generated)?
                {
-                  videourl = this._getContentURL(nodeRefAsLink, videopreview);
+                  audiourl = Alfresco.constants.PROXY_URI + "api/node/" + nodeRefAsLink + "/content/thumbnails/" + audiopreviewavail + argsNoCache;
                }
                return (
                {
-                  videourl: videourl,
+                  audiourl: audiourl,
                   imageurl: imageurl
                });
             }
@@ -509,31 +423,25 @@
          }
       },
       
-      _getContentURL: function WP_getContentURL(nodeRef, thumbnailName)
-      {
-         var argsNoCache = "?c=force&noCacheToken=" + new Date().getTime();
-         return Alfresco.constants.PROXY_URI + "api/node/" + nodeRef.replace("://", "/") + "/content" + (thumbnailName != null ? "/thumbnails/" + thumbnailName : "") + argsNoCache;
-      },
-      
       /**
-       * Fire off a request to the repository to queue the creation of video renditions
+       * Fire off a request to the repository to queue the creation of audio renditions
        * 
-       * @method _queueVideoThumbnailGeneration
+       * @method _queueAudioThumbnailGeneration
        * @return
        */
-      _queueVideoThumbnailGeneration: function WP_queueVideoThumbnailGeneration ()
+      _queueAudioThumbnailGeneration: function WP_queueAudioThumbnailGeneration ()
       {
-         var ps = this.previews, videopreview,
-         flvpreview = "flvpreview", h264preview = "h264preview";
+         var ps = this.options.previews, audiopreview,
+         mp3preview = "mp3preview";
          
-         videopreview = Alfresco.util.arrayContains(ps, h264preview) ? h264preview : (Alfresco.util.arrayContains(ps, flvpreview) ? flvpreview : null);
+         audiopreview = Alfresco.util.arrayContains(ps, mp3preview) ? mp3preview : null;
          
-         if (videopreview !== null)
+         if (audiopreview !== null)
          {
             var actionUrl = YAHOO.lang.substitute(Alfresco.constants.PROXY_URI + "api/node/{nodeRef}/content/thumbnails/{thumbnailname}?c=queue",
             {
                nodeRef: this.options.nodeRef.replace(":/", ""),
-               thumbnailname: videopreview
+               thumbnailname: audiopreview
             });
             
             Alfresco.util.Ajax.request(
@@ -542,7 +450,7 @@
                url: actionUrl,
                successCallback:
                {
-                  fn: function WP_onQueueVideoThumbnailSuccess(event, obj)
+                  fn: function WP_onQueueAudioThumbnailSuccess(event, obj)
                   { // Do nothing
                   },
                   scope: this,
@@ -552,7 +460,7 @@
                },
                failureCallback:
                {
-                  fn: function WP_onQueueVideoThumbnailFailure(event, obj)
+                  fn: function WP_onQueueAudioThumbnailFailure(event, obj)
                   { // Do nothing
                   },
                   scope: this,
