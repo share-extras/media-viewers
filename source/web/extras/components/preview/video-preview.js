@@ -144,7 +144,8 @@
           this.widgets.swfPlayerMessage = Dom.get(this.id + "-swfPlayerMessage-div");
           this.widgets.titleText = Dom.get(this.id + "-title-span");
           this.widgets.titleImg = Dom.get(this.id + "-title-img");
-          
+
+          // Support lazy loading of the previewer, so we can pass in a nodeRef later to have the player refreshed
           if (this.options.nodeRef != "")
           {
               this._load();
@@ -268,11 +269,6 @@
        */
       _setupVideoPreview: function VP__setupVideoPreview()
       {
-         if (this.previews === null || this.availablePreviews === null)
-         {
-            return;
-         }
-         
          // Set 'Preparing Previewer message'
          this.widgets.swfPlayerMessage.innerHTML = this.msg("label.preparingPreviewer");
 
