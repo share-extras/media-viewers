@@ -1,23 +1,4 @@
 /**
- * Copyright (C) 2005-2010 Alfresco Software Limited.
- *
- * This file is part of Alfresco
- *
- * Alfresco is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Alfresco is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with Alfresco. If not, see <http://www.gnu.org/licenses/>.
- */
-
-/**
  * AudioPreview component. 
  *
  * @namespace Alfresco
@@ -100,24 +81,24 @@
           * @property mimeType
           * @type string
           */
-         mimeType: "",
-
-         /**
-          * A list of previews available for this component
-          *
-          * @property previews
-          * @type Array
-          */
-         previews: [],
-
-         /**
-          * A list of previews which have already been generated for this component
-          *
-          * @property generatedPreviews
-          * @type Array
-          */
-         availablePreviews: []
+         mimeType: ""
       },
+
+      /**
+       * A list of previews available for this component
+       *
+       * @property previews
+       * @type Array
+       */
+      previews: [],
+
+      /**
+       * A list of previews which have already been generated for this component
+       *
+       * @property generatedPreviews
+       * @type Array
+       */
+      availablePreviews: [],
 
       /**
        * Fired by YUILoaderHelper when required component script files have
@@ -125,7 +106,7 @@
        *
        * @method onComponentsLoaded
        */
-      onComponentsLoaded: function WP_onComponentsLoaded()
+      onComponentsLoaded: function AP_onComponentsLoaded()
       {
          /**
           * SWFObject patch
@@ -155,10 +136,70 @@
        *
        * @method onReady
        */
-      onReady: function WP_onReady()
+      onReady: function AP_onReady()
       {
-         // Setup web preview
-         this._setupAudioPreview(false);
+          // Save a reference to the HTMLElement displaying texts so we can alter the texts later
+          this.widgets.swfPlayerMessage = Dom.get(this.id + "-swfPlayerMessage-div");
+          this.widgets.titleText = Dom.get(this.id + "-title-span");
+          this.widgets.titleImg = Dom.get(this.id + "-title-img");
+
+          // Support lazy loading of the previewer, so we can pass in a nodeRef later to have the player refreshed
+          if (this.options.nodeRef != "")
+          {
+              this._load();
+          }
+      },
+      
+      /**
+       * Load thumbnail information from the repository, then set up the audio previewer
+       * 
+       * @method _load
+       * @private
+       */
+      _load: function AP__load()
+      {
+          // Load thumbnail definitions
+          Alfresco.util.Ajax.jsonGet(
+          {
+             url: Alfresco.constants.PROXY_URI + "api/node/" + this.options.nodeRef.replace(":/", "") + "/content/thumbnaildefinitions",
+             successCallback:
+             {
+                fn: function AP_onLoadThumbnailDefinitions(p_resp, p_obj)
+                {
+                    this.previews = p_resp.json;
+
+                    // Load available thumbnail definitions, i.e. which thumbnails have been generated already
+                    Alfresco.util.Ajax.jsonGet(
+                    {
+                       url: Alfresco.constants.PROXY_URI + "api/node/" + this.options.nodeRef.replace(":/", "") + "/content/thumbnails",
+                       successCallback:
+                       {
+                          fn: function AP_onLoadThumbnails(p_resp, p_obj)
+                          {
+                              var thumbnails = [];
+                              for (var i = 0; i < p_resp.json.length; i++)
+                              {
+                                  thumbnails.push(p_resp.json[i].thumbnailName);
+                              }
+                              this.availablePreviews = thumbnails;
+                              this._setupAudioPreview();
+                          },
+                          scope: this,
+                          obj:
+                          {
+                          }
+                       },
+                       failureMessage: "Could not load thumbnails list"
+                    });
+                },
+                scope: this,
+                obj:
+                {
+                }
+             },
+             failureMessage: "Could not load thumbnail definitions list"
+          });
+          
       },
 
       /**
@@ -170,7 +211,7 @@
        * @param p_layer The type of the event
        * @param p_args Event information
        */
-      onDocumentDetailsAvailable: function WP_onDocumentDetailsAvailable(p_layer, p_args)
+      onDocumentDetailsAvailable: function AP_onDocumentDetailsAvailable(p_layer, p_args)
       {
          // Get the new info about the node and decide if the previewer must be refreshed
          var documentDetails = p_args[1].documentDetails,
@@ -200,7 +241,7 @@
          // Setup previewer
          if (refresh)
          {
-            this._setupAudioPreview();
+             this._load();
          }
       },
 
@@ -212,7 +253,7 @@
        * @param p_layer The type of the event
        * @param p_args Event information
        */
-      onRecalculatePreviewLayout: function WP_onRecalculatePreviewLayout(p_layer, p_args)
+      onRecalculatePreviewLayout: function AP_onRecalculatePreviewLayout(p_layer, p_args)
       {
          // Only if not in maximize view
          if (this.widgets.realSwfDivEl.getStyle("height") !== "100%")
@@ -222,18 +263,13 @@
       },
 
       /**
-       * Will setup the
+       * Set up the Flash audio player
        *
        * @method _setupAudioPreview
        * @private
        */
-      _setupAudioPreview: function WP__setupAudioPreview()
+      _setupAudioPreview: function AP__setupAudioPreview()
       {
-         // Save a reference to the HTMLElement displaying texts so we can alter the texts later
-         this.widgets.swfPlayerMessage = Dom.get(this.id + "-swfPlayerMessage-div");
-         this.widgets.titleText = Dom.get(this.id + "-title-span");
-         this.widgets.titleImg = Dom.get(this.id + "-title-img");
-
          // Set title and icon         
          this.widgets.titleText.innerHTML = this.options.name;
          this.widgets.titleImg.src = Alfresco.constants.URL_CONTEXT + this.options.icon.substring(1);
@@ -377,10 +413,10 @@
        * @method _resolvePreview
        * @return the name of the preview to use or null if none is appropriate
        */
-      _resolvePreview: function WP__resolvePreview(event)
+      _resolvePreview: function AP__resolvePreview(event)
       {
-         var ps = this.options.previews, audiopreview,
-            psa = this.options.availablePreviews, 
+         var ps = this.previews, audiopreview,
+            psa = this.availablePreviews, 
             flvpreview = "flvpreview", h264preview = "h264preview",
             imgpreview = "imgpreviewfull",
             nodeRefAsLink = this.options.nodeRef.replace(":/", ""),
@@ -429,9 +465,9 @@
        * @method _queueAudioThumbnailGeneration
        * @return
        */
-      _queueAudioThumbnailGeneration: function WP_queueAudioThumbnailGeneration ()
+      _queueAudioThumbnailGeneration: function AP_queueAudioThumbnailGeneration ()
       {
-         var ps = this.options.previews, audiopreview,
+         var ps = this.previews, audiopreview,
          mp3preview = "mp3preview";
          
          audiopreview = Alfresco.util.arrayContains(ps, mp3preview) ? mp3preview : null;
@@ -450,7 +486,7 @@
                url: actionUrl,
                successCallback:
                {
-                  fn: function WP_onQueueAudioThumbnailSuccess(event, obj)
+                  fn: function AP_onQueueAudioThumbnailSuccess(event, obj)
                   { // Do nothing
                   },
                   scope: this,
@@ -460,7 +496,7 @@
                },
                failureCallback:
                {
-                  fn: function WP_onQueueAudioThumbnailFailure(event, obj)
+                  fn: function AP_onQueueAudioThumbnailFailure(event, obj)
                   { // Do nothing
                   },
                   scope: this,
@@ -478,7 +514,7 @@
        * @method _positionOver
        * @param event
        */
-      _positionOver: function WP__positionOver(positionedYuiEl, sourceYuiEl)
+      _positionOver: function AP__positionOver(positionedYuiEl, sourceYuiEl)
       {
          var region = Dom.getRegion(sourceYuiEl.get("id"));
          positionedYuiEl.setStyle("left", region.left + "px");

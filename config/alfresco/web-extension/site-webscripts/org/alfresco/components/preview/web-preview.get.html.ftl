@@ -22,7 +22,7 @@ new Alfresco.AudioPreview("${args.htmlid}").setOptions(
    nodeRef: "${node.nodeRef}",
    name: "${node.name?js_string}",
    icon: "${node.icon}",
-   mimeType: "${node.mimeType}"
+   mimeType: "${node.mimeType}",
    size: "${node.size}"
 }).setMessages(
    ${messages}
