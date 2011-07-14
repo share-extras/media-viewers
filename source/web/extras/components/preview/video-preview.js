@@ -108,7 +108,7 @@
        *
        * @method onComponentsLoaded
        */
-      onComponentsLoaded: function WP_onComponentsLoaded()
+      onComponentsLoaded: function VP_onComponentsLoaded()
       {
          /**
           * SWFObject patch
@@ -152,7 +152,7 @@
       },
       
       /**
-       * Load video metadata
+       * Load video thumbnail information from the repository, then set up the video previewer
        * 
        * @method _load
        * @private
@@ -183,7 +183,7 @@
                                   thumbnails.push(p_resp.json[i].thumbnailName);
                               }
                               this.availablePreviews = thumbnails;
-                              this._setupVideoPreview(false);
+                              this._setupVideoPreview();
                           },
                           scope: this,
                           obj:
@@ -212,7 +212,7 @@
        * @param p_layer The type of the event
        * @param p_args Event information
        */
-      onDocumentDetailsAvailable: function WP_onDocumentDetailsAvailable(p_layer, p_args)
+      onDocumentDetailsAvailable: function VP_onDocumentDetailsAvailable(p_layer, p_args)
       {
          // Get the new info about the node and decide if the previewer must be refreshed
          var documentDetails = p_args[1].documentDetails,
@@ -254,7 +254,7 @@
        * @param p_layer The type of the event
        * @param p_args Event information
        */
-      onRecalculatePreviewLayout: function WP_onRecalculatePreviewLayout(p_layer, p_args)
+      onRecalculatePreviewLayout: function VP_onRecalculatePreviewLayout(p_layer, p_args)
       {
          // Only if not in maximize view
          this._positionOver(this.widgets.realSwfDivEl, this.widgets.shadowSfwDivEl);
@@ -266,7 +266,7 @@
        * @method _setupVideoPreview
        * @private
        */
-      _setupVideoPreview: function WP__setupVideoPreview()
+      _setupVideoPreview: function VP__setupVideoPreview()
       {
          if (this.previews === null || this.availablePreviews === null)
          {
@@ -274,7 +274,7 @@
          }
          
          // Set 'Preparing Previewer message'
-         this.widgets.swfPlayerMessage.innerHTML = this.msg("label.preparingPreviewer")
+         this.widgets.swfPlayerMessage.innerHTML = this.msg("label.preparingPreviewer");
 
          // Set preview area title and icon         
          if (this.widgets.titleText)
@@ -432,7 +432,7 @@
        * @method _getSupportedVideoMimeTypes
        * @return Array containing the video MIME types supported by the Flash video player for this file, in order of preference
        */
-      _getSupportedVideoMimeTypes: function WP__getSupportedVideoMimeTypes()
+      _getSupportedVideoMimeTypes: function VP__getSupportedVideoMimeTypes()
       {
          var ps = this.previews, 
             flvpreview = "flvpreview", h264preview = "h264preview", 
@@ -458,7 +458,7 @@
        * @method _resolvePreview
        * @return An object with two properties - 'videourl' contains the video content URL to use, 'imageurl' contains the still image URL. Either or both properties may be null if no appropriate thumbnail definitions can be found
        */
-      _resolvePreview: function WP__resolvePreview(event)
+      _resolvePreview: function VP__resolvePreview(event)
       {
          var ps = this.previews, videopreview,
             psa = this.availablePreviews, 
@@ -509,7 +509,7 @@
          }
       },
       
-      _getContentURL: function WP_getContentURL(nodeRef, thumbnailName)
+      _getContentURL: function VP_getContentURL(nodeRef, thumbnailName)
       {
          var argsNoCache = "?c=force&noCacheToken=" + new Date().getTime();
          return Alfresco.constants.PROXY_URI + "api/node/" + nodeRef.replace("://", "/") + "/content" + (thumbnailName != null ? "/thumbnails/" + thumbnailName : "") + argsNoCache;
@@ -521,7 +521,7 @@
        * @method _queueVideoThumbnailGeneration
        * @return
        */
-      _queueVideoThumbnailGeneration: function WP_queueVideoThumbnailGeneration ()
+      _queueVideoThumbnailGeneration: function VP_queueVideoThumbnailGeneration ()
       {
          var ps = this.previews, videopreview,
          flvpreview = "flvpreview", h264preview = "h264preview";
@@ -542,7 +542,7 @@
                url: actionUrl,
                successCallback:
                {
-                  fn: function WP_onQueueVideoThumbnailSuccess(event, obj)
+                  fn: function VP_onQueueVideoThumbnailSuccess(event, obj)
                   { // Do nothing
                   },
                   scope: this,
@@ -552,7 +552,7 @@
                },
                failureCallback:
                {
-                  fn: function WP_onQueueVideoThumbnailFailure(event, obj)
+                  fn: function VP_onQueueVideoThumbnailFailure(event, obj)
                   { // Do nothing
                   },
                   scope: this,
@@ -570,7 +570,7 @@
        * @method _positionOver
        * @param event
        */
-      _positionOver: function WP__positionOver(positionedYuiEl, sourceYuiEl)
+      _positionOver: function VP__positionOver(positionedYuiEl, sourceYuiEl)
       {
          var region = Dom.getRegion(sourceYuiEl.get("id"));
          positionedYuiEl.setStyle("left", region.left + "px");

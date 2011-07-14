@@ -90,6 +90,24 @@
          title: "",
 
          /**
+          * The mimetype of the configured content item
+          *
+          * @property mimeType
+          * @type string
+          * @default ""
+          */
+         mimeType: "",
+
+         /**
+          * The size in bytes of the configured content item
+          *
+          * @property size
+          * @type string
+          * @default ""
+          */
+         size: "",
+
+         /**
           * The siteId of the current site
           *
           * @property site
@@ -116,6 +134,30 @@
       videoPreview: null,
       
       /**
+       * Dashlet title Dom element
+       *
+       * @property titleEl
+       * @type HTMLElement
+       */
+      titleEl: null,
+      
+      /**
+       * Dashlet message area Dom element
+       *
+       * @property messageEl
+       * @type HTMLElement
+       */
+      messageEl: null,
+      
+      /**
+       * Dashlet preview area Dom element
+       *
+       * @property previewEl
+       * @type HTMLElement
+       */
+      previewEl: null,
+      
+      /**
        * Fired by YUI when parent element is available for scripting.
        * Component initialisation, including instantiation of YUI widgets and event listener binding.
        *
@@ -123,15 +165,16 @@
        */
       onReady: function VideoWidget_onReady()
       {
-         // Cache widget refs
-         this.widgets.pathField = Dom.get(parent.id + "-pathField"); 
-         this.widgets.nodeField = Dom.get(parent.id + "-nodeRef");
+         // Cache frequently used Dom elements
+         this.titleEl = Dom.get(this.id + "-title");
+         this.messageEl = Dom.get(this.id + "-msg");
+         this.previewEl = Dom.get(this.id + "-preview");
          
          // Add click handler to config feed link that will be visible if user is site manager.
-         var configVideoLink = Dom.get(this.id + "-configVideo-link");
-         if (configVideoLink)
+         var configLink = Dom.get(this.id + "-configVideo-link");
+         if (configLink)
          {
-            Event.addListener(configVideoLink, "click", this.onConfigVideoClick, this, true);            
+            Event.addListener(configLink, "click", this.onConfigVideoClick, this, true);            
          }
          
          // Set up the title
@@ -153,13 +196,13 @@
       {
           if (this.options.nodeRef != "" && this.options.name != "")
           {
-              Dom.get(this.id + "-title").innerHTML = "<a href=\"" + Alfresco.constants.URL_PAGECONTEXT + 
+              this.titleEl.innerHTML = "<a href=\"" + Alfresco.constants.URL_PAGECONTEXT + 
                   "site/" + this.options.site + "/document-details?nodeRef=" + this.options.nodeRef + "\">" +
                   this.options.name + "</a>";
           }
           else
           {
-             Dom.get(this.id + "-title").innerHTML = this.msg("header.video");
+              this.titleEl.innerHTML = this.msg("header.video");
           }
       },
       
@@ -172,12 +215,12 @@
       {
           if (this.options.nodeRef != null && this.options.nodeRef != "")
           {
-              Dom.setStyle(this.id + "-msg", "display", "none");
+              Dom.setStyle(this.messageEl, "display", "none");
           }
           else
           {
-             Dom.get(this.id + "-msg").innerHTML = this.msg("message.noVideo");
-             Dom.setStyle(this.id + "-msg", "display", "block");
+             this.messageEl.innerHTML = this.msg("message.noVideo");
+             Dom.setStyle(this.messageEl, "display", "block");
           }
       },
       
@@ -193,18 +236,16 @@
       {
           if (this.options.nodeRef != null && this.options.nodeRef != "")
           {
-              Dom.setStyle(this.id + "-preview", "display", "block");
+              Dom.setStyle(this.previewEl, "display", "block");
           }
           else
           {
-             Dom.setStyle(this.id + "-preview", "display", "none");
+             Dom.setStyle(this.previewEl, "display", "none");
           }
           
           if (this.videoPreview == null)
           {
               // Set up the video previewer
-              // This used to render the Flash movie below the shadow div, but no longer does (on 3.4)
-              // TODO test on 3.3
               this.videoPreview = new Alfresco.VideoPreview(this.id + "-preview").setOptions(
               {
                  nodeRef: this.options.nodeRef,
@@ -232,7 +273,7 @@
                              mcns = "{http://www.alfresco.org/model/content/1.0}",
                              content = p_response.json.properties[mcns + "content"];
                          documentDetails.fileName = p_response.json.properties[mcns + "name"];
-                         documentDetails.mimeType = p_response.json.mimetype;
+                         documentDetails.mimetype = p_response.json.mimetype;
                          if (content)
                          {
                             var size = content.substring(content.indexOf("size=") + 5);
@@ -255,6 +296,11 @@
               });
           }
       },
+
+      /**
+       * YUI WIDGET EVENT HANDLERS
+       * Handlers for standard events fired from YUI widgets, e.g. "click"
+       */
 
       /**
        * Called when the user clicks the configure video link.
