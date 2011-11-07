@@ -5,7 +5,7 @@
                             ***********************************
     
     Author: Will Abson
-    Version: 1.3
+    Version: 1.5.1
     
     Provides a set of targets for building extensions to Alfresco Share in ZIP, AMP and JAR archive 
     formats. Since Alfresco 3.3, JAR is the recommended package structure for all simple extensions.
@@ -58,8 +58,11 @@
     <property name="webapp.manager.url" value="${tomcat.url}/manager" />
     <property name="webapp.manager.username" value="admin" />
     <property name="webapp.manager.password" value="" />
+    <!-- Paths to local Tomcat instances -->
+    <property name="tomcat.repo.home" value="${tomcat.home}" />
+    <property name="tomcat.share.home" value="${tomcat.home}" />
    
-   <!-- Additional property values. Generally should not be overridden -->
+    <!-- Additional property values. Generally should not be overridden -->
     <property name="config.dir" value="${basedir}/config" />
     <property name="res.dir" value="${basedir}/source/web" />
     <property name="build.dir" value="${basedir}/build" />
@@ -149,6 +152,7 @@
                 <!-- Surf config -->
                 <exclude name="alfresco/share*-config.xml" />
                 <exclude name="alfresco/web-extension/share-config-custom.xml" />
+                <exclude name="share-config-custom.xml" />
                 <!-- Global excludes -->
                 <exclude name="${config.excludes}" />
             </fileset>
@@ -165,6 +169,11 @@
                 <filename name="alfresco/web-extension/share-config-custom.xml" />
             </fileset>
             <globmapper from="alfresco/web-extension/*.xml" to="*.xml" handledirsep="true" />
+        </copy>
+        <copy todir="${build.jar.dir}/META-INF" includeEmptyDirs="false">
+            <fileset dir="${config.dir}">
+                <filename name="share-config-custom.xml" />
+            </fileset>
         </copy>
         <!-- Minify JS -->
         <yuicompress fromdir="${res.dir}" todir="${build.jar.dir}/META-INF" excludes="**/*-min.js" warn="${yuicompress.warn}">
@@ -286,38 +295,60 @@
         </zip>
     </target>
     
+    <!-- Shared path definition used to copy files into the local Tomcat instance(s) -->
+    <patternset id="hotcopy-tomcat-zip-patternset">
+        <!-- Spring config -->
+        <exclude name="**/classes/web-application-config.xml" />
+        <exclude name="**/classes/surf-config.xml" />
+        <exclude name="**/classes/alfresco/slingshot-application-context.xml" />
+        <exclude name="**/classes/alfresco/web-extension/custom-slingshot-application-context.xml" />
+        <!-- Surf config -->
+        <exclude name="**/classes/alfresco/share*-config.xml" />
+        <exclude name="**/classes/alfresco/web-extension/share-config-custom.xml" />
+    </patternset>
+
     <!--
         Hot copy individual files into a local Tomcat instance.
         
         In version 3.3 and above the JAR file mechanism is recommended for distributing your 
         customisations, but this target can still be used during development as it allows you to
-        reload changes .
-    -->
+        reload changes without restarting Tomcat.
+    -->  
     <target name="hotcopy-tomcat-zip" depends="build-zip-tomcat" description="Hot copy individual files into a local Tomcat instance">
-        <copy todir="${tomcat.home}" includeEmptyDirs="false">
+        <echo message="Copying repository files" />
+        <copy todir="${tomcat.repo.home}" includeEmptyDirs="false">
             <fileset dir="${build.zip.dir}">
-                <!-- Spring config -->
-                <exclude name="**/classes/web-application-config.xml" />
-                <exclude name="**/classes/surf-config.xml" />
-                <exclude name="**/classes/alfresco/slingshot-application-context.xml" />
-                <exclude name="**/classes/alfresco/web-extension/custom-slingshot-application-context.xml" />
-                <!-- Surf config -->
-                <exclude name="**/classes/alfresco/share*-config.xml" />
-                <exclude name="**/classes/alfresco/web-extension/share-config-custom.xml" />
+                <patternset refid="hotcopy-tomcat-zip-patternset" />
+                <!-- Exclude static resources -->
+                <exclude name="${build.res.dir}/**" />
+                <!-- Exclude web-tier config -->
+                <exclude name="**/classes/alfresco/site-webscripts/**" />
+                <exclude name="**/classes/alfresco/site-data/**" />
+                <exclude name="**/classes/alfresco/web-extension/**" />
+                <exclude name="**/classes/org/springframework/extensions/surf/**" />
             </fileset>
         </copy>
+        <echo message="Copying Share files" />
+        <copy todir="${tomcat.share.home}" includeEmptyDirs="false">
+            <fileset dir="${build.zip.dir}">
+                <patternset refid="hotcopy-tomcat-zip-patternset" />
+                <!-- Exclude repo-tier web scripts config -->
+                <exclude name="**/classes/alfresco/extension/**" />
+                <exclude name="**/classes/alfresco/templates/webscripts/**" />
+            </fileset>
+         </copy>
     </target>
 
     <!--
         Hot copy JAR file into a local Tomcat instance.
-        
-        In version 3.3 and above the JAR file mechanism is recommended for distributing your 
-        customisations, but this target can still be used during development as it allows you to
-        reload changes without restarting Tomcat.
     -->
     <target name="hotcopy-tomcat-jar" depends="dist-jar" description="Hot copy JAR file into a local Tomcat instance">
-        <mkdir dir="${tomcat.home}/${build.lib.dir}" />
-        <copy todir="${tomcat.home}/${build.lib.dir}">
+        <mkdir dir="${tomcat.repo.home}/${build.lib.dir}" />
+        <mkdir dir="${tomcat.share.home}/${build.lib.dir}" />
+        <copy todir="${tomcat.repo.home}/${build.lib.dir}">
+            <fileset file="${dist.dir}/${jar.name}" />
+        </copy>
+        <copy todir="${tomcat.share.home}/${build.lib.dir}">
             <fileset file="${dist.dir}/${jar.name}" />
         </copy>
     </target>
