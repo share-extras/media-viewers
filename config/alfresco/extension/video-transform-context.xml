@@ -520,19 +520,5 @@
           </property>
         <property name="thumbnailRenditionConvertor" ref="thumbnailRenditionConvertor" />
     </bean>
-    
-    <bean id="mimetypeConfigService" class="org.springframework.extensions.config.xml.XMLConfigService" init-method="init">
-        <constructor-arg>
-            <bean class="org.springframework.extensions.config.source.UrlConfigSource">
-                <constructor-arg>
-                    <list>
-                        <value>classpath:alfresco/mimetype/mimetype-map.xml</value>
-                        <value>classpath:alfresco/mimetype/mimetype-map-openoffice.xml</value>
-                        <value>classpath:alfresco/extension/mimetype-map-ogg.xml</value>
-                    </list>
-                </constructor-arg>
-            </bean>
-        </constructor-arg>
-    </bean>
 
 </beans>

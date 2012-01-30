@@ -1,0 +1,58 @@
+div.video-preview.shadow
+{
+   margin-left: -10px;
+   border-right: 1px solid #CCCCCC;
+   border-bottom: 1px solid #CCCCCC;
+}
+
+div.video-preview.shadow span,
+div.video-preview.shadow div
+{
+   color: #000000;
+}
+
+div.video-preview.shadow .hd
+{
+   background-color: #FAFAFA;    
+   height: 40px;
+   line-height: 40px;
+}                                     
+
+div.video-preview.shadow img,
+div.video-preview.shadow span,
+div.video-preview.shadow input
+{
+   vertical-align: middle;
+}
+
+div.video-preview.shadow .bd
+{
+   text-align: center;
+}
+
+div.video-preview.shadow .bd .preview-swf
+{
+   background-color:#FAFAFA;
+   width: 100%;
+   height: 100px;
+}
+
+div.video-preview.shadow .bd .preview-swf div
+{
+   padding-top: 30px;
+}
+
+div.video-preview.shadow .bd .preview-swf.has-content
+{
+   height: 650px;
+}
+
+div.video-preview.shadow .bd .preview-swf.no-preview div
+{
+   padding-top: 200px;
+}
+
+div.video-preview.real.no-content
+{
+   visibility: hidden;
+}
