@@ -42,7 +42,7 @@ div.video-preview.shadow .bd .preview-swf div
    padding-top: 30px;
 }
 
-div.video-preview.shadow .bd .preview-swf.has-content
+.web-preview .previewer.FLVPlayer
 {
    height: 650px;
 }
