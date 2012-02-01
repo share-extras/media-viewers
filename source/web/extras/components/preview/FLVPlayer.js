@@ -1,18 +1,32 @@
 /**
- * Copyright (C) 2010-2011 Share Extras Contributors.
+ * Copyright (C) 20010-2011 Alfresco Share Extras project
  *
+ * This file is part of the Alfresco Share Extras project.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 /**
  * This is the "FLVPlayer" plug-in used to display documents directly in the web browser.
  *
- * Supports the "video/x-flv" and "video/mp4" mime types directly, and other video types
- * that can be converted into these formats (e.g. via FFmpeg).
+ * It supports the "video/x-flv" and "video/mp4" mime types directly, and other video types
+ * that can be converted into these formats (e.g. via FFmpeg transformations).
  *
- * TODO Use the same video thumbnail renditions as the base previewers
+ * TODO Use the same video thumbnail renditions as the base previewers?
  *
  * @namespace Alfresco.WebPreview.prototype.Plugins
  * @class Alfresco.WebPreview.prototype.Plugins.FLVPlayer
+ * @author Will Abson
  */
 (function()
 {
@@ -45,7 +59,7 @@
        this.swfDiv = null;
        this.previews = this.wp.options.thumbnails;
        this.availablePreviews = null;
-       this.thumbnailQueued = true;
+       this.thumbnailQueued = false;
        return this;
     };
     
@@ -57,20 +71,9 @@
        attributes:
        {
           /**
-           * Decides if the node's content or one of its thumbnails shall be displayed.
-           * Leave it as it is if the node's content shall be used.
-           * Set to a custom thumbnail definition name if the node's thumbnail contains the image to display.
-           *
-           * @property src
-           * @type String
-           * @default null
-           */
-          src: null,
-    
-          /**
            * Maximum size to display given in bytes if the node's content is used.
            * If the node content is larger than this value the image won't be displayed.
-           * Note! This doesn't apply if src is set to a thumbnail.
+           * Note! This doesn't apply if a thumbnail is used.
            *
            * @property srcMaxSize
            * @type String
@@ -96,11 +99,22 @@
            * @type boolean
            */
           disableI18nInputFix: "false",
-          
+
+          /**
+           * Name of the thumbnail which, if present, is used to display a static image representing the video
+           * before the play button is pressed. Use 'imgpreview' for the scaled-down thumbnail provided by the
+           * OOTB config, or 'imgpreviewfull' for the full-size version (config provided by this add-on)
+           */
           posterThumbnailName: "imgpreviewfull",
-          
+
+          /**
+           * Name of the thumbnail which, if present, contains a Flash video rendition of the video
+           */
           flvThumbnailName: "flvpreview",
           
+          /**
+           * Name of the thumbnail which, if present, contains a H264 rendition of the video
+           */
           h264ThumbnailName: "h264preview",
           
           /**
@@ -130,16 +144,9 @@
         */
        display: function FLVPlayer_display()
        {
-          // Make a XHR request to check which thumbnails are actually present on the file (since they usually take some time to generate)
-          // Existing Media Previews code should have the ability to do this based on changes made to make previews embeddable in wiki pages
-          // If the thumbnail has not been generated then we write out a message to the user saying the thumbnail is being generated, and check
-          // back via a timer to display the full preview when it has been.
-
-          // Find the url to the preview
-          // videourl will be non-null if the media is a natively-previewable type, e.g. flv or mp4
           var previewCtx = this.resolveUrls();
           
-          if (previewCtx.videourl) // Present if video is a native mimetype, e.g. mp4
+          if (previewCtx.videourl) // Present if video is a natively-previewable type, e.g. flv or mp4
           {
               this._displayPlayer(previewCtx);
           }
@@ -191,12 +198,11 @@
                               var pEl = this.wp.getPreviewerElement();
                               pEl.innerHTML = "";
                               var msgEl = document.createElement("div");
-                              // TODO Add poster behind the message area
+                              // TODO Add poster behind this message area, if available
                               //previewCtx.imageurl
                               //msgEl.set("id", this.wp.id + "-full-window-div");
                               //msgEl.setStyle("position", "absolute");
                               Dom.addClass(msgEl, "message");
-                              // TODO Add label.converting message
                               msgEl.innerHTML = this.wp.msg("label.converting");
                               pEl.appendChild(msgEl);
                               
@@ -212,21 +218,18 @@
                               pEl.innerHTML = "";
                               
                               var msgEl = document.createElement("div");
-                              //msgEl.set("id", this.wp.id + "-full-window-div");
-                              //msgEl.setStyle("position", "absolute");
                               Dom.addClass(msgEl, "message");
-                              
+
+                              // TODO Add poster behind this message area, if available
                               var msg = '';
                               msg += this.wp.msg("label.noVideoAvailable");
                               msg += '<br/>';
                               msg += '<a class="theme-color-1" href="' + this.wp.getContentUrl(true) + '">';
-                              // TODO Add i18n string label.noVideoDownloadFile and update label.noVideoAvailable
                               msg += this.wp.msg("label.noVideoDownloadFile");
                               msg += '</a>';
 
                               msgEl.innerHTML = msg;
                               pEl.appendChild(msgEl);
-                              //msgEl.appendTo(pEl);
                               
                               return pEl.innerHTML;
                           }
@@ -249,6 +252,8 @@
        {
            // To support "full window" we create a new div that will float above the rest of the ui
            this.createSwfDiv();
+           
+           // TODO Use the poster image (if present) dimensions to set the dimensions of the movie player
 
            // Create flash web preview by using swfobject
            var swfId = "VideoPreviewer_" + this.wp.id,
@@ -331,7 +336,7 @@
         */
        onDocumentDetailsAvailable: function VP_onDocumentDetailsAvailable(p_layer, p_args)
        {
-           // TODO Is this method needed in v4.0?
+           // TODO Investigate if this method needed in v4.0, and implement if so
        },
 
        /**
@@ -390,8 +395,6 @@
              flvpreview = this.attributes.flvThumbnailName, h264preview = this.attributes.h264ThumbnailName,
              imgpreview = this.attributes.posterThumbnailName,
              videourl, imageurl;
-          
-          // TODO Only display the original video if this.attributes.src = null, otherwise use the specific thumbnail specified
 
           // Static image to display before the user clicks 'play' - we do not care if this has been generated already or not
           imageurl = Alfresco.util.arrayContains(ps, imgpreview) ? this.wp.getThumbnailUrl(imgpreview) : null;
@@ -433,14 +436,9 @@
           }
        },
        
-       _getContentURL: function VP_getContentURL(nodeRef, thumbnailName)
-       {
-          var argsNoCache = "?c=force&noCacheToken=" + new Date().getTime();
-          return Alfresco.constants.PROXY_URI + "api/node/" + nodeRef.replace("://", "/") + "/content" + (thumbnailName != null ? "/thumbnails/" + thumbnailName : "") + argsNoCache;
-       },
-       
        /**
-        * Fire off a request to the repository to queue the creation of video renditions
+        * Fire off a request to the repository to queue the creation of video renditions. This will return a 404 if the queue request
+        * completes successfully, or a 500 if an error occurs
         * 
         * @method _queueVideoThumbnailGeneration
         * @return
@@ -468,23 +466,16 @@
                 {
                    fn: function VP_onQueueVideoThumbnailSuccess(event, obj)
                    {
-                       // TODO Use a timer to check when the thumbnail has been generated
                    },
-                   scope: this,
-                   obj:
-                   {
-                   }
+                   scope: this
                 },
                 failureCallback:
                 {
                    fn: function VP_onQueueVideoThumbnailFailure(event, obj)
                    {
-                       // TODO Display an error dialog (and log?) that the thumbnail generation could not be queued
+                       // TODO Display an error dialog (and log?) that the thumbnail generation could not be queued, if we get a non-404 response code
                    },
-                   scope: this,
-                   obj:
-                   {
-                   }
+                   scope: this
                 }
              });
           }
