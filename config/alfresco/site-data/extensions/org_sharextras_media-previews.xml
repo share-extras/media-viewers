@@ -12,8 +12,12 @@
                     <targetPackageRoot>org.alfresco.components.preview</targetPackageRoot>              
                     <sourcePackageRoot>org.sharextras.customization.media-previews</sourcePackageRoot>
                     <dependencies>
+                        <!-- Flash video previewer -->
                         <css>/res/extras/components/preview/FLVPlayer.css</css>
                         <js>/res/extras/components/preview/FLVPlayer.js</js>
+                        <!-- Audio previewer -->
+                        <css>/res/extras/components/preview/MP3Player.css</css>
+                        <js>/res/extras/components/preview/MP3Player.js</js>
                     </dependencies>
                 </customization>
             </customizations>
