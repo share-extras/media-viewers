@@ -277,7 +277,10 @@
            so.addParam("allowFullScreen", "true");
            so.addParam("quality", "autohigh");
            so.addParam("wmode", "transparent");
-
+           
+           // First clear the inner HTML of the previewer elem
+           this.wp.getPreviewerElement().innerHTML = "";
+           
            // Finally create (or recreate) the flash web preview in the new div
            so.write(this.swfDiv.get("id"));
 
