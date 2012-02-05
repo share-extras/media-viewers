@@ -100,6 +100,10 @@
                 <property name="targetMimetype"><value>video/x-flv</value></property>
             </bean>
             <bean class="org.alfresco.repo.content.transform.ExplictTransformationDetails" >
+                <property name="sourceMimetype"><value>video/x-m4v</value></property>
+                <property name="targetMimetype"><value>video/x-flv</value></property>
+            </bean>
+            <bean class="org.alfresco.repo.content.transform.ExplictTransformationDetails" >
                 <property name="sourceMimetype"><value>video/mpeg2</value></property>
                 <property name="targetMimetype"><value>video/x-flv</value></property>
             </bean>
@@ -224,6 +228,10 @@
             </bean>
             <bean class="org.alfresco.repo.content.transform.ExplictTransformationDetails" >
                 <property name="sourceMimetype"><value>video/mp4</value></property>
+                <property name="targetMimetype"><value>image/jpeg</value></property>
+            </bean>
+            <bean class="org.alfresco.repo.content.transform.ExplictTransformationDetails" >
+                <property name="sourceMimetype"><value>video/x-m4v</value></property>
                 <property name="targetMimetype"><value>image/jpeg</value></property>
             </bean>
             <bean class="org.alfresco.repo.content.transform.ExplictTransformationDetails" >
