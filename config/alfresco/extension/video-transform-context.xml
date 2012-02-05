@@ -307,7 +307,11 @@
                 <property name="targetMimetype"><value>audio/mpeg</value></property>
             </bean>
             <bean class="org.alfresco.repo.content.transform.ExplictTransformationDetails" >
-                <property name="sourceMimetype"><value>audio/oga</value></property>
+                <property name="sourceMimetype"><value>audio/vorbis</value></property>
+                <property name="targetMimetype"><value>audio/mpeg</value></property>
+            </bean>
+            <bean class="org.alfresco.repo.content.transform.ExplictTransformationDetails" >
+                <property name="sourceMimetype"><value>audio/x-flac</value></property>
                 <property name="targetMimetype"><value>audio/mpeg</value></property>
             </bean>
          </list>
