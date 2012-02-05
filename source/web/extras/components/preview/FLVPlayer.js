@@ -41,6 +41,11 @@
     const MIMETYPE_H264 = "video/mp4";
     
     /**
+     * H264 (m4v) video mimetype string
+     */
+    const MIMETYPE_M4V = "video/x-m4v";
+    
+    /**
      * FLVPlayer plug-in constructor
      * 
      * TODO Make this generic enough to handle the audio previews as well via a parameter e.g. <plugin previewer="flvplayer" ... />?
@@ -366,18 +371,18 @@
        {
            var ps = this.previews, // List of thumbnails that are available (might not have actually been generated yet) 
                flvpreview = this.attributes.flvThumbnailName, h264preview = this.attributes.h264ThumbnailName, 
-               flvmimetype = MIMETYPE_FLV, h264mimetype = MIMETYPE_H264,
                mimetype = this.wp.options.mimeType,
                mimetypes = [];
           
           // Require Flash player 9.0.115 (9 beta 3) for h264 video
-          if ((Alfresco.util.arrayContains(ps, h264preview) || mimetype == h264mimetype) && Alfresco.util.hasRequiredFlashPlayer(9, 0, 115))
+          if ((Alfresco.util.arrayContains(ps, h264preview) || mimetype == MIMETYPE_H264 || mimetype == MIMETYPE_M4V) && Alfresco.util.hasRequiredFlashPlayer(9, 0, 115))
           {
-             mimetypes.push(h264mimetype);
+             mimetypes.push(MIMETYPE_H264);
+             mimetypes.push(MIMETYPE_M4V);
           }
-          if ((Alfresco.util.arrayContains(ps, flvpreview) || mimetype == flvmimetype) && Alfresco.util.hasRequiredFlashPlayer(6, 0, 0))
+          if ((Alfresco.util.arrayContains(ps, flvpreview) || mimetype == MIMETYPE_FLV) && Alfresco.util.hasRequiredFlashPlayer(6, 0, 0))
           {
-             mimetypes.push(flvmimetype);
+             mimetypes.push(MIMETYPE_FLV);
           }
           return mimetypes;
        },
