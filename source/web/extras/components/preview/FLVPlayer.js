@@ -22,8 +22,6 @@
  * It supports the "video/x-flv" and "video/mp4" mime types directly, and other video types
  * that can be converted into these formats (e.g. via FFmpeg transformations).
  *
- * TODO Use the same video thumbnail renditions as the base previewers?
- *
  * @namespace Alfresco.WebPreview.prototype.Plugins
  * @class Alfresco.WebPreview.prototype.Plugins.FLVPlayer
  * @author Will Abson
@@ -48,8 +46,6 @@
     /**
      * FLVPlayer plug-in constructor
      * 
-     * TODO Make this generic enough to handle the audio previews as well via a parameter e.g. <plugin previewer="flvplayer" ... />?
-     *
      * @param wp {Alfresco.WebPreview} The Alfresco.WebPreview instance that decides which plugin to use
      * @param attributes {Object} Arbitrary attributes brought in from the <plugin> element
      */

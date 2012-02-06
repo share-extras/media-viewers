@@ -22,8 +22,6 @@
  * It supports the "audio/mp3" mime type directly, and other audio types
  * that can be converted into this formats (e.g. via FFmpeg transformations).
  *
- * TODO Use the same audio thumbnail renditions as the base previewers?
- *
  * @namespace Alfresco.WebPreview.prototype.Plugins
  * @class Alfresco.WebPreview.prototype.Plugins.MP3Player
  * @author Will Abson
@@ -43,8 +41,6 @@
     /**
      * MP3Player plug-in constructor
      * 
-     * TODO Make this generic enough to handle the audio previews as well via a parameter e.g. <plugin previewer="MP3Player" ... />?
-     *
      * @param wp {Alfresco.WebPreview} The Alfresco.WebPreview instance that decides which plugin to use
      * @param attributes {Object} Arbitrary attributes brought in from the <plugin> element
      */
