@@ -1,0 +1,26 @@
+.web-preview .WebODF
+{
+    height: 40em;
+    border: 1px solid #c0c0c0;
+    text-align: inherit;
+    overflow: scroll;
+}
+
+.web-preview .WebODF .odf-preview-container
+{
+    overflow: visible;
+}
+
+.web-preview .WebODF .odf-preview-content
+{
+    overflow: visible;
+    border-top: 1px solid #c0c0c0;
+    width: 70%;
+    height: 70%;
+    zoom: 0.7;
+    -moz-transform: scale(0.7);
+    -webkit-transform: scale(1.0);
+    transform-origin: 0 0;
+    -moz-transform-origin: 0 0;
+    -webkit-transform-origin: 0 0;
+}

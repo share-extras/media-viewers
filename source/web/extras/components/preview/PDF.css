@@ -1,0 +1,13 @@
+.web-preview .PDF
+{
+    width: 100%;
+    height: 40em;
+    border-top: 1px solid #c0c0c0;
+}
+
+.web-preview .PDF iframe
+{
+    width: 100%;
+    height: 40em;
+    border: none;
+}
