@@ -1,36 +1,3 @@
-/* 
-   Custom TreeView icons - see http://developer.yahoo.com/yui/examples/treeview/customicons.html
-*/
-.icon-ppt { display:block; min-height: 22px; padding-top: 2px; padding-left: 20px; background: transparent url(file-icons.png) 0 0px no-repeat; } 
-.icon-dmg { display:block; min-height: 22px; padding-top: 2px; padding-left: 20px; background: transparent url(file-icons.png) 0 -36px no-repeat; } 
-.icon-prv { display:block; min-height: 22px; padding-top: 2px; padding-left: 20px; background: transparent url(file-icons.png) 0 -72px no-repeat; } 
-.icon-gen { display:block; min-height: 22px; padding-top: 2px; padding-left: 20px; background: transparent url(file-icons.png) 0 -108px no-repeat; } 
-.icon-doc { display:block; min-height: 22px; padding-top: 2px; padding-left: 20px; background: transparent url(file-icons.png) 0 -144px no-repeat; } 
-.icon-jar { display:block; min-height: 22px; padding-top: 2px; padding-left: 20px; background: transparent url(file-icons.png) 0 -180px no-repeat; } 
-.icon-zip { display:block; min-height: 22px; padding-top: 2px; padding-left: 20px; background: transparent url(file-icons.png) 0 -216px no-repeat; } 
-.htmlnodelabel { margin-left: 20px; } 
-
-.ygtvcontent
-{
-   cursor: pointer;
-}
-
-.ygtv-highlight1 .ygtvcontent
-{
-   background: #c0e0e0;
-}
-
-.ygtvfocus
-{
-	background-color: transparent;
-	border: none;
-}
-
-.ygtvfocus .ygtvlabel,.ygtvfocus .ygtvlabel:link,.ygtvfocus .ygtvlabel:visited,.ygtvfocus .ygtvlabel:hover
-{
-	background-color: transparent;
-}
-
 .config-video span.video-name
 {
 	vertical-align: super;
@@ -40,6 +7,16 @@
 div.video-widget-msg
 {
 	display: none;
+}
+
+div.video-preview, div.video-preview div
+{
+	height: 100%;
+}
+
+div.dashlet.video .body
+{
+    overflow: hidden;
 }
 
 div.video-preview.shadow
@@ -97,4 +74,15 @@ div.video-preview.shadow .bd .preview-swf.no-preview div
 div.video-preview.real.no-content
 {
    visibility: hidden;
+}
+
+div.video-preview .web-preview .WebPreviewer {
+    height: 100%;
+    line-height: auto;
+}
+
+div.video-preview .web-preview .previewer {
+    height: 100%;
+    text-align: center;
+    width: 100%;
 }

@@ -36,7 +36,7 @@
       // Decoupled event listeners
       if (htmlId != "null")
       {
-         YAHOO.Bubbling.on("renderCurrentValue", this.onDocumentsSelected, this);
+         YAHOO.Bubbling.on("onDocumentsSelected", this.onDocumentsSelected, this);
       }
       
       return this;
@@ -90,31 +90,13 @@
          title: "",
 
          /**
-          * The mimetype of the configured content item
-          *
-          * @property mimeType
-          * @type string
-          * @default ""
-          */
-         mimeType: "",
-
-         /**
-          * The size in bytes of the configured content item
-          *
-          * @property size
-          * @type string
-          * @default ""
-          */
-         size: "",
-
-         /**
           * The siteId of the current site
           *
           * @property site
           * @type string
           * @default ""
           */
-         site: ""
+         siteId: ""
       },
       
       /**
@@ -124,14 +106,6 @@
        * @type object
        */
       configDialog: null,
-      
-      /**
-       * Video previewer object
-       *
-       * @property videoPreview
-       * @type object
-       */
-      videoPreview: null,
       
       /**
        * Dashlet title Dom element
@@ -170,13 +144,6 @@
          this.messageEl = Dom.get(this.id + "-msg");
          this.previewEl = Dom.get(this.id + "-preview");
          
-         // Add click handler to config feed link that will be visible if user is site manager.
-         var configLink = Dom.get(this.id + "-configVideo-link");
-         if (configLink)
-         {
-            Event.addListener(configLink, "click", this.onConfigVideoClick, this, true);            
-         }
-         
          // Set up the title
          this._setupTitle();
          
@@ -197,7 +164,7 @@
           if (this.options.nodeRef != "" && this.options.name != "")
           {
               this.titleEl.innerHTML = "<a href=\"" + Alfresco.constants.URL_PAGECONTEXT + 
-                  "site/" + this.options.site + "/document-details?nodeRef=" + this.options.nodeRef + "\">" +
+                  "site/" + this.options.siteId + "/document-details?nodeRef=" + this.options.nodeRef + "\">" +
                   this.options.name + "</a>";
           }
           else
@@ -228,72 +195,68 @@
        * Set up the dashlet preview area
        *
        * @method _setupPreview
-       * @param loadData {boolean} true if node metadata should be loaded using XHR, false otherwise.
-       * This allows the size and mimetype of new nodes to be determined. Default is false.
        * @private
        */
-      _setupPreview: function VideoWidget__setupPreview(loadData)
+      _setupPreview: function VideoWidget__setupPreview()
       {
+          // Attempt to match the WebPreview overlay div with Flash content and remove it, before reloading the preview
+          // This is very hacky. The Alfresco.WebPreview should really have a destroy() method to take care of this, but it does not override the base definition from Alfresco.component.Base.
+          var swfDiv = Dom.get(this.id + "-preview_x002e_dashlet-document-preview_x0023_default-full-window-div");
+          if (swfDiv)
+          {
+              var p = swfDiv.parentNode;
+              p.removeChild(swfDiv);
+          }
+         
           if (this.options.nodeRef != null && this.options.nodeRef != "")
           {
               Dom.setStyle(this.previewEl, "display", "block");
+              
+              var elId = Dom.getAttribute(this.previewEl, "id");
+
+              // Load the web-previewer mark-up using the custom page definition, which just includes that component
+              Alfresco.util.Ajax.request(
+              {
+                 url: Alfresco.constants.URL_PAGECONTEXT + "site/" + this.options.siteId + "/dashlet-document-preview",
+                 dataObj: {
+                    nodeRef: this.options.nodeRef
+                 },
+                 successCallback:
+                 {
+                    fn: function VideoWidget__createFromHTML_success(p_response, p_obj)
+                    {
+                       var phtml = p_response.serverResponse.responseText.replace(/template_x002e_web-preview/g, p_response.config.object.elId),
+                          result = Alfresco.util.Ajax.sanitizeMarkup(phtml);
+                       // Following code borrowed from Alfresco.util.Ajax._successHandler
+                       // Use setTimeout to execute the script. Note scope will always be "window"
+                       var scripts = result[1];
+                       if (YAHOO.lang.trim(scripts).length > 0)
+                       {
+                          window.setTimeout(scripts, 0);
+                          // Delay-call the PostExec function to continue response processing after the setTimeout above
+                          YAHOO.lang.later(0, this, function() {
+                             Alfresco.util.YUILoaderHelper.loadComponents();
+                          }, p_response.serverResponse);
+                       }
+                       p_response.config.object.previewEl.innerHTML = result[0];
+                    },
+                    scope: this
+                 },
+                 // Unfortunately we cannot set execScripts to true, as we need to first update the element ids in the html to make them unique, before the scripts are run
+                 // So instead we execute the scripts manually, above
+                 //execScripts: true,
+                 failureMessage: "Failed to load document details for " + this.options.nodeRef,
+                 scope: this,
+                 object: {
+                    elId: elId,
+                    previewEl: this.previewEl
+                 },
+                 noReloadOnAuthFailure: true
+              });
           }
           else
           {
              Dom.setStyle(this.previewEl, "display", "none");
-          }
-          
-          if (this.videoPreview == null)
-          {
-              // Set up the video previewer
-              this.videoPreview = new Alfresco.VideoPreview(this.id + "-preview").setOptions(
-              {
-                 nodeRef: this.options.nodeRef,
-                 name: this.options.name,
-                 icon: "/components/images/generic-file-32.png",
-                 mimeType: this.options.mimeType,
-                 size: this.options.size
-              }).setMessages(
-                    Alfresco.messages.scope[this.name]
-              );
-          }
-          
-          // Reload data via XHR if requested
-          if (typeof(loadData) != "undefined" && loadData === true)
-          {
-              Alfresco.util.Ajax.jsonGet(
-              {
-                 url: Alfresco.constants.PROXY_URI + "api/metadata?nodeRef=" + this.options.nodeRef,
-                 successCallback:
-                 {
-                     fn: function VP__loadDocumentDetails(p_response, p_obj)
-                     {
-                         // Get the document details
-                         var documentDetails = {},
-                             mcns = "{http://www.alfresco.org/model/content/1.0}",
-                             content = p_response.json.properties[mcns + "content"];
-                         documentDetails.fileName = p_response.json.properties[mcns + "name"];
-                         documentDetails.mimetype = p_response.json.mimetype;
-                         if (content)
-                         {
-                            var size = content.substring(content.indexOf("size=") + 5);
-                            size = size.substring(0, size.indexOf("|"));
-                            documentDetails.size = size;
-                         }
-                         else
-                         {
-                             documentDetails.size = "0";
-                         }
-                         // Notify the previewer via Bubbling
-                         YAHOO.Bubbling.fire("documentDetailsAvailable", {
-                             documentDetails: documentDetails
-                         });
-                     },
-                     scope: this
-                 },
-                 failureMessage: "Failed to load document details for " + this.options.nodeRef,
-                 noReloadOnAuthFailure: true
-              });
           }
       },
 
@@ -320,7 +283,7 @@
             this.configDialog = new Alfresco.module.SimpleDialog(this.id + "-configDialog").setOptions(
             {
                templateUrl: Alfresco.constants.URL_SERVICECONTEXT + "extras/modules/video/config", actionUrl: actionUrl,
-               site: this.options.site,
+               siteId: this.options.siteId,
                onSuccess:
                {
                   fn: function VideoWidget_onConfigFeed_callback(response)
@@ -328,23 +291,17 @@
                       // Update options from the submitted form fields
                       this.options.nodeRef = Dom.get(this.configDialog.id + "-nodeRef").value;
                       this.options.name = Dom.get(this.configDialog.id + "-video").innerHTML;
-                      
-                      if (this.videoPreview.options.nodeRef != this.options.nodeRef)
-                      {
-                          // Update the previewer's nodeRef
-                          this.videoPreview.options.nodeRef = this.options.nodeRef;
                           
-                          // Update dashlet title and message area
-                          this._setupTitle();
-                          this._setupMessage();
+                      // Update dashlet title and message area
+                      this._setupTitle();
+                      this._setupMessage();
 
-                          /*
-                           * Since we only have limited data on the node from the picker (e.g. mimetype
-                           * and size are missing), we need to retrieve this via XHR. We then notify the
-                           * previewer and it does the rest.
-                           */
-                          this._setupPreview(true);
-                      }
+                      /*
+                       * Since we only have limited data on the node from the picker (e.g. mimetype
+                       * and size are missing), we need to retrieve this via XHR. We then notify the
+                       * previewer and it does the rest.
+                       */
+                      this._setupPreview();
                   },
                   scope: this
                },
@@ -355,7 +312,38 @@
                      Dom.get(this.configDialog.id + "-nodeRef").value = this.options.nodeRef;
                      Dom.get(this.configDialog.id + "-video").innerHTML = this.options.name;
                      
+                     // Construct a new document picker... we need to know the nodeRef of the document library
+                     // of the site that we are viewing. Make an async request to retrieve this information
+                     // using the the siteId and when the call returns, construct a new DocumentPicker using the
+                     // DocLib nodeRef as the starting point for document selection...
+                     var getDocLibNodeRefUrl = Alfresco.constants.PROXY_URI + "slingshot/doclib/container/" + this.options.siteId + "/documentlibrary";
+                     Alfresco.util.Ajax.jsonGet(
+                     {
+                        url: getDocLibNodeRefUrl,
+                        successCallback:
+                        {
+                           fn: function(response)
+                           {
+                              var nodeRef = response.json.container.nodeRef;
+                              this.widgets.picker = new Alfresco.module.DocumentPicker(this.configDialog.id + "-filePicker", Alfresco.ObjectRenderer);
+                              this.widgets.picker.setOptions(
+                              {
+                                 displayMode: "items",
+                                 itemFamily: "node",
+                                 itemType: "cm:content",
+                                 multipleSelectMode: false,
+                                 mandatory: true,
+                                 parentNodeRef: nodeRef,
+                                 restrictParentNavigationToDocLib: true
+                              });
+                              this.widgets.picker.onComponentsLoaded(); // Need to force the component loaded call to ensure setup gets completed.
+                           },
+                           scope: this
+                        }
+                     });
+                     
                      // Set up file picker
+                     /*
                      if (!this.widgets.picker)
                      {
                         this.widgets.picker = new Alfresco.module.DocumentPicker(this.configDialog.id + "-filePicker");
@@ -367,6 +355,7 @@
                         multipleSelectMode: false,
                         mandatory: true
                      });
+                     */
                   },
                   scope: this
                }
@@ -394,23 +383,39 @@
       onDocumentsSelected: function VideoWidget_onDocumentsSelected(layer, args)
       {
           // Check the event is directed towards this instance
-          if ($hasEventInterest(this.widgets.picker, args))
+          //if ($hasEventInterest(this.widgets.picker, args))
+          if (args && args[1].items)
           {
               var obj = args[1];
-              if (obj !== null)
+              //var items = this.widgets.picker.currentValueMeta;
+              var items = obj.items;
+              if (items && items.length == 1)
               {
-                  var items = this.widgets.picker.currentValueMeta;
-                  if (items && items.length == 1)
+                  // Check value has changed, if so then update the form
+                  if (this.options.nodeRef != items[0].nodeRef)
                   {
-                      // Check value has changed, if so then update the form
-                      if (this.options.nodeRef != items[0].nodeRef)
-                      {
-                          Dom.get(this.configDialog.id + "-nodeRef").value = items[0].nodeRef;
-                          Dom.get(this.configDialog.id + "-video").innerHTML = items[0].name;
-                      }
+                      Dom.get(this.configDialog.id + "-nodeRef").value = items[0].nodeRef;
+                      Dom.get(this.configDialog.id + "-video").innerHTML = items[0].name;
+                      Dom.get(this.configDialog.id + "-name").value = items[0].name;
                   }
               }
+
+              // Clear the selections...
+              this.widgets.picker.resetSelection();
           }
+      },
+
+      /**
+       * Dashlet resizing completed
+       * 
+       * @method onEndResize
+       * @param height
+       *            {int} New height of the dashlet body in pixels
+       */
+      onEndResize: function VideoWidget_onEndResize(height)
+      {
+         // Re-load preview area
+         this._setupPreview();
       }
    });
 

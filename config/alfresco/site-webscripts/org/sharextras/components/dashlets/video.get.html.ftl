@@ -1,29 +1,52 @@
 <script type="text/javascript">//<![CDATA[
-   new Alfresco.dashlet.VideoWidget("${args.htmlid}").setOptions(
+   var dashlet = new Alfresco.dashlet.VideoWidget("${args.htmlid}").setOptions(
    {
       "componentId": "${instance.object.id}",
-      "site": "${page.url.templateArgs.site!""}", 
-      "nodeRef": "<#if args.nodeRef?exists>${args.nodeRef}<#else></#if>", 
-      "name": "<#if node??>${node.name}</#if>",
-      "icon": "<#if node??>${node.icon}</#if>",
-      "mimeType": "<#if node??>${node.mimeType}</#if>",
-      "size": "<#if node??>${node.size}</#if>"
+      "siteId": "${page.url.templateArgs.site!""}",
+      "nodeRef": "<#if args.nodeRef?exists>${args.nodeRef}<#else></#if>",
+      "name": "<#if args.name?exists>${args.name}<#else></#if>"
    }).setMessages(${messages});
-   new Alfresco.widget.DashletResizer("${args.htmlid}", "${instance.object.id}");
+   var resizer = new Alfresco.widget.DashletResizer("${args.htmlid}", "${instance.object.id}");
+   // End resize event handler
+   YAHOO.lang.later(5000, this, function(dashlet, resizer) {
+      if (resizer.widgets.resizer)
+      {
+         resizer.widgets.resizer.on("endResize", function(eventTarget)
+         {
+            dashlet.onEndResize(eventTarget.height);
+         }, dashlet, true);
+      }
+   }, [dashlet, resizer], false);
+   
+   var editDashletEvent = new YAHOO.util.CustomEvent("onDashletConfigure");
+   editDashletEvent.subscribe(dashlet.onConfigVideoClick, dashlet, true);
+
+   new Alfresco.widget.DashletTitleBarActions("${args.htmlid}").setOptions(
+   {
+      actions:
+      [
+<#if userIsSiteManager>
+         {
+            cssClass: "edit",
+            eventOnClick: editDashletEvent,
+            tooltip: "${msg("dashlet.edit.tooltip")?js_string}"
+         },
+</#if>
+         {
+            cssClass: "help",
+            bubbleOnClick:
+            {
+               message: "${msg("dashlet.help")?js_string}"
+            },
+            tooltip: "${msg("dashlet.help.tooltip")?js_string}"
+         }
+      ]
+   });
 //]]></script>
 <div class="dashlet video">
-   <div class="title" id="${args.htmlid}-title"><#if node??><a href="${url.context}/page/site/${page.url.templateArgs.site!''}/document-details?nodeRef=${args.nodeRef!''}">${node.name}</a><#else>${msg("header.video")}</#if></div>
-   <div class="toolbar">
-      <a id="${args.htmlid}-configVideo-link" href="#" class="theme-color-1">${msg("link.configure")}</a>
-   </div>
-   <div class="body" id="${args.htmlid}-body" style="height: ${args.height!200}px;">
-      <div class="msg video-widget-msg" id="${args.htmlid}-msg"></div>
-      <div class="video-preview shadow" id="${args.htmlid}-preview" style="height: ${args.height!200}px;">
-         <div class="bd">
-            <div id="${args.htmlid}-preview-shadow-swf-div" class="preview-swf no-content">
-               <div id="${args.htmlid}-preview-swfPlayerMessage-div" class="msg"></div>
-            </div>
-         </div>
-      </div>
+   <div class="title" id="${args.htmlid}-title"><#if node??><a href="${url.context}/page/site/${page.url.templateArgs.site!''}/document-details?nodeRef=${args.nodeRef!''}">${args.name}</a><#else><#if args.name?exists>${args.name}<#else>${msg("header.video")}</#if></#if></div>
+   <div class="body" id="${args.htmlid}-body" style="height: ${args.height!400}px;">
+      <div class="msg dashlet-padding video-widget-msg" id="${args.htmlid}-msg"></div>
+      <div class="video-preview" id="${args.htmlid}-preview"></div>
    </div>
 </div>

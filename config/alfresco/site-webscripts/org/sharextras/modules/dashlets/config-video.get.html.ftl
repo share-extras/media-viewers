@@ -11,6 +11,7 @@
                </div>
                <input type="hidden" name="nodeRef" id="${args.htmlid}-nodeRef" />
                <input type="hidden" name="pathField" id="${args.htmlid}-pathField" />
+               <input type="hidden" name="name" id="${args.htmlid}-name" />
             </div>
          </div>
          <div class="bdft">

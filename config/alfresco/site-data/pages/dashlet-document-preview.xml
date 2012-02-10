@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<page>
+   <title>Viewer Dashlet Document Preview</title>
+   <description>Page which just contains the web preview component, for embedding in the document viewer dashlet</description>
+   <template-instance>dashlet-document-preview</template-instance>
+   <authentication>user</authentication>
+</page>
