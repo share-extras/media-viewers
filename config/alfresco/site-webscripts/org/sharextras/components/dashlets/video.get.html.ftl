@@ -7,16 +7,17 @@
       "name": "<#if args.name?exists>${args.name}<#else></#if>"
    }).setMessages(${messages});
    var resizer = new Alfresco.widget.DashletResizer("${args.htmlid}", "${instance.object.id}");
-   // End resize event handler
-   YAHOO.lang.later(5000, this, function(dashlet, resizer) {
+   // Add end resize event handler
+   var timer = YAHOO.lang.later(1000, this, function(dashlet, resizer) {
       if (resizer.widgets.resizer)
       {
          resizer.widgets.resizer.on("endResize", function(eventTarget)
          {
             dashlet.onEndResize(eventTarget.height);
          }, dashlet, true);
+         timer.cancel();
       }
-   }, [dashlet, resizer], false);
+   }, [dashlet, resizer], true);
    
    var editDashletEvent = new YAHOO.util.CustomEvent("onDashletConfigure");
    editDashletEvent.subscribe(dashlet.onConfigVideoClick, dashlet, true);
