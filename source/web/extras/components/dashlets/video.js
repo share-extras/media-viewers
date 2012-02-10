@@ -290,7 +290,7 @@
                   {
                       // Update options from the submitted form fields
                       this.options.nodeRef = Dom.get(this.configDialog.id + "-nodeRef").value;
-                      this.options.name = Dom.get(this.configDialog.id + "-video").innerHTML;
+                      this.options.name = Dom.get(this.configDialog.id + "-name").value;
                           
                       // Update dashlet title and message area
                       this._setupTitle();
@@ -311,51 +311,47 @@
                   {
                      Dom.get(this.configDialog.id + "-nodeRef").value = this.options.nodeRef;
                      Dom.get(this.configDialog.id + "-video").innerHTML = this.options.name;
-                     
-                     // Construct a new document picker... we need to know the nodeRef of the document library
-                     // of the site that we are viewing. Make an async request to retrieve this information
-                     // using the the siteId and when the call returns, construct a new DocumentPicker using the
-                     // DocLib nodeRef as the starting point for document selection...
-                     var getDocLibNodeRefUrl = Alfresco.constants.PROXY_URI + "slingshot/doclib/container/" + this.options.siteId + "/documentlibrary";
-                     Alfresco.util.Ajax.jsonGet(
-                     {
-                        url: getDocLibNodeRefUrl,
-                        successCallback:
-                        {
-                           fn: function(response)
-                           {
-                              var nodeRef = response.json.container.nodeRef;
-                              this.widgets.picker = new Alfresco.module.DocumentPicker(this.configDialog.id + "-filePicker", Alfresco.ObjectRenderer);
-                              this.widgets.picker.setOptions(
-                              {
-                                 displayMode: "items",
-                                 itemFamily: "node",
-                                 itemType: "cm:content",
-                                 multipleSelectMode: false,
-                                 mandatory: true,
-                                 parentNodeRef: nodeRef,
-                                 restrictParentNavigationToDocLib: true
-                              });
-                              this.widgets.picker.onComponentsLoaded(); // Need to force the component loaded call to ensure setup gets completed.
-                           },
-                           scope: this
-                        }
-                     });
-                     
-                     // Set up file picker
-                     /*
+                     Dom.get(this.configDialog.id + "-name").value = this.options.name;
+
                      if (!this.widgets.picker)
                      {
-                        this.widgets.picker = new Alfresco.module.DocumentPicker(this.configDialog.id + "-filePicker");
+                        // Construct a new document picker... we need to know the nodeRef of the document library
+                        // of the site that we are viewing. Make an async request to retrieve this information
+                        // using the the siteId and when the call returns, construct a new DocumentPicker using the
+                        // DocLib nodeRef as the starting point for document selection...
+                        var getDocLibNodeRefUrl = Alfresco.constants.PROXY_URI + "slingshot/doclib/container/" + this.options.siteId + "/documentlibrary";
+                        Alfresco.util.Ajax.jsonGet(
+                        {
+                           url: getDocLibNodeRefUrl,
+                           successCallback:
+                           {
+                              fn: function(response)
+                              {
+                                 var nodeRef = response.json.container.nodeRef;
+                                 this.widgets.picker = new Alfresco.module.DocumentPicker(this.configDialog.id + "-filePicker", Alfresco.ObjectRenderer);
+                                 this.widgets.picker.setOptions(
+                                 {
+                                    multipleSelectMode: false,
+                                    mandatory: true,
+                                    parentNodeRef: nodeRef,
+                                    restrictParentNavigationToDocLib: true,
+                                    maintainAddedRemovedItems: false
+                                 });
+                                 this.widgets.picker.currentValueMeta = [];
+                                 this.widgets.picker.singleSelectedItem = null;
+                                 this.widgets.picker.onComponentsLoaded(); // Need to force the component loaded call to ensure setup gets completed.
+                              },
+                              scope: this
+                           }
+                        });
                      }
-                     this.widgets.picker.setOptions(
+                     else // already exists
                      {
-                        currentValue: this.options.nodeRef,
-                        itemFamily: "node",
-                        multipleSelectMode: false,
-                        mandatory: true
-                     });
-                     */
+                        // Clear the selections... (and work around resetSelection() limitations)
+                        this.widgets.picker.resetSelection();
+                        this.widgets.picker.currentValueMeta = [];
+                        this.widgets.picker.singleSelectedItem = null;
+                     }
                   },
                   scope: this
                }
@@ -391,8 +387,8 @@
               var items = obj.items;
               if (items && items.length == 1)
               {
-                  // Check value has changed, if so then update the form
-                  if (this.options.nodeRef != items[0].nodeRef)
+                  // Check nodeRef and name are supplied, if so then update the form
+                  if (items[0].nodeRef && items[0].name)
                   {
                       Dom.get(this.configDialog.id + "-nodeRef").value = items[0].nodeRef;
                       Dom.get(this.configDialog.id + "-video").innerHTML = items[0].name;
@@ -400,8 +396,12 @@
                   }
               }
 
-              // Clear the selections...
+              // Clear the selections... (and work around resetSelection() limitations)
               this.widgets.picker.resetSelection();
+              this.widgets.picker.currentValueMeta = [];
+              this.widgets.picker.singleSelectedItem = null;
+              // Make the Browse button active again, since a bug in the picker onOK() method leaves it disabled
+              this.widgets.picker.widgets.showPicker.set("disabled", false);
           }
       },
 
