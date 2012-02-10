@@ -21,6 +21,7 @@
                     </dependencies>
                 </customization>
             </customizations>
+            <auto-deploy>true</auto-deploy>
         </module>
         
     </modules>
