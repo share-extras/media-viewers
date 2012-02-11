@@ -83,7 +83,7 @@
                 <props>
                     <prop key="opts">-y</prop>
                     <prop key="infile_opts"></prop>
-                    <prop key="outfile_opts">-f flv</prop>
+                    <prop key="outfile_opts">-f flv -ar 44100</prop>
                 </props>
             </property>
          </bean>
@@ -375,7 +375,7 @@
                     <bean class="org.alfresco.repo.content.transform.RuntimeExecutableContentTransformerOptions">
                         <property name="propertyValues">
                             <props>
-                                <prop key="outfile_opts">-f flv -ab 56 -ar 44100 -b 200 -r 15 -s 320x240</prop>
+                                <prop key="outfile_opts">-f flv -ar 44100</prop>
                             </props>
                         </property>
                     </bean>
