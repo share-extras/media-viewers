@@ -83,45 +83,47 @@
           srcMaxSize: "100000000",
 
           /**
-           * Decides if flash previewers shall disable the i18n input fix all browsers.
-           * If it shall be disabled for certain a certain os/browser override the disableI18nInputFix() method.
-           *
-           * Fix solves the Flash i18n input keyCode bug when "wmode" is set to "transparent"
-           * http://bugs.adobe.com/jira/browse/FP-479
-           * http://issues.alfresco.com/jira/browse/ALF-1351
-           *
-           * ...see "Browser Testing" on this page to see supported browser/language combinations for AS2 version
-           * http://analogcode.com/p/JSTextReader/
-           *
-           * ... We are using the AS3 version of the same fix
-           * http://blog.madebypi.co.uk/2009/04/21/transparent-flash-text-entry/
-           *
-           * @property disableI18nInputFix
-           * @type boolean
-           */
-          disableI18nInputFix: "false",
-
-          /**
            * Name of the thumbnail which, if present, is used to display a static image representing the video
            * before the play button is pressed. Use 'imgpreview' for the scaled-down thumbnail provided by the
            * OOTB config, or 'imgpreviewfull' for the full-size version (config provided by this add-on)
+           * 
+           * @property poster
+           * @type string
            */
-          posterThumbnailName: "imgpreviewfull",
-
-          /**
-           * Name of the thumbnail which, if present, contains a Flash video rendition of the video
-           */
-          flvThumbnailName: "flvpreview",
-          
-          /**
-           * Name of the thumbnail which, if present, contains a H264 rendition of the video
-           */
-          h264ThumbnailName: "h264preview",
+          poster: "imgpreviewfull",
           
           /**
            * Whether to queue missing video renditions
+           * 
+           * @property queueMissingRenditions
+           * @type boolean
            */
-          queueMissingRenditions: true
+          queueMissingRenditions: true,
+          
+          /**
+           * Mimetypes supported by the player, including thumbnail names and versions of flash required for each type
+           * 
+           * @property playerSupportedTypes
+           * @type array
+           */
+          playerSupportedTypes: [
+             {
+                // Require Flash player 9.0.115 (9 beta 3) for h264 video
+                mimetype: MIMETYPE_H264,
+                thumbnailName: "h264preview",
+                minFlashVersion: [9, 0, 115]
+             },
+             {
+                mimetype: MIMETYPE_M4V,
+                thumbnailName: null,
+                minFlashVersion: [9, 0, 115]
+             },
+             {
+                mimetype: MIMETYPE_FLV,
+                thumbnailName: "flvpreview",
+                minFlashVersion: [6, 0, 0]
+             }
+          ]
        },
     
        /**
@@ -134,7 +136,7 @@
         */
        report: function FLVPlayer_report()
        {
-           return this._getSupportedVideoMimeTypes().length > 0 ? "" : "No supported MIME type available";
+           return this._getSupportedMimeTypes().length > 0 ? "" : "No supported MIME type available";
        },
     
        /**
@@ -191,7 +193,7 @@
                               // Fire off a request to queue the rendition generation, if it's not already been done
                               if (!this.thumbnailQueued)
                               {
-                                  this._queueVideoThumbnailGeneration();
+                                  this._queueThumbnailGeneration();
                                   this.thumbnailQueued = true;
                               }
                               
@@ -238,13 +240,13 @@
                    },
                    scope: this
                 },
-                failureMessage: "Could not load thumbnails list" // TODO localise this error message
+                failureMessage: this.wp.msg("error.thumbnailsFailure")
              });
           }
        },
     
        /**
-        * Display the Flash video player
+        * Display the Flash player
         *
         * @method _displayPlayer
         * @private
@@ -360,27 +362,29 @@
        /**
         * Return mime types supported by the video previewer for this file
         * 
-        * @method _getSupportedVideoMimeTypes
+        * @method _getSupportedMimeTypes
         * @return Array containing the video MIME types supported by the Flash video player for this file, in order of preference
         */
-       _getSupportedVideoMimeTypes: function VP__getSupportedVideoMimeTypes()
+       _getSupportedMimeTypes: function VP__getSupportedMimeTypes()
        {
-           var ps = this.previews, // List of thumbnails that are available (might not have actually been generated yet) 
-               flvpreview = this.attributes.flvThumbnailName, h264preview = this.attributes.h264ThumbnailName, 
-               mimetype = this.wp.options.mimeType,
-               mimetypes = [];
+          var ps = this.previews, // List of thumbnails that are available (might not have actually been generated yet) 
+               mimetype = this.wp.options.mimeType, // Mimetype of the file itself
+               supportedMimetypes = [];
           
-          // Require Flash player 9.0.115 (9 beta 3) for h264 video
-          if ((Alfresco.util.arrayContains(ps, h264preview) || mimetype == MIMETYPE_H264 || mimetype == MIMETYPE_M4V) && Alfresco.util.hasRequiredFlashPlayer(9, 0, 115))
+          var type, thumbnailName, minFlashVersion, hasRequiredFlashPlayer, i, ii;
+          // look through each mime type that the player supports
+          for (i = 0, ii = this.attributes.playerSupportedTypes.length; i < ii; i++)
           {
-             mimetypes.push(MIMETYPE_H264);
-             mimetypes.push(MIMETYPE_M4V);
+             type = this.attributes.playerSupportedTypes[i];
+             thumbnailName = type.thumbnailName || null;
+             minFlashVersion = type.minFlashVersion || null;
+             hasRequiredFlashPlayer = minFlashVersion && Alfresco.util.hasRequiredFlashPlayer(minFlashVersion[0], minFlashVersion[1], minFlashVersion[2])
+             if ((mimetype == type.mimetype || thumbnailName && Alfresco.util.arrayContains(ps, thumbnailName)) && hasRequiredFlashPlayer)
+             {
+                supportedMimetypes.push(type.mimetype);
+             }
           }
-          if ((Alfresco.util.arrayContains(ps, flvpreview) || mimetype == MIMETYPE_FLV) && Alfresco.util.hasRequiredFlashPlayer(6, 0, 0))
-          {
-             mimetypes.push(MIMETYPE_FLV);
-          }
-          return mimetypes;
+          return supportedMimetypes;
        },
 
        /**
@@ -391,16 +395,14 @@
         */
        resolveUrls: function VP_resolveUrls()
        {
-          var ps = this.previews, videopreview,
+          var ps = this.previews, 
              psa = this.availablePreviews, 
-             flvpreview = this.attributes.flvThumbnailName, h264preview = this.attributes.h264ThumbnailName,
-             imgpreview = this.attributes.posterThumbnailName,
              videourl, imageurl;
 
           // Static image to display before the user clicks 'play' - we do not care if this has been generated already or not
-          imageurl = Alfresco.util.arrayContains(ps, imgpreview) ? this.wp.getThumbnailUrl(imgpreview) : null;
+          imageurl = Alfresco.util.arrayContains(ps, this.attributes.poster) ? this.wp.getThumbnailUrl(this.attributes.poster) : null;
           
-          var supportedtypes = this._getSupportedVideoMimeTypes();
+          var supportedtypes = this._getSupportedMimeTypes();
           
           // Permissively allow the content item itself to be returned if supported - strict compliance would imply we always return the preferred thumbnail format
           if (Alfresco.util.arrayContains(supportedtypes, this.wp.options.mimeType))
@@ -416,7 +418,21 @@
           else
           {
              // Always use the preferred thumbnail format, even if less-preferred formats are available and have been generated already
-             videopreview = supportedtypes.length > 0 ? (supportedtypes[0] == MIMETYPE_H264 ? h264preview : (supportedtypes[0] == MIMETYPE_FLV ? flvpreview : null)) : null;
+             var videopreview = null;
+             if  (supportedtypes.length > 0)
+             {
+                var type, i, ii;
+                // look through each mime type that the player supports
+                for (i = 0, ii = this.attributes.playerSupportedTypes.length; i < ii; i++)
+                {
+                   type = this.attributes.playerSupportedTypes[i];
+                   if (Alfresco.util.arrayContains(supportedtypes, type.mimetype) && type.thumbnailName)
+                   {
+                      videopreview = type.thumbnailName;
+                      break;
+                   }
+                }
+             }
              
              if (videopreview !== null) // Can the content can be previewed?
              {
@@ -441,15 +457,25 @@
         * Fire off a request to the repository to queue the creation of video renditions. This will return a 404 if the queue request
         * completes successfully, or a 500 if an error occurs
         * 
-        * @method _queueVideoThumbnailGeneration
+        * @method _queueThumbnailGeneration
         * @return
         */
-       _queueVideoThumbnailGeneration: function VP_queueVideoThumbnailGeneration ()
+       _queueThumbnailGeneration: function VP_queueThumbnailGeneration ()
        {
-          var ps = this.previews, videopreview,
-          flvpreview = this.attributes.flvThumbnailName, h264preview = this.attributes.h264ThumbnailName;
-          
-          videopreview = Alfresco.util.arrayContains(ps, h264preview) ? h264preview : (Alfresco.util.arrayContains(ps, flvpreview) ? flvpreview : null);
+          var ps = this.previews, videopreview = null,
+             mimetype = this.wp.options.mimeType, // Mimetype of the file itself
+             supportedtypes = this._getSupportedMimeTypes(), type, i, ii;
+
+          // look through each mime type that the player supports
+          for (i = 0, ii = this.attributes.playerSupportedTypes.length; i < ii; i++)
+          {
+             type = this.attributes.playerSupportedTypes[i];
+             if (mimetype != type.mimetype && type.thumbnailName && Alfresco.util.arrayContains(supportedtypes, type.mimetype))
+             {
+                videopreview = type.thumbnailName;
+                break;
+             }
+          }
           
           if (videopreview !== null)
           {
