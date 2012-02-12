@@ -42,17 +42,21 @@ div.video-preview.shadow .bd .preview-swf div
    padding-top: 30px;
 }
 
-.web-preview .previewer.FLVPlayer
-{
-   height: 650px;
-}
-
 div.video-preview.shadow .bd .preview-swf.no-preview div
 {
    padding-top: 200px;
 }
 
 div.video-preview.real.no-content
+{
+   visibility: hidden;
+}
+
+.web-preview .previewer.FLVPlayer
+{
+}
+
+.web-preview-poster img
 {
    visibility: hidden;
 }

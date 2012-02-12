@@ -44,6 +44,23 @@
     const MIMETYPE_M4V = "video/x-m4v";
     
     /**
+     * Cropped image preview thumbnail name
+     */
+    const THUMBNAIL_IMGPREVIEW = "imgpreview";
+    
+    /**
+     * Full image preview thumbnail name
+     */
+    const THUMBNAIL_IMGPREVIEWFULL = "imgpreviewfull";
+    
+    /**
+     * YUI aliases
+     */
+    var Dom = YAHOO.util.Dom, 
+       Event = YAHOO.util.Event, 
+       Element = YAHOO.util.Element;
+    
+    /**
      * FLVPlayer plug-in constructor
      * 
      * @param wp {Alfresco.WebPreview} The Alfresco.WebPreview instance that decides which plugin to use
@@ -125,6 +142,24 @@
              }
           ]
        },
+       
+       /**
+        * Width of the video being played, in pixels
+        * 
+        * @property videoWidth
+        * @type int
+        * @default 0
+        */
+       videoWidth: 0,
+
+       /**
+        * Height of the video being played, in pixels
+        * 
+        * @property videoHeight
+        * @type int
+        * @default 0
+        */
+       videoHeight: 0,
     
        /**
         * Tests if the plugin can be used in the users browser.
@@ -244,9 +279,9 @@
              });
           }
        },
-    
+       
        /**
-        * Display the Flash player
+        * Display the previewer
         *
         * @method _displayPlayer
         * @private
@@ -255,77 +290,111 @@
        {
            // To support "full window" we create a new div that will float above the rest of the ui
            this.createSwfDiv();
-           
-           // TODO Use the poster image (if present) dimensions to set the dimensions of the movie player
-
-           // Create flash web preview by using swfobject
-           var swfId = "VideoPreviewer_" + this.wp.id,
-               argsNoCache = "?noCacheToken=" + new Date().getTime();
-           var so = new YAHOO.deconcept.SWFObject(Alfresco.constants.URL_CONTEXT + "res/extras/components/preview/player_flv_maxi.swf" + argsNoCache,
-                 swfId, "100%", "100%", "6.0.0");
-           so.addVariable("fileName", this.wp.options.name);
-           so.addVariable("flv", previewCtx.videourl);
-           if (previewCtx.imageurl != null)
+          
+           // Use the poster image (if present) dimensions to set the dimensions of the movie player
+           if (previewCtx.imageurl && this.attributes.poster == THUMBNAIL_IMGPREVIEWFULL) // Is a poster image available
            {
-              so.addVariable("startimage", previewCtx.imageurl);
-           }
-           so.addVariable("showfullscreen", 1);
-           so.addVariable("showiconplay", 1);
-           so.addVariable("showplayer", "always");
-           so.addVariable("showvolume", 1);
-           so.addVariable("showtime", 1);
-           so.addVariable("playercolor", "e1e3e5");
-           so.addVariable("margin", "0");
-           so.addVariable("buttoncolor", "000000");
-           so.addVariable("buttonovercolor", "0088de");
-           so.addVariable("sliderovercolor", "0088de");
-           so.addParam("allowScriptAccess", "sameDomain");
-           so.addParam("allowFullScreen", "true");
-           so.addParam("quality", "autohigh");
-           so.addParam("wmode", "transparent");
-
-           // Finally create (or recreate) the flash web preview in the new div
-           so.write(this.swfDiv.get("id"));
-
-           /**
-            * FF3 and SF4 hides the browser cursor if the flashmovie uses a custom cursor
-            * when the flash movie is placed/hidden under a div (which is what happens if a dialog
-            * is placed on top of the web previewer) so we must turn off custom cursor
-            * when the html environment tells us to.
-            */
-           YAHOO.util.Event.addListener(swfId, "mouseover", function(e)
-           {
-              var swf = YAHOO.util.Dom.get(swfId);
-              if (swf && YAHOO.lang.isFunction(swf.setMode))
-              {
-                 YAHOO.util.Dom.get(swfId).setMode("active");
-              }
-           });
-           YAHOO.util.Event.addListener(swfId, "mouseout", function(e)
-           {
-              var swf = YAHOO.util.Dom.get(swfId);
-              if (swf && YAHOO.lang.isFunction(swf.setMode))
-              {
-                 YAHOO.util.Dom.get(swfId).setMode("inactive");
-              }
-           });
-
-           // Page unload / unsaved changes behaviour
-           YAHOO.util.Event.addListener(window, "resize", function ()
-           {
-              // TODO Do we need to use Bubbling or not? WebPreviewer.js does not
-              YAHOO.Bubbling.fire("recalculatePreviewLayout");
-              /*
-              // Only if not in maximize view
-              if (this.swfDiv.getStyle("height") !== "100%")
-              {
+              this.createPosterDiv();
+              var imgNode = document.createElement("IMG");
+              this.posterImgEl = new Element(imgNode);
+              this.posterImgEl.set("src", previewCtx.imageurl);
+              Event.addListener(imgNode, "load", function(ev, obj) {
+                 var region = Dom.getRegion(ev.currentTarget);
+                 this.videoWidth = region.width, this.videoHeight = region.height;
+                 this.posterDiv.setStyle("display", "none");
+                 this._displaySwfPlayer(previewCtx);
+                 // Place the real flash preview div on top of the shadow div
                  this.synchronizeSwfDivPosition();
-              }
-              */
-           }, this, true);
+                 // Now set height of the previewer element, if no height already applied
+                 var size = this._calculateVideoDimensions();
+                 Dom.setStyle(this.wp.getPreviewerElement(), "height", "" + size.height + "px");
+              
+              }, null, this);
+              this.posterImgEl.appendTo(this.posterDiv);
+              this.synchronizeElementPosition(this.posterDiv);
+           }
+           else
+           {
+              this._displaySwfPlayer(previewCtx);
 
-           // Place the real flash preview div on top of the shadow div
-           this.synchronizeSwfDivPosition();
+              // Place the real flash preview div on top of the shadow div
+              this.synchronizeSwfDivPosition();
+           }
+       },
+    
+       /**
+        * Display the Flash player
+        *
+        * @method _displaySwfPlayer
+        * @private
+        */
+       _displaySwfPlayer: function FLVPlayer_display(previewCtx)
+       {
+          // Create flash web preview by using swfobject
+          var swfId = "VideoPreviewer_" + this.wp.id,
+              argsNoCache = "?noCacheToken=" + new Date().getTime();
+          var so = new YAHOO.deconcept.SWFObject(Alfresco.constants.URL_CONTEXT + "res/extras/components/preview/player_flv_maxi.swf" + argsNoCache,
+                swfId, "100%", "100%", "6.0.0");
+          so.addVariable("fileName", this.wp.options.name);
+          so.addVariable("flv", previewCtx.videourl);
+          if (previewCtx.imageurl != null)
+          {
+             so.addVariable("startimage", previewCtx.imageurl);
+          }
+          so.addVariable("showfullscreen", 1);
+          so.addVariable("showiconplay", 1);
+          so.addVariable("showplayer", "always");
+          so.addVariable("showvolume", 1);
+          so.addVariable("showtime", 1);
+          so.addVariable("playercolor", "e1e3e5");
+          so.addVariable("margin", "0");
+          so.addVariable("buttoncolor", "000000");
+          so.addVariable("buttonovercolor", "0088de");
+          so.addVariable("sliderovercolor", "0088de");
+          so.addParam("allowScriptAccess", "sameDomain");
+          so.addParam("allowFullScreen", "true");
+          so.addParam("quality", "autohigh");
+          so.addParam("wmode", "transparent");
+
+          // Finally create (or recreate) the flash web preview in the new div
+          so.write(this.swfDiv.get("id"));
+
+          /**
+           * FF3 and SF4 hides the browser cursor if the flashmovie uses a custom cursor
+           * when the flash movie is placed/hidden under a div (which is what happens if a dialog
+           * is placed on top of the web previewer) so we must turn off custom cursor
+           * when the html environment tells us to.
+           */
+          Event.addListener(swfId, "mouseover", function(e)
+          {
+             var swf = Dom.get(swfId);
+             if (swf && YAHOO.lang.isFunction(swf.setMode))
+             {
+                Dom.get(swfId).setMode("active");
+             }
+          });
+          Event.addListener(swfId, "mouseout", function(e)
+          {
+             var swf = Dom.get(swfId);
+             if (swf && YAHOO.lang.isFunction(swf.setMode))
+             {
+                Dom.get(swfId).setMode("inactive");
+             }
+          });
+
+          // Page unload / unsaved changes behaviour
+          Event.addListener(window, "resize", function ()
+          {
+             // TODO Do we need to use Bubbling or not? WebPreviewer.js does not
+             YAHOO.Bubbling.fire("recalculatePreviewLayout");
+             /*
+             // Only if not in maximize view
+             if (this.swfDiv.getStyle("height") !== "100%")
+             {
+                this.synchronizeSwfDivPosition();
+             }
+             */
+          }, this, true);
        },
 
        /**
@@ -356,6 +425,9 @@
            if (this.swfDiv.getStyle("height") !== "100%")
            {
               this.synchronizeSwfDivPosition();
+              // Also set height of the previewer element, if no height already applied
+              var size = this._calculateVideoDimensions();
+              Dom.setStyle(this.wp.getPreviewerElement(), "height", "" + size.height + "px");
            }
        },
        
@@ -520,29 +592,98 @@
        {
           if (!this.swfDiv)
           {
-             var realSwfDivEl = new YAHOO.util.Element(document.createElement("div"));
-             realSwfDivEl.set("id", this.wp.id + "-full-window-div");
-             realSwfDivEl.setStyle("position", "absolute");
-             realSwfDivEl.addClass("web-preview");
-             realSwfDivEl.addClass("real");
-             realSwfDivEl.appendTo(document.body);
-             this.swfDiv = realSwfDivEl;
+             this.swfDiv = this.createFloatingDiv(this.wp.id + "-full-window-div");
+             this.swfDiv.addClass("web-preview");
+             this.swfDiv.addClass("real");
           }
        },
 
        /**
-        * Positions the one element over another
+        * A second absolutely-positioned div for the movie poster
+        *
+        * @method createPosterDiv
+        */
+       createPosterDiv: function WebPreviewer_createPosterDiv()
+       {
+          if (!this.posterDiv)
+          {
+             this.posterDiv = this.createFloatingDiv(this.wp.id + "-poster-div");
+             this.posterDiv.addClass("web-preview-poster");
+          }
+       },
+
+       /**
+        * Create a floating div with absolute positioning
+        *
+        * @method createSwfDiv
+        */
+       createFloatingDiv: function WebPreviewer_createSwfDiv(elId)
+       {
+          var realSwfDivEl = new Element(document.createElement("div"));
+          realSwfDivEl.set("id", elId);
+          realSwfDivEl.setStyle("position", "absolute");
+          realSwfDivEl.appendTo(document.body);
+          return realSwfDivEl;
+       },
+
+       /**
+        * Positions the floating SWF div above the preview
         *
         * @method synchronizePosition
         */
        synchronizeSwfDivPosition: function WebPreviewer_synchronizePosition()
        {
-          var sourceYuiEl = new YAHOO.util.Element(this.wp.getPreviewerElement());
-          var region = YAHOO.util.Dom.getRegion(sourceYuiEl.get("id"));
-          this.swfDiv.setStyle("left", region.left + "px");
-          this.swfDiv.setStyle("top", region.top + "px");
-          this.swfDiv.setStyle("width", region.width + "px");
-          this.swfDiv.setStyle("height", region.height + "px");
+          var size = this._calculateVideoDimensions();
+          this.synchronizeElementPosition(this.swfDiv, size.width, size.height);
+       },
+
+       /**
+        * Position the given element over the preview element
+        *
+        * @method synchronizePosition
+        */
+       synchronizeElementPosition: function WebPreviewer_synchronizePosition(el, width, height)
+       {
+          var sourceYuiEl = new Element(this.wp.getPreviewerElement());
+          var region = Dom.getRegion(sourceYuiEl.get("id"));
+          if (width)
+          {
+             var wdiff = (region.width - width) / 2;
+             el.setStyle("left", (region.left + wdiff) + "px");
+             el.setStyle("width", width + "px");
+          }
+          else
+          {
+             el.setStyle("left", region.left + "px");
+             el.setStyle("width", region.width + "px");
+          }
+          el.setStyle("top", region.top + "px");
+          el.setStyle("height", (height || region.height) + "px");
+       },
+
+       /**
+        * Calculate the dimensions the video player should take up in the current container
+        *
+        * @method calculateVideoDimensions
+        * @private
+        * @return object
+        */
+       _calculateVideoDimensions: function WebPreviewer__calculateVideoDimensions()
+       {
+          var pwidth = this.videoWidth, pheight = this.videoHeight + 20; // toolbar at bottom takes up 20px
+          // Check image width does not exceed width of parent el
+          // TODO take into account vertical dimensions where this may be restrained, e.g. dashlets
+          var cregion = Dom.getRegion(this.wp.getPreviewerElement());
+          if (pwidth > cregion.width)
+          {
+             var scaleFactor = cregion.width / pwidth;
+             pwidth = cregion.width;
+             pheight = Math.floor((pheight - 20) * scaleFactor) + 20;
+          }
+          return {
+             width: pwidth,
+             height: pheight
+          };
        }
     };
 
