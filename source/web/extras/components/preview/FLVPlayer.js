@@ -680,6 +680,18 @@
              pwidth = cregion.width;
              pheight = Math.floor((pheight - 20) * scaleFactor) + 20;
           }
+          // Check if we are running in a dashlet, and may need to reduce the size further
+          var dashletBody = Dom.getAncestorByClassName(this.wp.getPreviewerElement(), "body");
+          if (dashletBody)
+          {
+             var bodyHeight = Dom.getRegion(dashletBody).height;
+             if (pheight > bodyHeight)
+             {
+                var scaleFactor = (bodyHeight - 20) / (pheight - 20);
+                pwidth = Math.floor(pwidth * scaleFactor);
+                pheight = bodyHeight;
+             }
+          }
           return {
              width: pwidth,
              height: pheight
