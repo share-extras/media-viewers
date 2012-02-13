@@ -670,7 +670,7 @@
         */
        _calculateVideoDimensions: function WebPreviewer__calculateVideoDimensions()
        {
-          var pwidth = this.videoWidth, pheight = this.videoHeight + 20; // toolbar at bottom takes up 20px
+          var pwidth = this.videoWidth, pheight = this.videoHeight ? this.videoHeight + 20 : this.videoHeight; // toolbar at bottom takes up 20px
           // Check image width does not exceed width of parent el
           // TODO take into account vertical dimensions where this may be restrained, e.g. dashlets
           var cregion = Dom.getRegion(this.wp.getPreviewerElement());
