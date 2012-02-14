@@ -1,7 +1,7 @@
-/**
- * Copyright (C) 20010-2011 Alfresco Share Extras project
+/*
+ * Copyright (C) 2010-2012 Share Extras contributors
  *
- * This file is part of the Alfresco Share Extras project.
+ * This file is part of the Share Extras project.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,10 +17,10 @@
  */
 
 /**
- * This is the "FLVPlayer" plug-in used to display documents directly in the web browser.
+ * This is the "FLVPlayer" plug-in used to display video directly in the web browser.
  *
- * It supports the "video/x-flv" and "video/mp4" mime types directly, and other video types
- * that can be converted into these formats (e.g. via FFmpeg transformations).
+ * It supports the "video/x-flv", "video/mp4" and "video/x-m4v" mime types directly, and 
+ * other types that can be converted into these formats (e.g. via FFmpeg transformations).
  *
  * @namespace Alfresco.WebPreview.prototype.Plugins
  * @class Alfresco.WebPreview.prototype.Plugins.FLVPlayer
@@ -68,10 +68,6 @@
      */
     Alfresco.WebPreview.prototype.Plugins.FLVPlayer = function(wp, attributes)
     {
-       /* Decoupled event listeners are added in setOptions */
-       YAHOO.Bubbling.on("documentDetailsAvailable", this.onDocumentDetailsAvailable, this);
-       YAHOO.Bubbling.on("recalculatePreviewLayout", this.onRecalculatePreviewLayout, this);
-        
        this.wp = wp;
        this.attributes = YAHOO.lang.merge(Alfresco.util.deepCopy(this.attributes), attributes);
        this.swfDiv = null;
@@ -84,12 +80,15 @@
     Alfresco.WebPreview.prototype.Plugins.FLVPlayer.prototype =
     {
        /**
-        * Attributes
+        * Plugin configuration attributes
+        * 
+        * @property attributes
+        * @type object
         */
        attributes:
        {
           /**
-           * Maximum size to display given in bytes if the node's content is used.
+           * Maximum size to display given in bytes if the node's content is used (not currently used).
            * If the node content is larger than this value the image won't be displayed.
            * Note! This doesn't apply if a thumbnail is used.
            *
@@ -102,20 +101,23 @@
           /**
            * Name of the thumbnail which, if present, is used to display a static image representing the video
            * before the play button is pressed. Use 'imgpreview' for the scaled-down thumbnail provided by the
-           * OOTB config, or 'imgpreviewfull' for the full-size version (config provided by this add-on)
+           * OOTB config, or 'imgpreviewfull' for the full-size version (config provided by this add-on).
+           * 
+           * Important: Sizing of the player to the dimensions of the video is dependent on the use of the 
+           * 'imgpreviewfull' thumbnail.
            * 
            * @property poster
            * @type string
            */
-          poster: "imgpreviewfull",
+          poster: THUMBNAIL_IMGPREVIEWFULL,
           
           /**
-           * Whether to queue missing video renditions
+           * Whether to queue missing video renditions. "true" for queue, "false" for do not queue.
            * 
            * @property queueMissingRenditions
-           * @type boolean
+           * @type string
            */
-          queueMissingRenditions: true,
+          queueMissingRenditions: "true",
           
           /**
            * Mimetypes supported by the player, including thumbnail names and versions of flash required for each type
@@ -166,26 +168,36 @@
         *
         * @method report
         * @return {String} Returns nothing if the plugin may be used, otherwise returns a message containing the reason
-        *         it cant be used as a string.
+        *         it can't be used as a string.
         * @public
         */
        report: function FLVPlayer_report()
        {
-           return this._getSupportedMimeTypes().length > 0 ? "" : "No supported MIME type available";
+           return this._getSupportedMimeTypes().length > 0 ? "" : this.wp.msg("error.noSupportedVideoType");
        },
     
        /**
-        * Display the node.
+        * Display the node using this plugin.
         *
         * @method display
         * @public
         */
        display: function FLVPlayer_display()
        {
-          var previewCtx = this.resolveUrls();
+          // Set up message area
+          this.msgEl = Dom.getFirstChild(this.wp.getPreviewerElement());
           
+          var previewCtx = this.resolveUrls();
           if (previewCtx.videourl) // Present if video is a natively-previewable type, e.g. flv or mp4
           {
+              /*
+               * TODO Add logic for maximum file size
+               * 
+               *  var srcMaxSize = this.attributes.srcMaxSize;
+               *  if (!this.attributes.src && srcMaxSize.match(/^\d+$/) && this.wp.options.size > parseInt(srcMaxSize))
+               *  {
+               *  }
+              */
               this._displayPlayer(previewCtx);
           }
           else // Otherwise we need to work out which renditions have already been generated
@@ -196,7 +208,7 @@
                 url: Alfresco.constants.PROXY_URI + "api/node/" + this.wp.options.nodeRef.replace(":/", "") + "/content/thumbnails",
                 successCallback:
                 {
-                   fn: function VP_onLoadThumbnails(p_resp, p_obj)
+                   fn: function FLVPlayer_onLoadThumbnails(p_resp, p_obj)
                    {
                        var thumbnails = [];
                        for (var i = 0; i < p_resp.json.length; i++)
@@ -206,16 +218,6 @@
                        this.availablePreviews = thumbnails;
 
                        var previewCtx = this.resolveUrls();
-
-                       /*
-                        * TODO Add logic for maximum file size
-                        * 
-                        *  var srcMaxSize = this.attributes.srcMaxSize;
-                        *  if (!this.attributes.src && srcMaxSize.match(/^\d+$/) && this.wp.options.size > parseInt(srcMaxSize))
-                        *  {
-                        *  }
-                       */
-                       
                        if (previewCtx.videourl) // Present if video is a native mimetype, e.g. mp4
                        {
                            this._displayPlayer(previewCtx);
@@ -223,7 +225,7 @@
                        else
                        {
                           // Video rendition is not yet ready, or could not be generated
-                          if (this.attributes.queueMissingRenditions)
+                          if (this.attributes.queueMissingRenditions == "true")
                           {
                               // Fire off a request to queue the rendition generation, if it's not already been done
                               if (!this.thumbnailQueued)
@@ -232,44 +234,15 @@
                                   this.thumbnailQueued = true;
                               }
                               
-                              // Add a message to the preview area to indicate we are waiting for the video to be converted
-                              var pEl = this.wp.getPreviewerElement();
-                              pEl.innerHTML = "";
-                              var msgEl = document.createElement("div");
-                              // TODO Add poster behind this message area, if available
-                              //previewCtx.imageurl
-                              //msgEl.set("id", this.wp.id + "-full-window-div");
-                              //msgEl.setStyle("position", "absolute");
-                              Dom.addClass(msgEl, "message");
-                              msgEl.innerHTML = this.wp.msg("label.videoConverting");
-                              pEl.appendChild(msgEl);
-                              
                               // Poll again in 10 seconds, to see if the thumbnail is available yet
                               YAHOO.lang.later(10000, this, this.display);
-                              
-                              return pEl.innerHTML;
+                              // Add a message to the preview area to indicate we are waiting for the video to be converted
+                              return this._displayMessage(this.wp.msg("label.videoConverting"), previewCtx);
                           }
                           else
                           {
-                              var pEl = this.wp.getPreviewerElement();
-                              
-                              pEl.innerHTML = "";
-                              
-                              var msgEl = document.createElement("div");
-                              Dom.addClass(msgEl, "message");
-
-                              // TODO Add poster behind this message area, if available
-                              var msg = '';
-                              msg += this.wp.msg("label.noVideoAvailable");
-                              msg += '<br/>';
-                              msg += '<a class="theme-color-1" href="' + this.wp.getContentUrl(true) + '">';
-                              msg += this.wp.msg("label.noVideoDownloadFile");
-                              msg += '</a>';
-
-                              msgEl.innerHTML = msg;
-                              pEl.appendChild(msgEl);
-                              
-                              return pEl.innerHTML;
+                              return this._displayMessage(this.wp.msg("label.noVideoAvailable") + '<br/>' + '<a class="theme-color-1" href="' + this.wp.getContentUrl(true) + '">' + 
+                                 this.wp.msg("label.noVideoDownloadFile") + '</a>', previewCtx);
                           }
                        }
                    },
@@ -281,12 +254,68 @@
        },
        
        /**
+        * Return a message to display within the previewer element, e.g. video being converted or could not be displayed. Use
+        * the return value to return from display(), which will be set as the innerHTML of the area.
+        *
+        * @method _displayMessage
+        * @private
+        * @param {string} msg Text or HTML mark-up to display in the message area
+        * @param {object} previewCtx Preview context object, with 'imageurl' and 'videourl' properties set
+        * @return {string} The innerHTML property of the web-preview element, after setting the message
+        */
+       _displayMessage: function FLVPlayer_displayMessage(msg, previewCtx)
+       {
+          var msgEl = this._findOrCreateChildElement(this.wp.getPreviewerElement(), "div", "message");
+          if (!Dom.getAttribute(msgEl, "id"))
+          {
+             msgEl.innerHTML = "";
+             Dom.setAttribute(msgEl, "id", this.wp.id + "-message");
+          }
+          var msgSpanEl = this._findOrCreateChildElement(this._findOrCreateChildElement(msgEl, "span"), "span");
+          msgSpanEl.innerHTML = msg;
+          Dom.setStyle(msgSpanEl, "display", msg == "" ? "none" : "inline");
+
+          // Use the poster image (if present) dimensions to set the dimensions of the movie player
+          if (previewCtx && previewCtx.imageurl && this.attributes.poster == THUMBNAIL_IMGPREVIEWFULL && !this.addingMsgBg) // Is a poster image available
+          {
+             this.addingMsgBg = true;
+             var bgEl = this.createFloatingDiv(this.wp.id + "-message-bg");
+             var imgNode = document.createElement("IMG");
+             var imgEl = new Element(imgNode);
+             imgEl.set("src", previewCtx.imageurl);
+             Event.addListener(imgNode, "load", function(ev, obj) {
+                var region = Dom.getRegion(ev.currentTarget);
+                this.videoWidth = region.width, this.videoHeight = region.height;
+                var size = this._calculateVideoDimensions();
+                // Place the real flash preview div on top of the shadow div
+                this.synchronizeElementPosition(bgEl, size.width, size.height);
+                imgEl.setStyle("width", "" + size.width + "px");
+                imgEl.setStyle("height", "" + (size.height - 20) + "px");
+                // Now set height of the previewer element, ready for the video
+                Dom.setStyle(this.wp.getPreviewerElement(), "height", "" + size.height + "px");
+                var msgEl = Dom.get(this.wp.id + "-message");
+                var spanEl = this._findOrCreateChildElement(msgEl, "span");
+                Dom.insertBefore(imgNode, spanEl);
+                Dom.addClass(spanEl, "overlay");
+                Dom.setStyle(spanEl, "top", "-" + (size.height/2) + "px");
+                Dom.setStyle(msgEl, "padding-top", "0");
+                // Remove old div
+                document.body.removeChild(Dom.get(bgEl.get("id")));
+             }, null, this);
+             imgEl.appendTo(bgEl);
+             this.synchronizeElementPosition(bgEl);
+          }
+          
+          return this.wp.getPreviewerElement().innerHTML;
+       },
+       
+       /**
         * Display the previewer
         *
         * @method _displayPlayer
         * @private
         */
-       _displayPlayer: function FLVPlayer_display(previewCtx)
+       _displayPlayer: function FLVPlayer_displayPlayer(previewCtx)
        {
            // To support "full window" we create a new div that will float above the rest of the ui
            this.createSwfDiv();
@@ -301,7 +330,8 @@
               Event.addListener(imgNode, "load", function(ev, obj) {
                  var region = Dom.getRegion(ev.currentTarget);
                  this.videoWidth = region.width, this.videoHeight = region.height;
-                 this.posterDiv.setStyle("display", "none");
+                 document.body.removeChild(Dom.get(this.posterDiv.get("id"))); // remove floating div now we are finished with it
+                 this._displayMessage(""); // clear the message area
                  this._displaySwfPlayer(previewCtx);
                  // Place the real flash preview div on top of the shadow div
                  this.synchronizeSwfDivPosition();
@@ -315,6 +345,7 @@
            }
            else
            {
+              this._displayMessage(""); // clear the message area
               this._displaySwfPlayer(previewCtx);
 
               // Place the real flash preview div on top of the shadow div
@@ -327,8 +358,9 @@
         *
         * @method _displaySwfPlayer
         * @private
+        * @param {object} previewCtx Preview context object, with 'imageurl' and 'videourl' properties set
         */
-       _displaySwfPlayer: function FLVPlayer_display(previewCtx)
+       _displaySwfPlayer: function FLVPlayer_displaySwfPlayer(previewCtx)
        {
           // Create flash web preview by using swfobject
           var swfId = "VideoPreviewer_" + this.wp.id,
@@ -383,32 +415,7 @@
           });
 
           // Page unload / unsaved changes behaviour
-          Event.addListener(window, "resize", function ()
-          {
-             // TODO Do we need to use Bubbling or not? WebPreviewer.js does not
-             YAHOO.Bubbling.fire("recalculatePreviewLayout");
-             /*
-             // Only if not in maximize view
-             if (this.swfDiv.getStyle("height") !== "100%")
-             {
-                this.synchronizeSwfDivPosition();
-             }
-             */
-          }, this, true);
-       },
-
-       /**
-        * Called when document details has been available or changed (if the useDocumentDetailsAvailableEvent
-        * option was set to true) on the page so the web previewer can remove its old preview and
-        * display a new one if available.
-        *
-        * @method onDocumentDetailsAvailable
-        * @param p_layer The type of the event
-        * @param p_args Event information
-        */
-       onDocumentDetailsAvailable: function VP_onDocumentDetailsAvailable(p_layer, p_args)
-       {
-           // TODO Investigate if this method needed in v4.0, and implement if so
+          Event.addListener(window, "resize", this.onRecalculatePreviewLayout, this, true);
        },
 
        /**
@@ -416,10 +423,10 @@
         * this event to prompt a recalculation of the absolute coordinates.
         *
         * @method onRecalculatePreviewLayout
-        * @param p_layer The type of the event
-        * @param p_args Event information
+        * @private
+        * @param ev {object} Event information
         */
-       onRecalculatePreviewLayout: function VP_onRecalculatePreviewLayout(p_layer, p_args)
+       onRecalculatePreviewLayout: function FLVPlayer_onRecalculatePreviewLayout(ev)
        {
            // Only if not in maximize view
            if (this.swfDiv.getStyle("height") !== "100%")
@@ -435,9 +442,10 @@
         * Return mime types supported by the video previewer for this file
         * 
         * @method _getSupportedMimeTypes
-        * @return Array containing the video MIME types supported by the Flash video player for this file, in order of preference
+        * @private
+        * @return {array} Array containing the video MIME types supported by the Flash video player for this file, in order of preference
         */
-       _getSupportedMimeTypes: function VP__getSupportedMimeTypes()
+       _getSupportedMimeTypes: function FLVPlayer__getSupportedMimeTypes()
        {
           var ps = this.previews, // List of thumbnails that are available (might not have actually been generated yet) 
                mimetype = this.wp.options.mimeType, // Mimetype of the file itself
@@ -460,12 +468,13 @@
        },
 
        /**
-        * Helper method for deciding what previews to use to display the video content plus a still image from the video
+        * Helper method for deciding what previews to use to display the video content plus a still 'poster' image from the video
         *
         * @method resolveUrls
-        * @return An object with two properties - 'videourl' contains the video content URL to use, 'imageurl' contains the still image URL. Either or both properties may be null if no appropriate thumbnail definitions can be found
+        * @private
+        * @return {object} An object with two properties - 'videourl' contains the video content URL to use, 'imageurl' contains the still image URL. Either or both properties may be null if no appropriate thumbnail definitions can be found
         */
-       resolveUrls: function VP_resolveUrls()
+       resolveUrls: function FLVPlayer_resolveUrls()
        {
           var ps = this.previews, 
              psa = this.availablePreviews, 
@@ -530,9 +539,10 @@
         * completes successfully, or a 500 if an error occurs
         * 
         * @method _queueThumbnailGeneration
+        * @private
         * @return
         */
-       _queueThumbnailGeneration: function VP_queueThumbnailGeneration ()
+       _queueThumbnailGeneration: function FLVPlayer_queueThumbnailGeneration ()
        {
           var ps = this.previews, videopreview = null,
              mimetype = this.wp.options.mimeType, // Mimetype of the file itself
@@ -563,16 +573,20 @@
                 url: actionUrl,
                 successCallback:
                 {
-                   fn: function VP_onQueueVideoThumbnailSuccess(event, obj)
+                   fn: function FLVPlayer_onQueueVideoThumbnailSuccess(event, obj)
                    {
                    },
                    scope: this
                 },
                 failureCallback:
                 {
-                   fn: function VP_onQueueVideoThumbnailFailure(event, obj)
+                   fn: function FLVPlayer_onQueueVideoThumbnailFailure(event, obj)
                    {
-                       // TODO Display an error dialog (and log?) that the thumbnail generation could not be queued, if we get a non-404 response code
+                      // Display an error dialog (and log?) that the thumbnail generation could not be queued, if we get a non-404 response code
+                      if (event.serverResponse.status != 404)
+                      {
+                         Alfresco.logger.error('Error, Alfresco.WebPreview.Plugins.FLVPlayer failed to queue thumbnail generation (got status code ' + event.serverResponse.status + ')');
+                      }
                    },
                    scope: this
                 }
@@ -581,14 +595,16 @@
        },
 
        /**
-        * To support full window mode an extra div (realSwfDivEl) is created with absolute positioning
-        * which will have the same position and dimensions as shadowSfwDivEl.
-        * The realSwfDivEl element is to make sure the flash move is on top of all other divs and
-        * the shadowSfwDivEl element is to make sure the previewer takes the screen real estate it needs.
+        * To support full window mode an extra floating div (with class 'real') is created with absolute positioning
+        * which will have the same position and dimensions as the main web-preview element.
+        * 
+        * The real element is to make sure the flash move is on top of all other divs and
+        * the underlying element is to make sure the previewer reserves the screen real estate it needs.
         *
         * @method createSwfDiv
+        * @private
         */
-       createSwfDiv: function WebPreviewer_createSwfDiv()
+       createSwfDiv: function FLVPlayer_createSwfDiv()
        {
           if (!this.swfDiv)
           {
@@ -599,11 +615,17 @@
        },
 
        /**
-        * A second absolutely-positioned div for the movie poster
+        * A second absolutely-positioned div for the movie poster. We could create this inside the main web-preview
+        * element but the parent WebPreviewer instancer may set the innerHTML property of that element, which 
+        * wipes out any event listeners attached to elements within it.
+        * 
+        * We need to know when the poster image has loaded, so we can find out the dimensions of the video, and 
+        * therefore we use this second external element to hold it.
         *
         * @method createPosterDiv
+        * @private
         */
-       createPosterDiv: function WebPreviewer_createPosterDiv()
+       createPosterDiv: function FLVPlayer_createPosterDiv()
        {
           if (!this.posterDiv)
           {
@@ -616,8 +638,9 @@
         * Create a floating div with absolute positioning
         *
         * @method createSwfDiv
+        * @private
         */
-       createFloatingDiv: function WebPreviewer_createSwfDiv(elId)
+       createFloatingDiv: function FLVPlayer_createFloatingDiv(elId)
        {
           var realSwfDivEl = new Element(document.createElement("div"));
           realSwfDivEl.set("id", elId);
@@ -627,22 +650,32 @@
        },
 
        /**
-        * Positions the floating SWF div above the preview
+        * Position the floating SWF div, which contains the player SWF file over the main web-preview 
+        * element. The floating element will be positioned such that it is centred over the base 
+        * element, with the player sized to the dimensions of the video, if this is known.
+        * 
+        * If the player dimensions would be larger than the underlying element then the floating div
+        * will be scaled to fit within it, while preserving the aspect ratio.
+        * 
+        * If the video dimensions are not known then the floating element will take up the full 
+        * area of the web-preview element.
         *
         * @method synchronizePosition
+        * @private
         */
-       synchronizeSwfDivPosition: function WebPreviewer_synchronizePosition()
+       synchronizeSwfDivPosition: function FLVPlayer_synchronizeSwfDivPosition()
        {
           var size = this._calculateVideoDimensions();
           this.synchronizeElementPosition(this.swfDiv, size.width, size.height);
        },
 
        /**
-        * Position the given element over the preview element
+        * Position the given element over the main web-preview element
         *
         * @method synchronizePosition
+        * @private
         */
-       synchronizeElementPosition: function WebPreviewer_synchronizePosition(el, width, height)
+       synchronizeElementPosition: function FLVPlayer_synchronizeElementPosition(el, width, height)
        {
           var sourceYuiEl = new Element(this.wp.getPreviewerElement());
           var region = Dom.getRegion(sourceYuiEl.get("id"));
@@ -662,23 +695,27 @@
        },
 
        /**
-        * Calculate the dimensions the video player should take up in the current container
+        * Calculate the dimensions the video player should take up in the current container. The player will be resized if necessary
+        * to fit the horizontal bounds, and if placed inside a dashlet, also the vertical bounds of the container.
+        * 
+        * The method ensures that the aspect ratio of the video object is preserved, if resizing is necessary.
         *
         * @method calculateVideoDimensions
         * @private
-        * @return object
+        * @return {object} Object containing 'width' and 'height' properties, set to the dimensions the player should assume. If the
+        * dimensions of the video are not known then both properties will be set to zero.
         */
-       _calculateVideoDimensions: function WebPreviewer__calculateVideoDimensions()
+       _calculateVideoDimensions: function FLVPlayer__calculateVideoDimensions()
        {
-          var pwidth = this.videoWidth, pheight = this.videoHeight ? this.videoHeight + 20 : this.videoHeight; // toolbar at bottom takes up 20px
+          var toolbarHeight = 20; // Height of the bottom toolbar in px
+          var pwidth = this.videoWidth, pheight = this.videoHeight ? this.videoHeight + toolbarHeight : this.videoHeight; // toolbar at bottom takes up 20px
           // Check image width does not exceed width of parent el
-          // TODO take into account vertical dimensions where this may be restrained, e.g. dashlets
           var cregion = Dom.getRegion(this.wp.getPreviewerElement());
           if (pwidth > cregion.width)
           {
              var scaleFactor = cregion.width / pwidth;
              pwidth = cregion.width;
-             pheight = Math.floor((pheight - 20) * scaleFactor) + 20;
+             pheight = Math.floor((pheight - toolbarHeight) * scaleFactor) + toolbarHeight;
           }
           // Check if we are running in a dashlet, and may need to reduce the size further
           var dashletBody = Dom.getAncestorByClassName(this.wp.getPreviewerElement(), "body");
@@ -687,7 +724,7 @@
              var bodyHeight = Dom.getRegion(dashletBody).height;
              if (pheight > bodyHeight)
              {
-                var scaleFactor = (bodyHeight - 20) / (pheight - 20);
+                var scaleFactor = (bodyHeight - toolbarHeight) / (pheight - toolbarHeight);
                 pwidth = Math.floor(pwidth * scaleFactor);
                 pheight = bodyHeight;
              }
@@ -696,6 +733,37 @@
              width: pwidth,
              height: pheight
           };
+       },
+
+       /**
+        * Locate the first child element with the given tag name or class name, and create it if it doesn't exist
+        * 
+        * @param baseEl {HTMLElement}  Base element to search within. Only direct children will be searched
+        * @param tagName {string}      Name of the tag to match. Either tagName or className must be provided, or both.
+        * @param className {string}    Name of the tag to match. Either tagName or className must be provided, or both.
+        *
+        * @method _findOrCreateChildElement
+        * @private
+        * @return {object} First matching element object, or if no matching element was found the new node that was created
+        */
+       _findOrCreateChildElement: function FLVPlayer_findOrCreateElement(baseEl, tagName, className) {
+          var els = Dom.getChildrenBy(baseEl, function(el) {
+             return (!tagName || el.tagName.toLowerCase() == tagName.toLowerCase()) && (!className || Dom.hasClass(el, className));
+          });
+          if (els.length > 0)
+          {
+             return els[0];
+          }
+          else
+          {
+             var newEl = document.createElement(tagName);
+             if (className)
+             {
+                Dom.addClass(newEl, className);
+             }
+             baseEl.appendChild(newEl);
+             return newEl;
+          }
        }
     };
 
