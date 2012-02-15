@@ -8,41 +8,20 @@
         <module>
             <id>Media Previews Add-on</id>
             <customizations>
+                <!-- Enable FLVPlayer.js and MP3Player.js plugins in web-previewer, plus additional messages -->
                 <customization>
                     <targetPackageRoot>org.alfresco.components.preview</targetPackageRoot>              
                     <sourcePackageRoot>org.sharextras.customization.media-previews</sourcePackageRoot>
-                    <dependencies>
-                        <!-- Flash video previewer -->
-                        <css>/res/extras/components/preview/FLVPlayer.css</css>
-                        <js>/res/extras/components/preview/FLVPlayer.js</js>
-                        <!-- Audio previewer -->
-                        <css>/res/extras/components/preview/MP3Player.css</css>
-                        <js>/res/extras/components/preview/MP3Player.js</js>
-                    </dependencies>
                 </customization>
                 <!-- Enable FLVPlayer.js and MP3Player.js plugins in Document Viewer dashlet -->
                 <customization>
-                    <targetPackageRoot>org.alfresco.components.dashlets</targetPackageRoot>
-                    <dependencies>
-                        <!-- Flash video previewer -->
-                        <css>/res/extras/components/preview/FLVPlayer.css</css>
-                        <js>/res/extras/components/preview/FLVPlayer.js</js>
-                        <!-- Audio previewer -->
-                        <css>/res/extras/components/preview/MP3Player.css</css>
-                        <js>/res/extras/components/preview/MP3Player.js</js>
-                    </dependencies>
+                    <targetPackageRoot>org.sharextras.components.dashlets</targetPackageRoot>
+                    <sourcePackageRoot>org.sharextras.customization.media-previews-dashlets</sourcePackageRoot>
                 </customization>
                 <!-- Enable FLVPlayer.js and MP3Player.js plugins in wiki pages - for Wiki Rich Content add-on -->
                 <customization>
-                    <targetPackageRoot>org.alfresco.components.wiki</targetPackageRoot>
-                    <dependencies>
-                        <!-- Flash video previewer -->
-                        <css>/res/extras/components/preview/FLVPlayer.css</css>
-                        <js>/res/extras/components/preview/FLVPlayer.js</js>
-                        <!-- Audio previewer -->
-                        <css>/res/extras/components/preview/MP3Player.css</css>
-                        <js>/res/extras/components/preview/MP3Player.js</js>
-                    </dependencies>
+                    <targetPackageRoot>org.sharextras.components.wiki</targetPackageRoot>
+                    <sourcePackageRoot>org.sharextras.customization.media-previews-wiki</sourcePackageRoot>
                 </customization>
             </customizations>
             <auto-deploy>true</auto-deploy>
