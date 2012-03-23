@@ -2,26 +2,48 @@
     <modules>
     
         <!--
-            Customization module for adding i18n labels and importing client-side dependencies for
-            the extra web previewer plugins
+            Customization modules for adding i18n labels and importing client-side dependencies for
+            the two extra web previewer plugins
         -->
         <module>
-            <id>Media Previews Add-on</id>
+            <id>FLVPlayer Video Player</id>
             <customizations>
-                <!-- Enable FLVPlayer.js and MP3Player.js plugins in web-previewer, plus additional messages -->
+                <!-- Enable FLVPlayer.js plugin in web-previewer, plus additional messages -->
                 <customization>
                     <targetPackageRoot>org.alfresco.components.preview</targetPackageRoot>              
-                    <sourcePackageRoot>org.sharextras.customization.media-previews</sourcePackageRoot>
+                    <sourcePackageRoot>org.sharextras.customization.media-previews.flvplayer</sourcePackageRoot>
                 </customization>
-                <!-- Enable FLVPlayer.js and MP3Player.js plugins in Document Viewer dashlet -->
+                <!-- Enable FLVPlayer.js plugin in Document Viewer dashlet -->
                 <customization>
                     <targetPackageRoot>org.sharextras.components.dashlets</targetPackageRoot>
-                    <sourcePackageRoot>org.sharextras.customization.media-previews-dashlets</sourcePackageRoot>
+                    <sourcePackageRoot>org.sharextras.customization.media-previews-dashlets.flvplayer</sourcePackageRoot>
                 </customization>
-                <!-- Enable FLVPlayer.js and MP3Player.js plugins in wiki pages - for Wiki Rich Content add-on -->
+                <!-- Enable FLVPlayer.js plugin in wiki pages - for Wiki Rich Content add-on -->
                 <customization>
                     <targetPackageRoot>org.sharextras.components.wiki</targetPackageRoot>
-                    <sourcePackageRoot>org.sharextras.customization.media-previews-wiki</sourcePackageRoot>
+                    <sourcePackageRoot>org.sharextras.customization.media-previews-wiki.flvplayer</sourcePackageRoot>
+                </customization>
+            </customizations>
+            <auto-deploy>true</auto-deploy>
+        </module>
+        
+        <module>
+            <id>MP3Player Audio Player</id>
+            <customizations>
+                <!-- Enable MP3Player.js plugin in Document Viewer dashlet -->
+                <customization>
+                    <targetPackageRoot>org.sharextras.components.dashlets</targetPackageRoot>
+                    <sourcePackageRoot>org.sharextras.customization.media-previews-dashlets.mp3player</sourcePackageRoot>
+                </customization>
+                <!-- Enable MP3Player.js plugin in Document Viewer dashlet -->
+                <customization>
+                    <targetPackageRoot>org.sharextras.components.dashlets</targetPackageRoot>
+                    <sourcePackageRoot>org.sharextras.customization.media-previews-dashlets.mp3player</sourcePackageRoot>
+                </customization>
+                <!-- Enable MP3Player.js plugin in wiki pages - for Wiki Rich Content add-on -->
+                <customization>
+                    <targetPackageRoot>org.sharextras.components.wiki</targetPackageRoot>
+                    <sourcePackageRoot>org.sharextras.customization.media-previews-wiki.mp3player</sourcePackageRoot>
                 </customization>
             </customizations>
             <auto-deploy>true</auto-deploy>
