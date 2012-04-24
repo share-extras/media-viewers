@@ -1,0 +1,137 @@
+<project basedir="." default="dist-jar" name="Viewer Extension Build Script">
+	<!-- Import properties and targets from stock build script -->
+	<import file="build.xml" />
+	<taskdef name="jsmin" classname="net.matthaynes.jsmin.JSMin_Task" classpath="${basedir}/lib/jsmin.0.2.4.jar" />
+
+	<target name="copy-jar" description="Assemble configuration and resource files in a JAR file structure">
+		<mkdir dir="${build.jar.dir}" />
+		<!-- Copy configuration files, web scripts, etc. directly into the JAR so they appear on the
+			classpath. -->
+		<copy todir="${build.jar.dir}" includeEmptyDirs="false">
+			<fileset dir="${config.dir}" includes="${config.includes}">
+				<!-- Spring config -->
+				<exclude name="web-application-config.xml" />
+				<exclude name="surf-config.xml" />
+				<exclude name="alfresco/slingshot-application-context.xml" />
+				<exclude name="alfresco/web-extension/custom-slingshot-application-context.xml" />
+				<!-- Surf config -->
+				<exclude name="alfresco/share*-config.xml" />
+				<exclude name="alfresco/web-extension/share-config-custom.xml" />
+				<exclude name="share-config-custom.xml" />
+				<!-- Global excludes -->
+				<exclude name="${config.excludes}" />
+			</fileset>
+		</copy>
+		<!-- Copy web-tier resources into the JAR. These can then be loaded by browsers via Share's resources
+			servlet by prefixing their path with '/res' -->
+		<mkdir dir="${build.jar.dir}/META-INF" />
+		<copy todir="${build.jar.dir}/META-INF" includeEmptyDirs="false">
+			<fileset dir="${res.dir}" includes="${build.res.includes}" excludes="${build.res.excludes}" />
+		</copy>
+		<!-- Map alfresco/web-extension/share-config-custom.xml to META-INF/share-config-custom.xml in the JAR -->
+		<copy todir="${build.jar.dir}/META-INF" includeEmptyDirs="false">
+			<fileset dir="${config.dir}">
+				<filename name="alfresco/web-extension/share-config-custom.xml" />
+			</fileset>
+			<globmapper from="alfresco/web-extension/*.xml" to="*.xml" handledirsep="true" />
+		</copy>
+		<copy todir="${build.jar.dir}/META-INF" includeEmptyDirs="false">
+			<fileset dir="${config.dir}">
+				<filename name="share-config-custom.xml" />
+			</fileset>
+		</copy>
+
+	</target>
+
+	<target name="compress-jar" description="Compress client side javascripts">
+		<!-- Minify JS -->
+		<yuicompress fromdir="${res.dir}" todir="${build.jar.dir}/META-INF" excludes="**/*-min.js" warn="${yuicompress.warn}">
+			<include name="extras/components/**/*.js" />
+			<exclude name="extras/components/preview/pdfjs/*" />
+		</yuicompress>
+		<!-- There is a bug in yuicompress that breaks get in prototypes
+			http://yuilibrary.com/projects/yuicompressor/ticket/2528049
+			Minify JS works, use it for all pdf.js files -->
+		<jsmin suffix="true" suffixvalue="-min">
+			<fileset dir="${build.jar.dir}/META-INF/" includes="extras/components/preview/pdfjs/*.js" excludes="**/*-min.js" />
+		</jsmin>
+
+	</target>
+
+	<target name="dist-jar" depends="clean, prepare, copy-jar, compress-jar" description="Build a JAR file containing configuration and resource files">
+		<jar destfile="${dist.dir}/${jar.name}">
+			<fileset dir="${build.jar.dir}" />
+		</jar>
+	</target>
+
+	<target name="copy-zip-tomcat" depends="build-zip-prepare,build-zip-config" description="Assemble the configuration and resource files for a Tomcat deployment structure">
+		<!-- Copy web assets -->
+		<copy todir="${build.zip.dir}/${build.res.dir}">
+			<fileset dir="${res.dir}" includes="${build.res.includes}" excludes="${build.res.excludes}" />
+		</copy>
+	</target>
+
+	<target name="compress-zip-tomcat" description="Compress client side javascripts">
+		<!-- Minify JS -->
+		<yuicompress fromdir="${res.dir}" todir="${build.zip.dir}/${build.res.dir}" excludes="**/*-min.js" warn="${yuicompress.warn}">
+			<include name="extras/components/**/*.js" />
+			<exclude name="extras/components/preview/pdfjs/*" />
+		</yuicompress>
+		<jsmin suffix="true" suffixvalue="-min">
+			<fileset dir="${build.zip.dir}/${build.res.dir}" includes="extras/components/preview/pdfjs/*.js" excludes="**/*-min.js" />
+		</jsmin>
+	</target>
+
+	<target name="dist-zip-tomcat" depends="clean, prepare, copy-zip-tomcat, compress-zip-tomcat " description="Build a ZIP file containing the customisations that can be deployed in an existing Tomcat installation">
+		<zip destfile="${dist.dir}/${zip.name}">
+			<fileset dir="${build.zip.dir}" />
+		</zip>
+	</target>
+
+	<!-- Overrides the default build-zip-tomcat that is used by hotc -->
+	<target name="build-zip-tomcat" depends="build-zip-prepare,build-zip-config, copy-zip-tomcat, compress-zip-tomcat" description="Assemble the configuration and resource files for a Tomcat deployment structure" />
+
+
+	<target name="copy-amp" description="Assemble the configuration and resource files in an AMP file structure">
+
+		<!-- Copy properties files -->
+		<copy todir="${build.amp.dir}" file="${amp.file.properties}" failonerror="true" />
+		<copy todir="${build.amp.dir}" file="${amp.file.mappings}" failonerror="true" />
+
+		<!-- Copy config files -->
+		<mkdir dir="${build.amp.dir}/config" />
+		<copy todir="${build.amp.dir}/config">
+			<fileset dir="${config.dir}" includes="${config.includes}" excludes="${config.excludes}" />
+		</copy>
+
+		<!-- Copy resource files -->
+		<mkdir dir="${build.amp.dir}/web" />
+		<copy todir="${build.amp.dir}/web">
+			<fileset dir="${res.dir}" includes="${build.res.includes}" excludes="${build.res.excludes}" />
+		</copy>
+
+	</target>
+
+	<target name="compress-amp" description="Compress client side javascripts">
+
+		<!-- Minify JS -->
+		<yuicompress fromdir="${res.dir}" todir="${build.amp.dir}/web" excludes="**/*-min.js" warn="${yuicompress.warn}">
+			<include name="**/*.js" />
+			<exclude name="extras/components/preview/pdfjs/*" />
+
+		</yuicompress>
+		<jsmin suffix="true" suffixvalue="-min">
+			<fileset dir="${build.amp.dir}/web/" includes="extras/components/preview/pdfjs/*.js" excludes="**/*-min.js" />
+		</jsmin>
+	</target>
+
+	<!-- Build the AMP file -->
+	<target name="dist-amp" depends="clean, prepare, copy-amp, compress-amp" description="Build an AMP file containing all customisations">
+		<zip destfile="${dist.dir}/${amp.name}">
+			<fileset dir="${build.amp.dir}" />
+		</zip>
+	</target>
+
+
+
+</project>

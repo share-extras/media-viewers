@@ -49,5 +49,49 @@
             <auto-deploy>true</auto-deploy>
         </module>
         
+        <module>
+            <id>Media Preview Common</id>
+            <customizations>
+                <customization>
+                    <targetPackageRoot>org.alfresco.components.preview</targetPackageRoot>              
+                    <sourcePackageRoot>org.sharextras.customization.media-previews.common</sourcePackageRoot>
+                </customization>
+            </customizations>
+            <auto-deploy>true</auto-deploy>
+        </module>
+        
+        <module>
+            <id>Iframe Viewer</id>
+            <customizations>
+                <customization>
+                    <targetPackageRoot>org.alfresco.components.preview</targetPackageRoot>              
+                    <sourcePackageRoot>org.sharextras.customization.media-previews.iframeviewer</sourcePackageRoot>
+                </customization>
+            </customizations>
+            <auto-deploy>true</auto-deploy>
+        </module>
+        
+        <module>
+            <id>PdfJs Viewer</id>
+            <customizations>
+                <customization>
+                    <targetPackageRoot>org.alfresco.components.preview</targetPackageRoot>
+                    <sourcePackageRoot>org.sharextras.customization.media-previews.pdfjs</sourcePackageRoot>
+                </customization>
+            </customizations>
+            <auto-deploy>true</auto-deploy>
+        </module>
+        
+        <module>
+            <id>PdfPlugin Viewer</id>
+            <customizations>
+                <customization>
+                    <targetPackageRoot>org.alfresco.components.preview</targetPackageRoot>
+                    <sourcePackageRoot>org.sharextras.customization.media-previews.pdfplugin</sourcePackageRoot>
+                </customization>
+            </customizations>
+            <auto-deploy>true</auto-deploy>
+        </module>
+        
     </modules>
 </extension>
