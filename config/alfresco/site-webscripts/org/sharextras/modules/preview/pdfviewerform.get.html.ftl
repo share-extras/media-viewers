@@ -1,4 +1,18 @@
 <#-- This file is part of the Share Extras PdfJs Viewer project -->
+<html>
+<head>
+<#include "/org/alfresco/components/component.head.inc">
+<#-- This file is part of the Share Extras PdfJs Viewer project -->
+<#-- Do not import pdfviewer.css with link directive, this ads media screen directive and breaks print css override -->
+<style type="text/css">
+   @import "${url.context}/res/extras/components/preview/pdfjs/pdfviewer.css";
+</style>
+<@script type="text/javascript" src="${url.context}/res/extras/components/preview/pdfjs/pdfviewercompatibility.js"></@script>
+<@script type="text/javascript" src="${url.context}/res/extras/components/preview/pdfjs/pdf.js"></@script>
+<script type="text/javascript">PDFJS.workerSrc = '${url.context}/res/extras/components/preview/pdfjs/pdf<#if DEBUG==false>-min.js<#else>.js</#if>';</script> 
+<@script type="text/javascript" src="${url.context}/res/extras/components/preview/pdfjs/pdfviewer.js"></@script>
+</head>
+<body>
 <#assign el=args.htmlid?html>
     <div id="controls">
       <button id="previous" onclick="PDFView.page--;" oncontextmenu="return false;">
@@ -106,4 +120,5 @@
         <div id="loadingBar"><div class="progress"></div></div>
     </div>
     <div id="viewer"></div>
-    
+</body>
+</html>
