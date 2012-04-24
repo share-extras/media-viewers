@@ -30,10 +30,10 @@
         <module>
             <id>MP3Player Audio Player</id>
             <customizations>
-                <!-- Enable MP3Player.js plugin in Document Viewer dashlet -->
+                <!-- Enable MP3Player.js plugin in web-previewer, plus additional messages -->
                 <customization>
-                    <targetPackageRoot>org.sharextras.components.dashlets</targetPackageRoot>
-                    <sourcePackageRoot>org.sharextras.customization.media-previews-dashlets.mp3player</sourcePackageRoot>
+                    <targetPackageRoot>org.alfresco.components.preview</targetPackageRoot>
+                    <sourcePackageRoot>org.sharextras.customization.media-previews.mp3player</sourcePackageRoot>
                 </customization>
                 <!-- Enable MP3Player.js plugin in Document Viewer dashlet -->
                 <customization>
