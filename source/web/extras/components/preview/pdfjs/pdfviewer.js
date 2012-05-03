@@ -463,7 +463,7 @@ var PDFView = {
     var percent = Math.round(level * 100);
     var loadingIndicator = document.getElementById('loading');
 //ShareExtras Changes Start
-    loadingIndicator.textContent = Alfresco.util.message("label.loading") +' '+ percent + '%';
+    loadingIndicator.textContent = '';
 //ShareExtras Changes Start
 	PDFView.loadingBar.percent = percent;
   },

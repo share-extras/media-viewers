@@ -54,6 +54,7 @@ body {
 	border-style: solid;
 	border-width: 1px;
 	background-color: transparent;
+	margin-right: -1px;
 }
 #controls > button:hover {
 	background-image: url(../../../../themes/default/images/sprite.png);
@@ -73,6 +74,11 @@ body {
 
 #controls > button[disabled] > img {
   opacity: 0.5;
+}
+
+.zoombutton {
+	font-weight: bold;
+	color: #3B5D8C;
 }
 
 #pageNumber {

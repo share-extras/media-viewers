@@ -11,6 +11,10 @@
 <@script type="text/javascript" src="${url.context}/res/extras/components/preview/pdfjs/pdf.js"></@script>
 <script type="text/javascript">PDFJS.workerSrc = '${url.context}/res/extras/components/preview/pdfjs/pdf<#if DEBUG==false>-min.js<#else>.js</#if>';</script> 
 <@script type="text/javascript" src="${url.context}/res/extras/components/preview/pdfjs/pdfviewer.js"></@script>
+<#if DEBUG==true>
+<#-- Add #pdfBug=all to end of url (view in separata window/tab) start pdf.js debugger -->
+<@script type="text/javascript" src="${url.context}/res/extras/components/preview/pdfjs/debugger.js"></@script>
+</#if>
 </head>
 <body>
 <#assign el=args.htmlid?html>
@@ -35,10 +39,10 @@
 
 
       <button id="zoomOut" title="${msg("button.zoomout")}" onclick="PDFView.zoomOut();" oncontextmenu="return false;">
-        <img src="${url.context}/res/extras/components/preview/pdfjs/images/zoom-out.svg" align="top" height="16"/>
+        <div class="zoombutton">-</div>
       </button>
       <button id="zoomIn" title="${msg("button.zoomin")}" onclick="PDFView.zoomIn();" oncontextmenu="return false;">
-        <img src="${url.context}/res/extras/components/preview/pdfjs/images/zoom-in.svg" align="top" height="16"/>
+        <div class="zoombutton">+</div>
       </button>
 
 
@@ -116,7 +120,7 @@
     </div>
 
     <div id="loadingBox">
-        <div id="loading">${msg("loading")}... 0%</div>
+        <div id="loading"></div>
         <div id="loadingBar"><div class="progress"></div></div>
     </div>
     <div id="viewer"></div>
