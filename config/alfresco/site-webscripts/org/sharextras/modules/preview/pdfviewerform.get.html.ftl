@@ -11,10 +11,6 @@
 <@script type="text/javascript" src="${url.context}/res/extras/components/preview/pdfjs/pdf.js"></@script>
 <script type="text/javascript">PDFJS.workerSrc = '${url.context}/res/extras/components/preview/pdfjs/pdf<#if DEBUG==false>-min.js<#else>.js</#if>';</script> 
 <@script type="text/javascript" src="${url.context}/res/extras/components/preview/pdfjs/pdfviewer.js"></@script>
-<#if DEBUG==true>
-<#-- Add #pdfBug=all to end of url (view in separata window/tab) start pdf.js debugger -->
-<@script type="text/javascript" src="${url.context}/res/extras/components/preview/pdfjs/debugger.js"></@script>
-</#if>
 </head>
 <body>
 <#assign el=args.htmlid?html>
