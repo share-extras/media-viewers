@@ -3,3 +3,6 @@
 <#-- Extend base web-preview with common methods -->
 <@script type="text/javascript" src="${page.url.context}/res/extras/components/preview/web-preview-extend.js"></@script>
 <@script type="text/javascript" src="${page.url.context}/res/extras/components/preview/PdfJs.js"></@script>
+<@link rel="stylesheet" type="text/css" href="${page.url.context}/res/extras/components/preview/PdfJs.css" />
+<@script type="text/javascript" src="${page.url.context}/res/extras/components/preview/pdfjs/pdf.js"></@script>
+<script type="text/javascript">PDFJS.workerSrc = '${page.url.context}/res/extras/components/preview/pdfjs/pdf<#if DEBUG==false>-min.js<#else>.js</#if>';</script> 
