@@ -41,6 +41,7 @@ var Dom = YAHOO.util.Dom,
 Alfresco.WebPreview.prototype.Plugins.PdfJs = function(wp, attributes)
 {
 	this.wp = wp;
+	this.id = wp.id; // needed by Alfresco.util.createYUIButton
 	this.attributes = YAHOO.lang.merge(Alfresco.util.deepCopy(this.attributes), attributes);
 	return this;
 };
@@ -210,119 +211,76 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
          + '" scrolling="yes" marginwidth="0" marginheight="0" frameborder="0" vspace="5" hspace="5"  style="height:' + (previewHeight - 10).toString()
          + 'px;"></iframe>';
 	      
+	      // Return HTML that will be set as the innerHTML of the previewer
 	      return displaysource;
       }
 	   else
       {
-	      var shadowDiv = document.createElement("div");
+	      // Viewer HTML is contained in an external web script, which we load via XHR, then onViewerLoad() does the rest
+	      Alfresco.util.Ajax.request({
+	         url: Alfresco.constants.URL_SERVICECONTEXT + 'extras/components/preview/pdfjs?htmlid=' + encodeURIComponent(this.wp.id),
+	         successCallback: {
+	            fn: onViewerLoad,
+	            scope: this
+	         },
+	         failureMessage: 'Could not load the viewer component'
+	      });
+	      
+         // Create shadow div for full page mode
+         var shadowDiv = document.createElement("div");
          Dom.addClass(shadowDiv, "previewer");
          Dom.addClass(shadowDiv, "PdfJs");
          Dom.addClass(shadowDiv, "shadowDiv");
          Dom.setStyle(shadowDiv, "height", window.innerHeight);
          document.body.appendChild(shadowDiv);
          this.shadowDiv = shadowDiv;
-	      
-	      // Viewer HTML is contained in an external web script, which we load via XHR
-	      Alfresco.util.Ajax.request({
-	         url: Alfresco.constants.URL_SERVICECONTEXT + 'extras/components/preview/pdfjs?htmlid=' + encodeURIComponent(this.wp.id),
-	         successCallback: {
-	            fn: function(p_obj) {
-	               this.wp.getPreviewerElement().innerHTML = p_obj.serverResponse.responseText;
-	               
-	               // Cache references to commonly-used elements
-                  this.controls = Dom.get(this.wp.id + "-controls");
-                  this.pageNumber = Dom.get(this.wp.id + "-pageNumber");
-                  this.viewer = Dom.get(this.wp.id + "-viewer");
-                  Event.addListener(this.viewer, "scroll", this.onViewerScroll, this, true);
-                  
-                  // Set up viewer
-                  if (this.attributes.pageLayout == "multi")
-                  {
-                     Dom.addClass(this.viewer, "multiPage");
-                  }
-                  
-                  // Set up toolbar
-                  this.widgets.nextButton = new YAHOO.widget.Button(
-                        this.wp.id + "-next",
-                        {
-                           disabled: false,
-                           onclick: {
-                              fn: this.onPageNext,
-                              scope: this
-                           }
-                        }
-                     );
-                  this.widgets.previousButton = new YAHOO.widget.Button(
-                        this.wp.id + "-previous",
-                        {
-                           disabled: false,
-                           onclick: {
-                              fn: this.onPagePrevious,
-                              scope: this
-                           }
-                        }
-                     );
-                  Event.addListener(this.wp.id + "-pageNumber", "change", this.onPageChange, this, true);
-                  this.widgets.zoomOutButton = new YAHOO.widget.Button(
-                        this.wp.id + "-zoomOut",
-                        {
-                           disabled: false,
-                           onclick: {
-                              fn: this.onZoomOut,
-                              scope: this
-                           }
-                        }
-                     );
-                  this.widgets.zoomInButton = new YAHOO.widget.Button(
-                        this.wp.id + "-zoomIn",
-                        {
-                           disabled: false,
-                           onclick: {
-                              fn: this.onZoomIn,
-                              scope: this
-                           }
-                        }
-                     );
-                  Event.addListener(this.wp.id + "-scaleSelect", "change", this.onZoomChange, this, true);
-                  
-                  this.widgets.downloadButton = new YAHOO.widget.Button(
-                        this.wp.id + "-download",
-                        {
-                           disabled: false,
-                           onclick: {
-                              fn: this.onDownloadClick,
-                              scope: this
-                           }
-                        }
-                     );
-                  
-                  this.widgets.maximize = new YAHOO.widget.Button(
-                        this.wp.id + "-fullpage",
-                        {
-                           disabled: false,
-                           onclick: {
-                              fn: this.onMaximizeClick,
-                              scope: this
-                           }
-                        }
-                     );
-	               
-	               // Set height of the viewer area
-	               var controlRegion = Dom.getRegion(this.controls);
-	               var previewHeight = this.wp.setupPreviewSize();
-                  Dom.setStyle(this.wp.getPreviewerElement(), "height", (previewHeight - 10).toString() + "px");
-                  Dom.setStyle(this.viewer, "height", (previewHeight - 10 - controlRegion.height).toString() + "px");
-
-                  this.viewerRegion = Dom.getRegion(this.viewer);
-                  
-                  this._loadPdf();
-	            },
-	            scope: this
-	         },
-	         failureMessage: 'Could not load the viewer component'
-	      });
+         
+         // Return null means WebPreview instance will not overwrite the innerHTML of the preview area
 	      return null;
       }
+	},
+	
+	/**
+	 * Handler for successful load of the viewer markup webscript
+	 * 
+	 * @method onViewerLoad
+	 * @public
+	 */
+	onViewerLoad: function PdfJs_onViewerLoad(p_obj)
+	{
+      this.wp.getPreviewerElement().innerHTML = p_obj.serverResponse.responseText;
+      
+      // Cache references to commonly-used elements
+      this.controls = Dom.get(this.wp.id + "-controls");
+      this.pageNumber = Dom.get(this.wp.id + "-pageNumber");
+      this.viewer = Dom.get(this.wp.id + "-viewer");
+      Event.addListener(this.viewer, "scroll", this.onViewerScroll, this, true);
+      
+      // Set up viewer
+      if (this.attributes.pageLayout == "multi")
+      {
+         Dom.addClass(this.viewer, "multiPage");
+      }
+      
+      // Set up toolbar
+      this.widgets.nextButton = Alfresco.util.createYUIButton(this, "next", this.onPageNext);
+      this.widgets.previousButton = Alfresco.util.createYUIButton(this, "previous", this.onPagePrevious);
+      Event.addListener(this.wp.id + "-pageNumber", "change", this.onPageChange, this, true);
+      this.widgets.zoomOutButton = Alfresco.util.createYUIButton(this, "zoomOut", this.onZoomOut);
+      this.widgets.zoomInButton = Alfresco.util.createYUIButton(this, "zoomIn", this.onZoomIn);
+      Event.addListener(this.wp.id + "-scaleSelect", "change", this.onZoomChange, this, true);
+      this.widgets.downloadButton = Alfresco.util.createYUIButton(this, "download", this.onDownloadClick);
+      this.widgets.maximize = Alfresco.util.createYUIButton(this, "fullpage", this.onMaximizeClick);
+      
+      // Set height of the viewer area
+      var controlRegion = Dom.getRegion(this.controls);
+      var previewHeight = this.wp.setupPreviewSize();
+      Dom.setStyle(this.wp.getPreviewerElement(), "height", (previewHeight - 10).toString() + "px");
+      Dom.setStyle(this.viewer, "height", (previewHeight - 10 - controlRegion.height).toString() + "px");
+
+      this.viewerRegion = Dom.getRegion(this.viewer);
+      
+      this._loadPdf();
 	},
    
    /**
