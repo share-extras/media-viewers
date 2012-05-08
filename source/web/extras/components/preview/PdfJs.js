@@ -40,39 +40,39 @@ var Dom = YAHOO.util.Dom,
  */
 Alfresco.WebPreview.prototype.Plugins.PdfJs = function(wp, attributes)
 {
-	this.wp = wp;
-	this.id = wp.id; // needed by Alfresco.util.createYUIButton
-	this.attributes = YAHOO.lang.merge(Alfresco.util.deepCopy(this.attributes), attributes);
-	return this;
+   this.wp = wp;
+   this.id = wp.id; // needed by Alfresco.util.createYUIButton
+   this.attributes = YAHOO.lang.merge(Alfresco.util.deepCopy(this.attributes), attributes);
+   return this;
 };
 
 Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
-	/**
-	 * Attributes
-	 */
-	attributes : {
+   /**
+    * Attributes
+    */
+   attributes : {
 
-		/**
-		 * Decides if the node's content or one of its thumbnails shall be
-		 * displayed. Leave it as it is if the node's content shall be used. Set
-		 * to a custom thumbnail definition name if the node's thumbnail contains
-		 * the PdfJs to display.
-		 * 
-		 * @property src
-		 * @type String
-		 * @default null
-		 */
-		src : null,
+      /**
+       * Decides if the node's content or one of its thumbnails shall be
+       * displayed. Leave it as it is if the node's content shall be used. Set
+       * to a custom thumbnail definition name if the node's thumbnail contains
+       * the PdfJs to display.
+       * 
+       * @property src
+       * @type String
+       * @default null
+       */
+      src : null,
 
-		/**
-		 * Skipbrowser test, mostly for developer to force test loading Valid
-		 * options "true" "false" as String
-		 * 
-		 * @property skipbrowsertest
-		 * @type String
-		 * @default "false"
-		 */
-		skipbrowsertest : "false",
+      /**
+       * Skipbrowser test, mostly for developer to force test loading Valid
+       * options "true" "false" as String
+       * 
+       * @property skipbrowsertest
+       * @type String
+       * @default "false"
+       */
+      skipbrowsertest : "false",
 
       /**
        * Display mode, either "iframe" or "block"
@@ -81,7 +81,7 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
        * @type String
        * @default "iframe"
        */
-		mode: "iframe",
+      mode: "iframe",
 
       /**
        * Default zoom level
@@ -90,16 +90,16 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
        * @type String
        * @default "auto"
        */
-		defaultScale: "auto",
-		
-		/**
-		 * Multipler for zooming in/out
+      defaultScale: "auto",
+      
+      /**
+       * Multipler for zooming in/out
        * 
        * @property scaleDelta
        * @type String
        * @default "1.1"
-		 */
-		scaleDelta: "1.1",
+       */
+      scaleDelta: "1.1",
 
       /**
        * Layout to use to display pages, "single" or "multi"
@@ -108,146 +108,140 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
        * @type String
        * @default "multi"
        */
-		pageLayout: "multi"
-	},
-	
-	pdfDoc: null,
-	
-	pageNum: 1,
+      pageLayout: "multi"
+   },
+   
+   pdfDoc: null,
+   
+   pageNum: 1,
 
-	pages: [],
-	
-	numPages: 0,
-	
-	thumbnails: [],
-	
-	currentScale: K_UNKNOWN_SCALE,
-	
-	currentScaleValue: null,
-	
-	widgets: {},
-	
-	maximized: false,
+   pages: [],
+   
+   numPages: 0,
+   
+   thumbnails: [],
+   
+   currentScale: K_UNKNOWN_SCALE,
+   
+   currentScaleValue: null,
+   
+   widgets: {},
+   
+   maximized: false,
 
-	/**
-	 * Tests if the plugin can be used in the users browser.
-	 * 
-	 * @method report
-	 * @return {String} Returns nothing if the plugin may be used, otherwise
-	 *         returns a message containing the reason it cant be used as a
-	 *         string.
-	 * @public
-	 */
-	report : function PdfJs_report()
-	{
-		var canvassupport = false, skipbrowsertest = (this.attributes.skipbrowsertest && this.attributes.skipbrowsertest === "true") ? true : false;
+   /**
+    * Tests if the plugin can be used in the users browser.
+    * 
+    * @method report
+    * @return {String} Returns nothing if the plugin may be used, otherwise
+    *         returns a message containing the reason it cant be used as a
+    *         string.
+    * @public
+    */
+   report : function PdfJs_report()
+   {
+      var canvassupport = false, skipbrowsertest = (this.attributes.skipbrowsertest && this.attributes.skipbrowsertest === "true") ? true : false;
 
-		if (skipbrowsertest === false)
-		{
-			// Test if canvas is supported
-			if (window.HTMLCanvasElement)
-			{
-				canvassupport = true;
-				// Do some engine test as well, some support canvas but not the
-				// rest for full html5
-				if (YAHOO.env.ua.webkit > 0 && YAHOO.env.ua.webkit < 534)
-				{
-					// http://en.wikipedia.org/wiki/Google_Chrome
-					// Guessing for the same for safari
-					canvassupport = false;
-				}
-				if (YAHOO.env.ua.ie > 0 && YAHOO.env.ua.ie < 9)
-				{
-					canvassupport = false;
-				}
-				if (YAHOO.env.ua.gecko > 0 && YAHOO.env.ua.gecko < 5)
-				{
-					// http://en.wikipedia.org/wiki/Gecko_(layout_engine)
-					canvassupport = false;
-				}
-			}
-
-		} else
-		{
-			canvassupport = true;
-		}
-
-		// If neither is supported, then report this, and bail out as viewer
-		if (canvassupport === false && skipbrowsertest === false)
-		{
-			return this.wp.msg("label.browserReport", "&lt;canvas&gt; missing");
-		}
-	},
-
-	/**
-	 * Display the node.
-	 * 
-	 * @method display
-	 * @public
-	 */
-	display : function PdfJs_display()
-	{
-		// html5 is supported, display with pdf.js
-		// id and name needs to be equal, easier if you need scripting access
-		// to iframe
-	   if (this.attributes.mode == "iframe")
+      if (skipbrowsertest === false)
       {
-	      var fileurl;
-	      if (this.attributes.src)
-	      {
-	         // We do not use the built in function to get url, since pdf.js will
-	         // strip
-	         // attributes from the url. Instead we add it back in pdfviewer.js
-	         fileurl = Alfresco.constants.PROXY_URI + "api/node/" + this.wp.options.nodeRef.replace(":/", "") + "/content/thumbnails/pdf/" + this.wp.options.name
-	               + '.pdf';
-	      }
-	      else
-	      {
-	         fileurl = this.wp.getContentUrl();
-	      }
+         // Test if canvas is supported
+         if (window.HTMLCanvasElement)
+         {
+            canvassupport = true;
+            // Do some engine test as well, some support canvas but not the
+            // rest for full html5
+            if (YAHOO.env.ua.webkit > 0 && YAHOO.env.ua.webkit < 534)
+            {
+               // http://en.wikipedia.org/wiki/Google_Chrome
+               // Guessing for the same for safari
+               canvassupport = false;
+            }
+            if (YAHOO.env.ua.ie > 0 && YAHOO.env.ua.ie < 9)
+            {
+               canvassupport = false;
+            }
+            if (YAHOO.env.ua.gecko > 0 && YAHOO.env.ua.gecko < 5)
+            {
+               // http://en.wikipedia.org/wiki/Gecko_(layout_engine)
+               canvassupport = false;
+            }
+         }
+
+      } else
+      {
+         canvassupport = true;
+      }
+
+      // If neither is supported, then report this, and bail out as viewer
+      if (canvassupport === false && skipbrowsertest === false)
+      {
+         return this.wp.msg("label.browserReport", "&lt;canvas&gt; missing");
+      }
+   },
+
+   /**
+    * Display the node.
+    * 
+    * @method display
+    * @public
+    */
+   display : function PdfJs_display()
+   {
+      // html5 is supported, display with pdf.js
+      // id and name needs to be equal, easier if you need scripting access
+      // to iframe
+      if (this.attributes.mode == "iframe")
+      {
+         var fileurl;
+         if (this.attributes.src)
+         {
+            // We do not use the built in function to get url, since pdf.js will
+            // strip
+            // attributes from the url. Instead we add it back in pdfviewer.js
+            fileurl = Alfresco.constants.PROXY_URI + "api/node/" + this.wp.options.nodeRef.replace(":/", "") + "/content/thumbnails/pdf/" + this.wp.options.name
+                  + '.pdf';
+         }
+         else
+         {
+            fileurl = this.wp.getContentUrl();
+         }
          var previewHeight = this.wp.setupPreviewSize();
          Dom.setAttribute(this.wp.getPreviewerElement(), "height", (previewHeight - 10).toString());
-	      var displaysource = '<iframe id="PdfJs" name="PdfJs" src="' + Alfresco.constants.URL_SERVICECONTEXT + 'extras/components/preview/pdfviewer?htmlid=' + encodeURIComponent(this.wp.id) + '&file=' + encodeURIComponent(fileurl)
+         var displaysource = '<iframe id="PdfJs" name="PdfJs" src="' + Alfresco.constants.URL_SERVICECONTEXT + 'extras/components/preview/pdfviewer?htmlid=' + encodeURIComponent(this.wp.id) + '&file=' + encodeURIComponent(fileurl)
          + '" scrolling="yes" marginwidth="0" marginheight="0" frameborder="0" vspace="5" hspace="5"  style="height:' + (previewHeight - 10).toString()
          + 'px;"></iframe>';
-	      
-	      // Return HTML that will be set as the innerHTML of the previewer
-	      return displaysource;
+         
+         // Return HTML that will be set as the innerHTML of the previewer
+         return displaysource;
       }
-	   else
+      else
       {
-	      // Viewer HTML is contained in an external web script, which we load via XHR, then onViewerLoad() does the rest
-	      Alfresco.util.Ajax.request({
-	         url: Alfresco.constants.URL_SERVICECONTEXT + 'extras/components/preview/pdfjs?htmlid=' + encodeURIComponent(this.wp.id),
-	         successCallback: {
-	            fn: this.onViewerLoaded,
-	            scope: this
-	         },
-	         failureMessage: 'Could not load the viewer component'
-	      });
-	      
-         // Create shadow div for full page mode
-         var shadowDiv = document.createElement("div");
-         Dom.addClass(shadowDiv, "previewer");
-         Dom.addClass(shadowDiv, "PdfJs");
-         Dom.addClass(shadowDiv, "shadowDiv");
-         Dom.setStyle(shadowDiv, "height", window.innerHeight);
-         document.body.appendChild(shadowDiv);
-         this.shadowDiv = shadowDiv;
+         // Viewer HTML is contained in an external web script, which we load via XHR, then onViewerLoad() does the rest
+         Alfresco.util.Ajax.request({
+            url: Alfresco.constants.URL_SERVICECONTEXT + 'extras/components/preview/pdfjs?htmlid=' + encodeURIComponent(this.wp.id),
+            successCallback: {
+               fn: this.onViewerLoaded,
+               scope: this
+            },
+            failureMessage: 'Could not load the viewer component'
+         });
+         
+         // Window resize behaviour
+         Event.addListener(window, "resize", this.onRecalculatePreviewLayout, this, true);
          
          // Return null means WebPreview instance will not overwrite the innerHTML of the preview area
-	      return null;
+         return null;
       }
-	},
-	
-	/**
-	 * Handler for successful load of the viewer markup webscript
-	 * 
-	 * @method onViewerLoaded
-	 * @public
-	 */
-	onViewerLoaded: function PdfJs_onViewerLoaded(p_obj)
-	{
+   },
+   
+   /**
+    * Handler for successful load of the viewer markup webscript
+    * 
+    * @method onViewerLoaded
+    * @public
+    */
+   onViewerLoaded: function PdfJs_onViewerLoaded(p_obj)
+   {
       this.wp.getPreviewerElement().innerHTML = p_obj.serverResponse.responseText;
       
       // Cache references to commonly-used elements
@@ -272,16 +266,46 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
       this.widgets.downloadButton = Alfresco.util.createYUIButton(this, "download", this.onDownloadClick);
       this.widgets.maximize = Alfresco.util.createYUIButton(this, "fullpage", this.onMaximizeClick);
       
-      // Set height of the viewer area
-      var controlRegion = Dom.getRegion(this.controls);
-      var previewHeight = this.wp.setupPreviewSize();
-      Dom.setStyle(this.wp.getPreviewerElement(), "height", (previewHeight - 10).toString() + "px");
-      Dom.setStyle(this.viewer, "height", (previewHeight - 10 - controlRegion.height).toString() + "px");
-
-      this.viewerRegion = Dom.getRegion(this.viewer);
+      // Set height of the container and the viewer area
+      this._setPreviewerElementHeight();
+      this._setViewerHeight();
       
       this._loadPdf();
-	},
+   },
+   
+   /**
+    * Set the height of the preview element
+    * 
+    * @method _setPreviewerElementHeight
+    * @private
+    */
+   _setPreviewerElementHeight: function _setPreviewerElementHeight()
+   {
+      if (!this.maximized)
+      {
+         var previewHeight = this.wp.setupPreviewSize();
+         Dom.setStyle(this.wp.getPreviewerElement(), "height", (previewHeight - 10).toString() + "px");
+      }
+      else
+      {
+         Dom.setStyle(this.wp.getPreviewerElement(), "height", (Dom.getViewportHeight()).toString() + "px");
+      }
+   },
+   
+   /**
+    * Set the height of the viewer area where content is displayed, so that it occupies the height of the parent previewer element
+    * minus the menu bar.
+    * 
+    * @method _setViewerHeight
+    * @private
+    */
+   _setViewerHeight: function _setViewerHeight()
+   {
+      var previewRegion = Dom.getRegion(this.viewer.parentNode);
+      var controlRegion = Dom.getRegion(this.controls);
+      Dom.setStyle(this.viewer, "height", (previewRegion.height - controlRegion.height).toString() + "px");
+      this.viewerRegion = Dom.getRegion(this.viewer);
+   },
    
    /**
     * Fetch the PDF content and display it
@@ -289,7 +313,7 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
     * @method _fetchPdf
     * @private
     */
-	_loadPdf: function PdfJs__loadPdf() {
+   _loadPdf: function PdfJs__loadPdf() {
       var fileurl, me = this;
       if (this.attributes.src)
       {
@@ -326,14 +350,14 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
           me._renderPdf.call(me);
       });
    },
-	
-	/**
-	 * Display the PDF content in the container
-	 * 
+   
+   /**
+    * Display the PDF content in the container
+    * 
     * @method _renderPdf
     * @private
-	 */
-	_renderPdf: function PdfJs__renderPdf()
+    */
+   _renderPdf: function PdfJs__renderPdf()
    {
       this.loading = true;
       for (var i = 0; i < this.pdfDoc.numPages; i++)
@@ -355,7 +379,7 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
       }
       this._scrollToPage(this.pageNum);
       
-	},
+   },
    
    /**
     * Set page zoom level
@@ -405,46 +429,54 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
        // update the UI
        //selectScaleOption(value);
    },
-	
+   
    /**
     * 
     */
-	_setScale: function PdfJs__setScale(value)
-	{
+   _setScale: function PdfJs__setScale(value)
+   {
       if (value == this.currentScale)
       {
          return;
       }
       this.currentScale = value;
-
-      Dom.setStyle(this.viewer, "padding-left", "0px");
       
-      var pages = this.pages;
-      for (var i = 0; i < pages.length; i++)
+      // Remove all the existing canvas elements
+      for (var i = 0; i < this.pages.length; i++)
       {
-         var page = pages[i];
+         var page = this.pages[i];
          this._resetPage(page);
-         this._setPageVPos(page);
+         //this._setPageVPos(page);
       }
 
+      // Now redefine the row margins
+      this._alignViewerRows();
+   },
+   
+   /**
+    * 
+    */
+   _alignViewerRows: function PdfJs__alignViewerRows()
+   {
       var rowPos = -1, rowWidth = 0, largestRow = 0;
       if (this.attributes.pageLayout == "multi")
       {
-         for (var i = 0; i < pages.length; i++)
+         Dom.setStyle(this.viewer, "padding-left", "0px");
+         for (var i = 0; i < this.pages.length; i++)
          {
-            var page = pages[i], container = page.container;
+            var page = this.pages[i], container = page.container, vpos = this._getPageVPos(page);
             // If multi-page mode is on, we need to add custom extra margin to the LHS of the 1st item in the row to make it centred
-            if (page.vpos != rowPos)
+            if (vpos != rowPos)
             {
                rowWidth = 0;
             }
             rowWidth += Dom.getRegion(container).width + parseInt(Dom.getStyle(container, "margin-left")) * 2;
             largestRow = Math.max(largestRow, rowWidth);
-            rowPos = page.vpos;
+            rowPos = vpos;
          }
          Dom.setStyle(this.viewer, "padding-left", "" + ((this.viewer.clientWidth - largestRow) / 2) + "px");
       }
-	},
+   },
    
    /**
     * 
@@ -458,7 +490,7 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
       for (var i = this.pageNum - 1; i < this.pages.length; i++)
       {
          var page = this.pages[i];
-         if (!page.canvas && page.vpos < scrollTop + this.viewerRegion.height)
+         if (!page.canvas && this._getPageVPos(page) < scrollTop + this.viewerRegion.height)
          {
             this._renderPage(page);
             if (i + 1 < this.pages.length)
@@ -498,10 +530,21 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
           };
        
        this._setPageSize(pageObj);
-       this._setPageVPos(pageObj);
+       //this._setPageVPos(pageObj);
 
        // Add to the list of pages
        this.pages.push(pageObj);
+    },
+    
+    /**
+     * 
+     */
+    _getPageVPos: function PdfJs__getPageVPos(page)
+    {
+       var vregion = this.viewerRegion,
+          pregion = Dom.getRegion(page.container);
+       
+       return pregion.top - vregion.top;
     },
     
     /**
@@ -597,7 +640,7 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
     _scrollToPage: function PdfJs__scrollToPage(n)
     {
        var marginTop = parseInt(Dom.getStyle(this.pages[n - 1].container, "margin-top")),
-          scrollTop = this.pages[n - 1].vpos - marginTop;
+          scrollTop = this._getPageVPos(this.pages[n - 1]) - marginTop;
        this.viewer.scrollTop = scrollTop;
        this.pageNum = n;
        
@@ -698,14 +741,34 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
     
     onMaximizeClick: function PdfJs_onMaximizeClick(p_obj)
     {
-       var src = !this.maximized ? this.viewer : this.shadowDiv,
-             target = !this.maximized ? this.shadowDiv : this.viewer;
-       
-       Dom.setStyle(this.shadowDiv, "display", !this.maximized ? "block" : "none");
-
-       target.appendChild(this.controls);
-       target.appendChild(this.viewer);
-       
        this.maximized = !this.maximized;
+       
+       if (this.maximized)
+       {
+          Dom.addClass(this.wp.getPreviewerElement(), "fullPage");
+          this.widgets.maximize.set("label", this.wp.msg("button.minimize"));
+       }
+       else
+       {
+          Dom.removeClass(this.wp.getPreviewerElement(), "fullPage");
+          this.widgets.maximize.set("label", this.wp.msg("button.maximize"));
+       }
+       
+       this._setPreviewerElementHeight();
+       this._setViewerHeight();
+       // Now redefine the row margins
+       this._alignViewerRows();
+       // Render any pages that have appeared
+       this._renderVisiblePages();
+    },
+    
+    onRecalculatePreviewLayout: function PdfJs_onRecalculatePreviewLayout(p_obj)
+    {
+       this._setPreviewerElementHeight();
+       this._setViewerHeight();
+       // Now redefine the row margins
+       this._alignViewerRows();
+       // Render any pages that have appeared
+       this._renderVisiblePages();
     }
 };

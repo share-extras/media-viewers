@@ -43,9 +43,9 @@
         ${msg("button.download")}
       </button>
 
-      <button id="${el}-fullpage" title="${msg("button.fullpage")}">
+      <button id="${el}-fullpage">
         <img src="${url.context}/res/components/documentlibrary/actions/default-16.png" align="top" height="16"/>
-        ${msg("button.fullpage")}
+        ${msg("button.maximize")}
       </button>
 
     </div>
