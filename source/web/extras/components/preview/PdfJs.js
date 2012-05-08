@@ -220,7 +220,7 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
 	      Alfresco.util.Ajax.request({
 	         url: Alfresco.constants.URL_SERVICECONTEXT + 'extras/components/preview/pdfjs?htmlid=' + encodeURIComponent(this.wp.id),
 	         successCallback: {
-	            fn: onViewerLoad,
+	            fn: this.onViewerLoaded,
 	            scope: this
 	         },
 	         failureMessage: 'Could not load the viewer component'
@@ -243,10 +243,10 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
 	/**
 	 * Handler for successful load of the viewer markup webscript
 	 * 
-	 * @method onViewerLoad
+	 * @method onViewerLoaded
 	 * @public
 	 */
-	onViewerLoad: function PdfJs_onViewerLoad(p_obj)
+	onViewerLoaded: function PdfJs_onViewerLoaded(p_obj)
 	{
       this.wp.getPreviewerElement().innerHTML = p_obj.serverResponse.responseText;
       
