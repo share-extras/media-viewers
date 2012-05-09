@@ -523,19 +523,24 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
     */
    _renderPageContainer: function PdfJs__renderPageContainer(pageNum)
    {
-      // TODO separate creating the divs from the rendering
       var content = this.pdfDoc.getPage(pageNum)
       
        var div = document.createElement('div');
        div.id = this.wp.id + '-pageContainer-' + pageNum;
        Dom.addClass(div, "page");
        this.viewer.appendChild(div);
+
+       // Create the loading indicator div
+       var loadingIconDiv = document.createElement('div');
+       Dom.addClass(loadingIconDiv, 'loadingIcon');
+       div.appendChild(loadingIconDiv);
        
        var pageObj = {
              id: '',
              content: content,
              canvas: null,
-             container: div
+             container: div,
+             loadingIconDiv: loadingIconDiv
           };
        
        this._setPageSize(pageObj);
@@ -574,6 +579,10 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
      */
     _renderPage: function PdfJs__renderPage(page)
     {
+       if (page.loadingIconDiv)
+       {
+          Dom.setStyle(page.loadingIconDiv, "display", "none");
+       }
        var region = Dom.getRegion(page.container),
           canvas = document.createElement('canvas');
        canvas.id = page.container.id.replace('-pageContainer-', '-canvas-');
@@ -622,22 +631,20 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
     * @private
     */
    _resetPage: function PdfJs__resetPage(page)
-   {  
+   {
        this._setPageSize(page);
        
-       var div = page.container;
-       while (div.hasChildNodes())
-       {
-          div.removeChild(div.lastChild);
-       }
-
+       // Remove any existing page canvas
        if (page.canvas)
        {
+          page.container.removeChild(page.canvas);
           delete page.canvas;
           page.canvas = null;
-          page.loadingIconDiv = document.createElement('div');
-          Dom.addClass(page.loadingIconDiv, 'loadingIcon');
-          div.appendChild(page.loadingIconDiv);
+       }
+       
+       if (page.loadingIconDiv)
+       {
+          Dom.setStyle(page.loadingIconDiv, "display", "block");
        }
 
    },
