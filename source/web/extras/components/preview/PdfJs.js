@@ -544,7 +544,6 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
           };
        
        this._setPageSize(pageObj);
-       //this._setPageVPos(pageObj);
 
        // Add to the list of pages
        this.pages.push(pageObj);
@@ -685,7 +684,7 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
     {
        var marginTop = parseInt(Dom.getStyle(this.pages[n - 1].container, "margin-top")),
           scrollTop = this._getPageVPos(this.pages[n - 1]) - marginTop;
-       this.viewer.scrollTop = scrollTop;
+       this.viewer.scrollTop += scrollTop;
        this.pageNum = n;
        
        // Update toolbar controls
