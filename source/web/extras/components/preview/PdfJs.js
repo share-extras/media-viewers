@@ -728,7 +728,7 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
        if (pn < 1 || pn > this.numPages)
        {
           Alfresco.util.PopupManager.displayPrompt({
-             text: "That is not a valid page number"
+             text: this.wp.msg('error.badpage')
           }) 
        }
        else
