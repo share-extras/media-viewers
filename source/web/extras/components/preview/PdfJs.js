@@ -223,7 +223,7 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
                fn: this.onViewerLoaded,
                scope: this
             },
-            failureMessage: 'Could not load the viewer component'
+            failureMessage: this.wp.msg("error.viewerload")
          });
          
          // Window resize behaviour
@@ -330,21 +330,21 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
       
       PDFJS.getPdf({
          url: fileurl,
-         progress: function getPdfProgress(evt) {
+         progress: function PdfJs_getPdf_progress(evt) {
             if (evt.lengthComputable)
             {
                //me.progress(evt.loaded / evt.total);
             }
          },
-         error: function getPdfError(e) {
+         error: function PdfJs_getPdf_onError(e) {
             var loadingIndicator = document.getElementById('loading');
-            loadingIndicator.textContent = 'Error';
+            //loadingIndicator.textContent = 'Error';
             var moreInfo = {
               message: 'Unexpected server response of ' + e.target.status + '.'
             };
-            //me.error('An error occurred while loading the PDF.', moreInfo);
+            Alfresco.util.PopupManager.displayMessage(this.wp.msg('error.pdfload'));
          }
-      }, function getPdfHelloWorld(data) {
+      }, function PdfJs_getPdf_onSuccess(data) {
           me.pdfDoc = new PDFJS.PDFDoc(data);
           me.numPages = me.pdfDoc.numPages;
           me._renderPdf.call(me);
