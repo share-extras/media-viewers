@@ -90,7 +90,7 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
        * @type String
        * @default "auto"
        */
-      defaultScale: "auto",
+      defaultScale: "two-page-fit",
       
       /**
        * Multipler for zooming in/out
@@ -365,69 +365,84 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
          this._renderPageContainer(i + 1);
       }
       this.loading = false;
-
-      // Update toolbar
-      //Dom.get(this.wp.id + "-pageNumber").value = pageNum;
-      Dom.get(this.wp.id + "-numPages").textContent = this.numPages;
       
       // Set scale, if not already set
       if (this.currentScale === K_UNKNOWN_SCALE)
       {
-        // Scale was not initialized: invalid bookmark or scale was not specified.
-        // Setting the default one.
-        this._parseScale(this.attributes.defaultScale);
+         // Scale was not initialized: invalid bookmark or scale was not specified.
+         // Setting the default one.
+         this._setScale(this._parseScale(this.attributes.defaultScale));
+         this.currentScaleValue = this.attributes.defaultScale;
       }
       this._scrollToPage(this.pageNum);
+      
+      // Update toolbar
+      this._updateZoomControls();
+      Dom.get(this.wp.id + "-numPages").textContent = this.numPages;
       
    },
    
    /**
-    * Set page zoom level
+    * Calculate page zoom level based on the supplied value. Recognises numerical values and special string constants, e.g. 'page-fit'.
+    * Normally used in conjunction with setScale(), since this method does not set the current value.
     * 
     * @method _parseScale
     * @private
+    * @return {float} Numerical scale value
     */
    _parseScale: function PdfJs__parseScale(value)
    {
-       if ('custom' == value)
-       {
-          return;
-       }
-
-       this.currentScaleValue = value;
        var scale = parseFloat(value);
        if (scale)
        {
-         this._setScale(scale);
-         return;
+          return scale;
        }
 
-       var currentPage = this.pages[this.pageNum - 1];
-       var vregion = this.viewerRegion;
-       var pageWidthScale = (vregion.width) /
-                             currentPage.content.width / K_CSS_UNITS;
-       var pageHeightScale = (vregion.height) /
-                              currentPage.content.height / K_CSS_UNITS;
+       var currentPage = this.pages[this.pageNum - 1],
+          container = currentPage.container,
+          hmargin = parseInt(Dom.getStyle(container, "margin-left")) + parseInt(Dom.getStyle(container, "margin-right")),
+          vmargin = parseInt(Dom.getStyle(container, "margin-top")) + parseInt(Dom.getStyle(container, "margin-bottom")),
+          contentWidth = parseInt(currentPage.content.width),
+          contentHeight = parseInt(currentPage.content.height),
+          clientWidth = this.viewer.clientWidth - 1, // allow an extra pixel in width otherwise 2-up view wraps
+          clientHeight = this.viewer.clientHeight;
        
        if ('page-width' == value)
        {
-          this._setScale(pageWidthScale);
+          var pageWidthScale = (clientWidth - hmargin) / contentWidth;
+          return pageWidthScale;
+       }
+       else if ('two-page-width' == value)
+       {
+          var pageWidthScale = (clientWidth - hmargin*2) / contentWidth;
+          return pageWidthScale / 2;
        }
        else if ('page-height' == value)
        {
-          this._setScale(pageHeightScale);
+          var pageHeightScale = (clientHeight - vmargin) / contentHeight;
+          return pageHeightScale;
        }
        else if ('page-fit' == value)
        {
-          this._setScale(Math.min(pageWidthScale, pageHeightScale));
+          var pageWidthScale = (clientWidth - hmargin) / contentWidth,
+             pageHeightScale = (clientHeight - vmargin) / contentHeight;
+          return Math.min(pageWidthScale, pageHeightScale);
+       }
+       else if ('two-page-fit' == value)
+       {
+          var pageWidthScale = (clientWidth - hmargin*2) / contentWidth,
+             pageHeightScale = (clientHeight - vmargin) / contentHeight;
+          return Math.min(pageWidthScale / 2, pageHeightScale);
        }
        else if ('auto' == value)
        {
-          this._setScale(Math.min(1.0, pageWidthScale));
+          var pageWidthScale = (clientWidth - hmargin) / contentWidth;
+          return Math.min(1.0, pageWidthScale);
        }
-       
-       // update the UI
-       //selectScaleOption(value);
+       else
+       {
+          throw "Unrecognised zoom level '" + value + "'";
+       }
    },
    
    /**
@@ -446,7 +461,6 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
       {
          var page = this.pages[i];
          this._resetPage(page);
-         //this._setPageVPos(page);
       }
 
       // Now redefine the row margins
@@ -474,7 +488,7 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
             largestRow = Math.max(largestRow, rowWidth);
             rowPos = vpos;
          }
-         Dom.setStyle(this.viewer, "padding-left", "" + ((this.viewer.clientWidth - largestRow) / 2) + "px");
+         Dom.setStyle(this.viewer, "padding-left", "" + Math.floor(((this.viewer.clientWidth - largestRow) / 2)) + "px");
       }
    },
    
@@ -603,8 +617,8 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
       var pageContainer = page.container, content = page.content,
          height = content.height * this.currentScale,
          width = content.width * this.currentScale;
-      Dom.setStyle(pageContainer, "height", "" + height + "px");
-      Dom.setStyle(pageContainer, "width", "" + width + "px");
+      Dom.setStyle(pageContainer, "height", "" + Math.floor(height) + "px");
+      Dom.setStyle(pageContainer, "width", "" + Math.floor(width) + "px");
    },
    
    /**
@@ -633,6 +647,36 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
        }
 
    },
+   
+   /**
+    * @method _updatePageControls
+    */
+   _updatePageControls: function PdfJs__updatePageControls()
+   {
+      // Update current page number
+      this.pageNumber.value = this.pageNum;
+      // Update toolbar controls
+      this.widgets.nextButton.set("disabled", this.pageNum >= this.pdfDoc.numPages);
+      this.widgets.previousButton.set("disabled", this.pageNum <= 1);
+   },
+   
+   /**
+    * @method _updateZoomControls
+    */
+   _updateZoomControls: function PdfJs__updateZoomControls(n)
+   {
+      // Update zoom controls
+      this.widgets.zoomInButton.set("disabled", this.currentScale * this.attributes.scaleDelta > K_MAX_SCALE);
+      this.widgets.zoomOutButton.set("disabled", this.currentScale / this.attributes.scaleDelta < K_MIN_SCALE);
+      var select = Dom.get(this.wp.id + "-scaleSelect");
+      for (var i = 0; i < select.options.length; i++)
+      {
+         if (this.currentScaleValue == select.options[i].value)
+         {
+            select.selectedIndex = i;
+         }
+      }
+   },
     
     /**
      * 
@@ -645,9 +689,7 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
        this.pageNum = n;
        
        // Update toolbar controls
-       this.pageNumber.value = n;
-       this.widgets.nextButton.set("disabled", this.pageNum >= this.pdfDoc.numPages);
-       this.widgets.previousButton.set("disabled", this.pageNum <= 1);
+       this._updatePageControls();
        
        // Render visible pages
        this._renderVisiblePages();
@@ -715,23 +757,29 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
     onZoomOut: function PdfJs_onZoomOut(p_obj)
     {
        var newScale = Math.max(K_MIN_SCALE, this.currentScale / this.attributes.scaleDelta);
-       this._parseScale(newScale);
+       this._setScale(this._parseScale(newScale));
+       this.currentScaleValue = newScale;
        this._scrollToPage(this.pageNum);
+       this._updateZoomControls();
        
     },
     
     onZoomIn: function PdfJs_onZoomIn(p_obj)
     {
        var newScale = Math.min(K_MAX_SCALE, this.currentScale * this.attributes.scaleDelta);
-       this._parseScale(newScale);
+       this._setScale(this._parseScale(newScale));
+       this.currentScaleValue = newScale;
        this._scrollToPage(this.pageNum);
+       this._updateZoomControls();
     },
     
     onZoomChange: function PdfJs_onZoomChange(p_obj)
     {
        var newScale = p_obj.currentTarget.options[p_obj.currentTarget.selectedIndex].value;
-       this._parseScale(newScale);
+       this._setScale(this._parseScale(newScale));
+       this.currentScaleValue = newScale;
        this._scrollToPage(this.pageNum);
+       this._updateZoomControls();
     },
     
     onDownloadClick: function PdfJs_onDownloadClick(p_obj)

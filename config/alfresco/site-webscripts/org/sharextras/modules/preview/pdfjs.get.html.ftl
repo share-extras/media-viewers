@@ -24,7 +24,6 @@
       </button>
 
       <select id="${el}-scaleSelect">
-        <option id="customScaleOption" value="custom"></option>
         <option value="0.25">25%</option>
         <option value="0.5">50%</option>
         <option value="0.75">75%</option>
@@ -33,9 +32,11 @@
         <option value="1.5">150%</option>
         <option value="2">200%</option>
         <option value="4">400%</option>
-        <option id="pageWidthOption" value="page-width">${msg("select.pagewidth")}</option>
-        <option id="pageFitOption" value="page-fit">${msg("select.pagefit")}</option>
-        <option id="pageAutoOption" value="auto" selected="selected">${msg("select.auto")}</option>
+        <option value="page-width">${msg("select.pagewidth")}</option>
+        <option value="two-page-width">${msg("select.twopagewidth")}</option>
+        <option value="page-fit">${msg("select.pagefit")}</option>
+        <option value="two-page-fit">${msg("select.twopagefit")}</option>
+        <option value="auto">${msg("select.auto")}</option>
       </select>
 
       <button id="${el}-download" title="${msg("button.download")}">
