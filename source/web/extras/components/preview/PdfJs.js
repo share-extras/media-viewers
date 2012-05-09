@@ -314,19 +314,8 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
     * @private
     */
    _loadPdf: function PdfJs__loadPdf() {
-      var fileurl, me = this;
-      if (this.attributes.src)
-      {
-         // We do not use the built in function to get url, since pdf.js will
-         // strip
-         // attributes from the url. Instead we add it back in pdfviewer.js
-         fileurl = Alfresco.constants.PROXY_URI + "api/node/" + this.wp.options.nodeRef.replace(":/", "") + "/content/thumbnails/pdf/" + this.wp.options.name
-               + '.pdf';
-      }
-      else
-      {
-         fileurl = this.wp.getContentUrl();
-      }
+      var me = this,
+         fileurl = this.attributes.src ? this.wp.getThumbnailUrl(this.attributes.src) : this.wp.getContentUrl();
       
       PDFJS.getPdf({
          url: fileurl,
