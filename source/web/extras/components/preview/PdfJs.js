@@ -501,19 +501,14 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
          scrollTop = this.viewer.scrollTop;
       
       // Render visible pages
-      for (var i = this.pageNum - 1; i < this.pages.length; i++)
+      for (var i = 0; i < this.pages.length; i++)
       {
          var page = this.pages[i];
-         if (!page.canvas && this._getPageVPos(page) < scrollTop + this.viewerRegion.height)
+         if (!page.canvas && this._getPageVPos(page) < this.viewerRegion.height * 1.5)
          {
             this._renderPage(page);
-            if (i + 1 < this.pages.length)
-            {
-               this._renderPage(this.pages[i + 1]);
-            }
          }
       }
-      // TODO render next page? Or one before?
    },
    
    /*
