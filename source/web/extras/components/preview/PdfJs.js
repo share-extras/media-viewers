@@ -753,6 +753,23 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
     {
        // Render visible pages
        this._renderVisiblePages();
+       
+       // Calculate new page number
+       var currVpos = this._getPageVPos(this.pages[this.pageNum - 1]);
+       for (var i = 0; i < this.pages.length; i++)
+       {
+          var page = this.pages[i],
+             vpos = this._getPageVPos(page);
+          if (vpos + parseInt(page.container.style.height) / 2 > 0)
+          {
+             if (vpos != currVpos)
+             {
+                this.pageNum = i + 1;
+                this._updatePageControls();
+             }
+             break;
+          }
+       }
     },
     
     onZoomOut: function PdfJs_onZoomOut(p_obj)
