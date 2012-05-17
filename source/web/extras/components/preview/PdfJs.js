@@ -16,10 +16,11 @@
  * limitations under the License.
  */
 
-const K_UNKNOWN_SCALE = 0;
-const K_CSS_UNITS = 96.0 / 72.0;
-const K_MIN_SCALE = 0.25;
-const K_MAX_SCALE = 4.0;
+//IE does not support const
+var K_UNKNOWN_SCALE = 0;
+var K_CSS_UNITS = 96.0 / 72.0;
+var K_MIN_SCALE = 0.25;
+var K_MAX_SCALE = 4.0;
 
 /**
  * YUI aliases
@@ -208,7 +209,7 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
          var previewHeight = this.wp.setupPreviewSize();
          Dom.setAttribute(this.wp.getPreviewerElement(), "height", (previewHeight - 10).toString());
          var displaysource = '<iframe id="PdfJs" name="PdfJs" src="' + Alfresco.constants.URL_SERVICECONTEXT + 'extras/components/preview/pdfviewer?htmlid=' + encodeURIComponent(this.wp.id) + '&file=' + encodeURIComponent(fileurl)
-         + '" scrolling="yes" marginwidth="0" marginheight="0" frameborder="0" vspace="5" hspace="5"  style="height:' + (previewHeight - 10).toString()
+         + '" scrolling="yes" marginwidth="0" marginheight="0" frameborder="0" vspace="5" hspace="5"  style="height:' + previewHeight.toString()
          + 'px;"></iframe>';
          
          // Return HTML that will be set as the innerHTML of the previewer
@@ -316,28 +317,19 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
    _loadPdf: function PdfJs__loadPdf() {
       var me = this,
          fileurl = this.attributes.src ? this.wp.getThumbnailUrl(this.attributes.src) : this.wp.getContentUrl();
-      
-      PDFJS.getPdf({
-         url: fileurl,
-         progress: function PdfJs_getPdf_progress(evt) {
-            if (evt.lengthComputable)
-            {
-               //me.progress(evt.loaded / evt.total);
-            }
-         },
-         error: function PdfJs_getPdf_onError(e) {
-            var loadingIndicator = document.getElementById('loading');
-            //loadingIndicator.textContent = 'Error';
-            var moreInfo = {
-              message: 'Unexpected server response of ' + e.target.status + '.'
-            };
-            Alfresco.util.PopupManager.displayMessage(this.wp.msg('error.pdfload'));
+         
+         //Disable Text layer for now
+         PDFJS.disableTextLayer =  true;
+         //Check if Safari, disable workers due to bug https://github.com/mozilla/pdf.js/issues/1627
+         if (YAHOO.env.ua.webkit > 0 && !YAHOO.env.ua.chrome){
+         	PDFJS.disableWorker = true;
          }
-      }, function PdfJs_getPdf_onSuccess(data) {
-          me.pdfDoc = new PDFJS.PDFDoc(data);
-          me.numPages = me.pdfDoc.numPages;
-          me._renderPdf.call(me);
-      });
+         PDFJS.getDocument(fileurl).then(function(pdf) {
+         	me.pdfDoc = pdf;
+         	me.numPages = me.pdfDoc.numPages;
+         	me._renderPdf.call(me);
+         	  
+         	});
    },
    
    /**
@@ -349,25 +341,47 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
    _renderPdf: function PdfJs__renderPdf()
    {
       this.loading = true;
-      for (var i = 0; i < this.pdfDoc.numPages; i++)
-      {
-         this._renderPageContainer(i + 1);
-      }
-      this.loading = false;
       
-      // Set scale, if not already set
-      if (this.currentScale === K_UNKNOWN_SCALE)
-      {
-         // Scale was not initialized: invalid bookmark or scale was not specified.
-         // Setting the default one.
-         this._setScale(this._parseScale(this.attributes.defaultScale));
-         this.currentScaleValue = this.attributes.defaultScale;
+      var pagePromises = [], pagesCount = this.pdfDoc.numPages;
+      for (var i = 1; i <= pagesCount; i++){
+        pagePromises.push(this.pdfDoc.getPage(i));
       }
-      this._scrollToPage(this.pageNum);
+      var pagesPromise = PDFJS.Promise.all(pagePromises);
       
-      // Update toolbar
-      this._updateZoomControls();
-      Dom.get(this.wp.id + "-numPages").textContent = this.numPages;
+      var renderPageContainer = Alfresco.util.bind(function (promisedPages) {
+         
+         for (var i = 1; i <= pagesCount; i++) {
+            var page = promisedPages[i - 1];
+            this._renderPageContainer(i,page);
+          }
+         
+         // Set scale, if not already set
+         if (this.currentScale === K_UNKNOWN_SCALE)
+         {
+            // Scale was not initialized: invalid bookmark or scale was not specified.
+            // Setting the default one.
+            this._setScale(this._parseScale(this.attributes.defaultScale));
+            this.currentScaleValue = this.attributes.defaultScale;
+         }
+         
+         this.loading = false;
+         
+         
+         this._scrollToPage(this.pageNum);
+         
+         // Update toolbar
+         this._updateZoomControls();
+         Dom.get(this.wp.id + "-numPages").textContent = this.numPages;
+        }, this);
+      
+        
+      pagesPromise.then(renderPageContainer);
+      
+//      for (var i = 0; i < this.pdfDoc.numPages; i++)
+//      {
+//         this._renderPageContainer(i + 1);
+//      }
+
       
    },
    
@@ -387,51 +401,57 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
           return scale;
        }
 
-       var currentPage = this.pages[this.pageNum - 1],
-          container = currentPage.container,
-          hmargin = parseInt(Dom.getStyle(container, "margin-left")) + parseInt(Dom.getStyle(container, "margin-right")),
-          vmargin = parseInt(Dom.getStyle(container, "margin-top")) + parseInt(Dom.getStyle(container, "margin-bottom")),
-          contentWidth = parseInt(currentPage.content.width),
-          contentHeight = parseInt(currentPage.content.height),
-          clientWidth = this.viewer.clientWidth - 1, // allow an extra pixel in width otherwise 2-up view wraps
-          clientHeight = this.viewer.clientHeight;
-       
-       if ('page-width' == value)
+       if(this.pages.length>0){
+	          var currentPage = this.pages[this.pageNum - 1],
+	          container = currentPage.container,
+	          hmargin = parseInt(Dom.getStyle(container, "margin-left")) + parseInt(Dom.getStyle(container, "margin-right")),
+	          vmargin = parseInt(Dom.getStyle(container, "margin-top")) + parseInt(Dom.getStyle(container, "margin-bottom")),
+	          contentWidth = parseInt(currentPage.content.pageInfo.view[2]),
+	          contentHeight = parseInt(currentPage.content.pageInfo.view[3]),
+	          clientWidth = this.viewer.clientWidth - 1, // allow an extra pixel in width otherwise 2-up view wraps
+	          clientHeight = this.viewer.clientHeight;
+	       
+	       if ('page-width' == value)
+	       {
+	          var pageWidthScale = (clientWidth - hmargin) / contentWidth;
+	          return pageWidthScale;
+	       }
+	       else if ('two-page-width' == value)
+	       {
+	          var pageWidthScale = (clientWidth - hmargin*2) / contentWidth;
+	          return pageWidthScale / 2;
+	       }
+	       else if ('page-height' == value)
+	       {
+	          var pageHeightScale = (clientHeight - vmargin) / contentHeight;
+	          return pageHeightScale;
+	       }
+	       else if ('page-fit' == value)
+	       {
+	          var pageWidthScale = (clientWidth - hmargin) / contentWidth,
+	             pageHeightScale = (clientHeight - vmargin) / contentHeight;
+	          return Math.min(pageWidthScale, pageHeightScale);
+	       }
+	       else if ('two-page-fit' == value)
+	       {
+	          var pageWidthScale = (clientWidth - hmargin*2) / contentWidth,
+	             pageHeightScale = (clientHeight - vmargin) / contentHeight;
+	          return Math.min(pageWidthScale / 2, pageHeightScale);
+	       }
+	       else if ('auto' == value)
+	       {
+	          var pageWidthScale = (clientWidth - hmargin) / contentWidth;
+	          return Math.min(1.0, pageWidthScale);
+	       }
+	       else
+	       {
+	          throw "Unrecognised zoom level '" + value + "'";
+	       }
+       } else
        {
-          var pageWidthScale = (clientWidth - hmargin) / contentWidth;
-          return pageWidthScale;
+          throw "Unrecognised zoom level - no pages";
        }
-       else if ('two-page-width' == value)
-       {
-          var pageWidthScale = (clientWidth - hmargin*2) / contentWidth;
-          return pageWidthScale / 2;
-       }
-       else if ('page-height' == value)
-       {
-          var pageHeightScale = (clientHeight - vmargin) / contentHeight;
-          return pageHeightScale;
-       }
-       else if ('page-fit' == value)
-       {
-          var pageWidthScale = (clientWidth - hmargin) / contentWidth,
-             pageHeightScale = (clientHeight - vmargin) / contentHeight;
-          return Math.min(pageWidthScale, pageHeightScale);
-       }
-       else if ('two-page-fit' == value)
-       {
-          var pageWidthScale = (clientWidth - hmargin*2) / contentWidth,
-             pageHeightScale = (clientHeight - vmargin) / contentHeight;
-          return Math.min(pageWidthScale / 2, pageHeightScale);
-       }
-       else if ('auto' == value)
-       {
-          var pageWidthScale = (clientWidth - hmargin) / contentWidth;
-          return Math.min(1.0, pageWidthScale);
-       }
-       else
-       {
-          throw "Unrecognised zoom level '" + value + "'";
-       }
+
    },
    
    /**
@@ -510,9 +530,9 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
     * @method _renderPageContainer
     * @private
     */
-   _renderPageContainer: function PdfJs__renderPageContainer(pageNum)
+   _renderPageContainer: function PdfJs__renderPageContainer(pageNum, page)
    {
-      var content = this.pdfDoc.getPage(pageNum)
+      var content = page;
       
        var div = document.createElement('div');
        div.id = this.wp.id + '-pageContainer-' + pageNum;
@@ -592,10 +612,14 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
        ctx.fillStyle = 'rgb(255, 255, 255)';
        ctx.fillRect(0, 0, canvas.width, canvas.height);
        ctx.restore();
-       ctx.translate(-view.x * this.currentScale, -view.y * this.currentScale);
+       ctx.translate(-view[0] * this.currentScale, -view[1] * this.currentScale);
        
        // Render the content itself
-       content.startRendering(ctx);
+       var renderContext = {
+      	      canvasContext: ctx,
+      	      viewport: page.content.getViewport(this._parseScale(this.currentScale))
+      	    };
+      content.render(renderContext);
     },
    
    /**
@@ -607,10 +631,9 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
    _setPageSize: function PdfJs__setPageSize(page)
    {
       var pageContainer = page.container, content = page.content,
-         height = content.height * this.currentScale,
-         width = content.width * this.currentScale;
-      Dom.setStyle(pageContainer, "height", "" + Math.floor(height) + "px");
-      Dom.setStyle(pageContainer, "width", "" + Math.floor(width) + "px");
+         viewPort = content.getViewport(this.currentScale||this.attributes.defaultScale);;
+      Dom.setStyle(pageContainer, "height", "" + Math.floor(viewPort.height) + "px");
+      Dom.setStyle(pageContainer, "width", "" + Math.floor(viewPort.width) + "px");
    },
    
    /**
