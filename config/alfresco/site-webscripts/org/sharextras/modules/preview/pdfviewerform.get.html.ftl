@@ -9,15 +9,15 @@
 <#-- This file is part of the Share Extras PdfJs Viewer project -->
 <#-- Do not import pdfviewer.css with link directive, this ads media screen directive and breaks print css override -->
 <style type="text/css">
-   @import "${url.context}/res/extras/components/preview/pdfjs/pdfviewer.css";
+   @import "${url.context}/res/extras/components/preview/pdfjs/viewer.css";
 </style>
 <@script type="text/javascript" src="${url.context}/res/js/yui-common.js"></@script>
-<@script type="text/javascript" src="${url.context}/res/extras/components/preview/pdfjs/pdfviewercompatibility.js"></@script>
+<@script type="text/javascript" src="${url.context}/res/extras/components/preview/pdfjs/compatibility.js"></@script>
 <link rel="resource" type="application/l10n" href="${url.context}/res/extras/components/preview/pdfjs/locale.properties"/>
 <@script type="text/javascript" src="${url.context}/res/extras/components/preview/pdfjs/l10n.js"></@script>
 <@script type="text/javascript" src="${url.context}/res/extras/components/preview/pdfjs/pdf.js"></@script>
 <script type="text/javascript">PDFJS.workerSrc = '${url.context}/res/extras/components/preview/pdfjs/pdf<#if DEBUG==false>-min.js<#else>.js</#if>';</script> 
-<@script type="text/javascript" src="${url.context}/res/extras/components/preview/pdfjs/pdfviewer.js"></@script>
+<@script type="text/javascript" src="${url.context}/res/extras/components/preview/pdfjs/viewer.js"></@script>
 
 
 </head>
