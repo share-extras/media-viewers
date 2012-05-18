@@ -50,49 +50,7 @@
       </button>
 
     </div>
-    <div id="${el}-errorWrapper" hidden='true'>
-      <div id="${el}-errorMessageLeft">
-        <span id="${el}-errorMessage"></span>
-        <button id="${el}-errorShowMore" onclick="" oncontextmenu="return false;">
-          ${msg("error.moreinformation")}
-        </button>
-        <button id="${el}-errorShowLess" onclick="" oncontextmenu="return false;" hidden='true'>
-          ${msg("error.lessinformation")}
-        </button>
-      </div>
-      <div id="${el}-errorMessageRight">
-        <button id="${el}-errorClose" oncontextmenu="return false;">
-          ${msg("error.close")}
-        </button>
-      </div>
-      <div class="clearBoth"></div>
-      <textarea id="${el}-errorMoreInfo" hidden='true' readonly="readonly"></textarea>
-    </div>
 
-    <div id="${el}-sidebar" class="sidebar">
-      <div id="${el}-sidebarBox">
-        <div id="${el}-pinIcon" onClick="PDFView.pinSidebar()"></div>
-        <div id="${el}-sidebarScrollView">
-          <div id="${el}-sidebarView"></div>
-        </div>
-        <div id="${el}-outlineScrollView" hidden='true'>
-          <div id="${el}-outlineView"></div>
-        </div>
-        <div id="${el}-sidebarControls">
-          <button id="${el}-thumbsSwitch" title="${msg("sidebar.showthumbnails")}" onclick="PDFView.switchSidebarView('thumbs')" data-selected>
-            <img src="${url.context}/res/extras/components/preview/pdfjs/images/nav-thumbs.svg" align="top" height="16" alt="${msg("sidebar.showthumbnails.alt")}" />
-          </button>
-          <button id="${el}-outlineSwitch" title="${msg("sidebar.showoutline")}" onclick="PDFView.switchSidebarView('outline')" disabled>
-            <img src="${url.context}/res/extras/components/preview/pdfjs/images/nav-outline.svg" align="top" height="16" alt="${msg("sidebar.showoutline.alt")}" />
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <div id="${el}-loadingBox" class="loadingBox">
-        <div id="${el}-loading">${msg("loading")}... 0%</div>
-        <div id="${el}-loadingBar"><div class="progress"></div></div>
-    </div>
     <div id="${el}-viewer" class="viewer">
         <a name="${el}"></a>
     </div>

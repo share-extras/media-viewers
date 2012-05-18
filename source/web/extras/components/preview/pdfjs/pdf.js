@@ -13,7 +13,7 @@ var PDFJS = {};
   // Use strict in our context only - users might not want it
   'use strict';
 
-  PDFJS.build = '60dd0e0';
+  PDFJS.build = '58be8a0';
 
   // Files are inserted below - see Makefile
 /* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
@@ -338,19 +338,19 @@ var Page = (function PageClosure() {
  * `PDFDocument` objects on the main thread created.
  */
 var PDFDocument = (function PDFDocumentClosure() {
-  function PDFDocument(arg, callback) {
+  function PDFDocument(arg, password) {
     if (isStream(arg))
-      init.call(this, arg);
+      init.call(this, arg, password);
     else if (isArrayBuffer(arg))
-      init.call(this, new Stream(arg));
+      init.call(this, new Stream(arg), password);
     else
       error('PDFDocument: Unknown argument type');
   }
 
-  function init(stream) {
+  function init(stream, password) {
     assertWellFormed(stream.length > 0, 'stream must have data');
     this.stream = stream;
-    this.setup();
+    this.setup(password);
     this.acroForm = this.catalog.catDict.get('AcroForm');
   }
 
@@ -441,11 +441,12 @@ var PDFDocument = (function PDFDocumentClosure() {
       }
       // May not be a PDF file, continue anyway.
     },
-    setup: function PDFDocument_setup(ownerPassword, userPassword) {
+    setup: function PDFDocument_setup(password) {
       this.checkHeader();
       var xref = new XRef(this.stream,
                           this.startXRef,
-                          this.mainXRefEntriesOffset);
+                          this.mainXRefEntriesOffset,
+                          password);
       this.xref = xref;
       this.catalog = new Catalog(xref);
     },
@@ -557,6 +558,19 @@ function shadow(obj, prop, value) {
                                      writable: false });
   return value;
 }
+
+var PasswordException = (function PasswordExceptionClosure() {
+  function PasswordException(msg, code) {
+    this.name = 'PasswordException';
+    this.message = msg;
+    this.code = code;
+  }
+
+  PasswordException.prototype = new Error();
+  PasswordException.constructor = PasswordException;
+
+  return PasswordException;
+})();
 
 function bytesToString(bytes) {
   var str = '';
@@ -956,7 +970,7 @@ var Promise = PDFJS.Promise = (function PromiseClosure() {
       }
 
       this.isResolved = true;
-      this.data = data || null;
+      this.data = (typeof data !== 'undefined') ? data : null;
       var callbacks = this.callbacks;
 
       for (var i = 0, ii = callbacks.length; i < ii; i++) {
@@ -971,7 +985,7 @@ var Promise = PDFJS.Promise = (function PromiseClosure() {
       }
     },
 
-    reject: function Promise_reject(reason) {
+    reject: function Promise_reject(reason, exception) {
       if (this.isRejected) {
         error('A Promise can be rejected only once ' + this.name);
       }
@@ -984,7 +998,7 @@ var Promise = PDFJS.Promise = (function PromiseClosure() {
       var errbacks = this.errbacks;
 
       for (var i = 0, ii = errbacks.length; i < ii; i++) {
-        errbacks[i].call(null, reason);
+        errbacks[i].call(null, reason, exception);
       }
     },
 
@@ -1076,20 +1090,46 @@ var StatTimer = (function StatTimerClosure() {
  * is used, which means it must follow the same origin rules that any XHR does
  * e.g. No cross domain requests without CORS.
  *
- * @param {string|TypedAray} source Either a url to a PDF is located or a
- * typed array (Uint8Array) already populated with data.
- * @param {Object} headers An object containing the http headers like this:
- * { Authorization: "BASIC XXX" }.
+ * @param {string|TypedAray|object} source Can be an url to where a PDF is
+ * located, a typed array (Uint8Array) already populated with data or
+ * and parameter object with the following possible fields:
+ *  - url   - The URL of the PDF.
+ *  - data  - A typed array with PDF data.
+ *  - httpHeaders - Basic authentication headers.
+ *  - password - For decrypting password-protected PDFs.
+ *
  * @return {Promise} A promise that is resolved with {PDFDocumentProxy} object.
  */
-PDFJS.getDocument = function getDocument(source, headers) {
+PDFJS.getDocument = function getDocument(source) {
+  var url, data, headers, password, parameters = {};
+  if (typeof source === 'string') {
+    url = source;
+  } else if (isArrayBuffer(source)) {
+    data = source;
+  } else if (typeof source === 'object') {
+    url = source.url;
+    data = source.data;
+    headers = source.httpHeaders;
+    password = source.password;
+    parameters.password = password || null;
+
+    if (!url && !data)
+      error('Invalid parameter array, need either .data or .url');
+  } else {
+    error('Invalid parameter in getDocument, need either Uint8Array, ' +
+          'string or a parameter object');
+  }
+
   var promise = new PDFJS.Promise();
   var transport = new WorkerTransport(promise);
-  if (typeof source === 'string') {
+  if (data) {
+    // assuming the data is array, instantiating directly from it
+    transport.sendData(data, parameters);
+  } else if (url) {
     // fetch url
     PDFJS.getPdf(
       {
-        url: source,
+        url: url,
         progress: function getPDFProgress(evt) {
           if (evt.lengthComputable)
             promise.progress({
@@ -1104,12 +1144,10 @@ PDFJS.getDocument = function getDocument(source, headers) {
         headers: headers
       },
       function getPDFLoad(data) {
-        transport.sendData(data);
+        transport.sendData(data, parameters);
       });
-  } else {
-    // assuming the source is array, instantiating directly from it
-    transport.sendData(source);
   }
+
   return promise;
 };
 
@@ -1189,6 +1227,11 @@ var PDFDocumentProxy = (function PDFDocumentProxyClosure() {
         info: info,
         metadata: metadata ? new PDFJS.Metadata(metadata) : null
       });
+      return promise;
+    },
+    isEncrypted: function PDFDocumentProxy_isEncrypted() {
+      var promise = new PDFJS.Promise();
+      promise.resolve(this.pdfInfo.encrypted);
       return promise;
     },
     destroy: function PDFDocumentProxy_destroy() {
@@ -1536,6 +1579,14 @@ var WorkerTransport = (function WorkerTransportClosure() {
         this.workerReadyPromise.resolve(pdfDocument);
       }, this);
 
+      messageHandler.on('NeedPassword', function transportPassword(data) {
+        this.workerReadyPromise.reject(data.exception.message, data.exception);
+      }, this);
+
+      messageHandler.on('IncorrectPassword', function transportBadPass(data) {
+        this.workerReadyPromise.reject(data.exception.message, data.exception);
+      }, this);
+
       messageHandler.on('GetPage', function transportPage(data) {
         var pageInfo = data.pageInfo;
         var page = new PDFPageProxy(pageInfo, this);
@@ -1638,8 +1689,8 @@ var WorkerTransport = (function WorkerTransportClosure() {
       });
     },
 
-    sendData: function WorkerTransport_sendData(data) {
-      this.messageHandler.send('GetDocRequest', data);
+    sendData: function WorkerTransport_sendData(data, params) {
+      this.messageHandler.send('GetDocRequest', {data: data, params: params});
     },
 
     getPage: function WorkerTransport_getPage(pageNumber, promise) {
@@ -3208,7 +3259,7 @@ var Catalog = (function CatalogClosure() {
 })();
 
 var XRef = (function XRefClosure() {
-  function XRef(stream, startXRef, mainXRefEntriesOffset) {
+  function XRef(stream, startXRef, mainXRefEntriesOffset, password) {
     this.stream = stream;
     this.entries = [];
     this.xrefstms = {};
@@ -3221,8 +3272,7 @@ var XRef = (function XRefClosure() {
     var encrypt = trailerDict.get('Encrypt');
     if (encrypt) {
       var fileId = trailerDict.get('ID');
-      this.encrypt = new CipherTransformFactory(encrypt,
-                                                fileId[0] /*, password */);
+      this.encrypt = new CipherTransformFactory(encrypt, fileId[0], password);
     }
 
     // get the root dictionary (catalog) object
@@ -12734,7 +12784,9 @@ var CipherTransformFactory = (function CipherTransformFactoryClosure() {
     var encryptionKey = prepareKeyData(fileIdBytes, passwordBytes,
                                        ownerPassword, userPassword, flags,
                                        revision, keyLength, encryptMetadata);
-    if (!encryptionKey && password) {
+    if (!encryptionKey && !password) {
+      throw new PasswordException('No password given', 'needpassword');
+    } else if (!encryptionKey && password) {
       // Attempting use the password as an owner password
       var decodedPassword = decodeUserPassword(passwordBytes, ownerPassword,
                                                revision, keyLength);
@@ -12744,7 +12796,7 @@ var CipherTransformFactory = (function CipherTransformFactoryClosure() {
     }
 
     if (!encryptionKey)
-      error('incorrect password or encryption data');
+      throw new PasswordException('Incorrect Password', 'incorrectpassword');
 
     this.encryptionKey = encryptionKey;
 
@@ -29313,14 +29365,35 @@ var WorkerMessageHandler = {
     handler.on('GetDocRequest', function wphSetupDoc(data) {
       // Create only the model of the PDFDoc, which is enough for
       // processing the content of the pdf.
-      pdfModel = new PDFDocument(new Stream(data));
+      var pdfData = data.data;
+      var pdfPassword = data.params.password;
+      try {
+        pdfModel = new PDFDocument(new Stream(pdfData), pdfPassword);
+      } catch (e) {
+        if (e instanceof PasswordException) {
+          if (e.code === 'needpassword') {
+            handler.send('NeedPassword', {
+              exception: e
+            });
+          } else if (e.code === 'incorrectpassword') {
+            handler.send('IncorrectPassword', {
+              exception: e
+            });
+          }
+
+          return;
+        } else {
+          throw e;
+        }
+      }
       var doc = {
         numPages: pdfModel.numPages,
         fingerprint: pdfModel.getFingerprint(),
         destinations: pdfModel.catalog.destinations,
         outline: pdfModel.catalog.documentOutline,
         info: pdfModel.getDocumentInfo(),
-        metadata: pdfModel.catalog.metadata
+        metadata: pdfModel.catalog.metadata,
+        encrypted: !!pdfModel.xref.encrypt
       };
       handler.send('GetDoc', {pdfInfo: doc});
     });
