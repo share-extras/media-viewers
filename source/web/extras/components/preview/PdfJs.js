@@ -109,7 +109,17 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
        * @type String
        * @default "multi"
        */
-      pageLayout: "multi"
+      pageLayout: "multi",
+      
+      /**
+       * Whether text overlays on pages should be disabled. Overlays allow users to select text
+       * content in their browser but reduce rendering performance.
+       * 
+       * @property disableTextLayer
+       * @type String
+       * @default "false"
+       */
+      disableTextLayer: "false"
    },
    
    pdfDoc: null,
@@ -318,8 +328,6 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
       var me = this,
          fileurl = this.attributes.src ? this.wp.getThumbnailUrl(this.attributes.src) : this.wp.getContentUrl();
          
-         //Disable Text layer for now
-         PDFJS.disableTextLayer =  true;
          //Check if Safari, disable workers due to bug https://github.com/mozilla/pdf.js/issues/1627
          if (YAHOO.env.ua.webkit > 0 && !YAHOO.env.ua.chrome){
          	PDFJS.disableWorker = true;
@@ -600,6 +608,16 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
        
        page.canvas = canvas;
        
+       // Add text layer
+       var textLayerDiv = null;
+       if (this.attributes.disableTextLayer != "true")
+       {
+          textLayerDiv = document.createElement('div');
+          textLayerDiv.className = 'textLayer';
+          page.container.appendChild(textLayerDiv);
+       }
+       var textLayer = textLayerDiv ? new TextLayerBuilder(textLayerDiv) : null;
+       
        var content = page.content,
           view = content.view,
           ctx = canvas.getContext('2d');
@@ -617,7 +635,8 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
        // Render the content itself
        var renderContext = {
       	      canvasContext: ctx,
-      	      viewport: page.content.getViewport(this._parseScale(this.currentScale))
+      	      viewport: page.content.getViewport(this._parseScale(this.currentScale)),
+      	      textLayer: textLayer
       	    };
       content.render(renderContext);
     },
@@ -850,3 +869,84 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
        this._renderVisiblePages();
     }
 };
+
+var TextLayerBuilder = function textLayerBuilder(textLayerDiv) {
+   this.textLayerDiv = textLayerDiv;
+
+   this.beginLayout = function textLayerBuilderBeginLayout() {
+     this.textDivs = [];
+     this.textLayerQueue = [];
+   };
+
+   this.endLayout = function textLayerBuilderEndLayout() {
+     var self = this;
+     var textDivs = this.textDivs;
+     var textLayerDiv = this.textLayerDiv;
+     var renderTimer = null;
+     var renderingDone = false;
+     var renderInterval = 0;
+     var resumeInterval = 500; // in ms
+
+     // Render the text layer, one div at a time
+     function renderTextLayer() {
+       if (textDivs.length === 0) {
+         clearInterval(renderTimer);
+         renderingDone = true;
+         return;
+       }
+       var textDiv = textDivs.shift();
+       if (textDiv.dataset.textLength > 0) {
+         textLayerDiv.appendChild(textDiv);
+
+         if (textDiv.dataset.textLength > 1) { // avoid div by zero
+           // Adjust div width to match canvas text
+           // Due to the .offsetWidth calls, this is slow
+           // This needs to come after appending to the DOM
+           var textScale = textDiv.dataset.canvasWidth / textDiv.offsetWidth;
+           Dom.setStyle(textDiv, 'transform', 'scale(' + textScale + ', 1)');
+           Dom.setStyle(textDiv, 'transformOrigin', '0% 0%');
+         }
+       } // textLength > 0
+     }
+     renderTimer = setInterval(renderTextLayer, renderInterval);
+
+     // Stop rendering when user scrolls. Resume after XXX milliseconds
+     // of no scroll events
+     var scrollTimer = null;
+     function textLayerOnScroll() {
+       if (renderingDone) {
+         window.removeEventListener('scroll', textLayerOnScroll, false);
+         return;
+       }
+
+       // Immediately pause rendering
+       clearInterval(renderTimer);
+
+       clearTimeout(scrollTimer);
+       scrollTimer = setTimeout(function textLayerScrollTimer() {
+         // Resume rendering
+         renderTimer = setInterval(renderTextLayer, renderInterval);
+       }, resumeInterval);
+     }; // textLayerOnScroll
+
+     window.addEventListener('scroll', textLayerOnScroll, false);
+   }; // endLayout
+
+   this.appendText = function textLayerBuilderAppendText(text,
+                                                         fontName, fontSize) {
+     var textDiv = document.createElement('div');
+
+     // vScale and hScale already contain the scaling to pixel units
+     var fontHeight = fontSize * text.geom.vScale;
+     textDiv.dataset.canvasWidth = text.canvasWidth * text.geom.hScale;
+     textDiv.dataset.fontName = fontName;
+
+     textDiv.style.fontSize = fontHeight + 'px';
+     textDiv.style.left = text.geom.x + 'px';
+     textDiv.style.top = (text.geom.y - fontHeight) + 'px';
+     textDiv.textContent = PDFJS.bidi(text, -1);
+     textDiv.dir = text.direction;
+     textDiv.dataset.textLength = text.length;
+     this.textDivs.push(textDiv);
+   };
+ };
