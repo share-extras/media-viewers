@@ -327,6 +327,9 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
    _loadPdf: function PdfJs__loadPdf() {
       var me = this,
          fileurl = this.attributes.src ? this.wp.getThumbnailUrl(this.attributes.src) : this.wp.getContentUrl();
+
+         //Set the worker source
+         PDFJS.workerSrc = Alfresco.constants.URL_CONTEXT + 'res/extras/components/preview/pdfjs/pdf' +  (Alfresco.constants.DEBUG ? '.js' : '-min.js'); 
          
          //Check if Safari, disable workers due to bug https://github.com/mozilla/pdf.js/issues/1627
          if (YAHOO.env.ua.webkit > 0 && !YAHOO.env.ua.chrome){
@@ -381,15 +384,8 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
          this._updateZoomControls();
          Dom.get(this.wp.id + "-numPages").textContent = this.numPages;
         }, this);
-      
-        
+     
       pagesPromise.then(renderPageContainer);
-      
-//      for (var i = 0; i < this.pdfDoc.numPages; i++)
-//      {
-//         this._renderPageContainer(i + 1);
-//      }
-
       
    },
    

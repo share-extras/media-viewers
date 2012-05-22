@@ -6,4 +6,3 @@
 <@link rel="stylesheet" type="text/css" href="${page.url.context}/res/extras/components/preview/PdfJs.css" />
 <@script type="text/javascript" src="${page.url.context}/res/extras/components/preview/pdfjs/compatibility.js"></@script>
 <@script type="text/javascript" src="${page.url.context}/res/extras/components/preview/pdfjs/pdf.js"></@script>
-<script type="text/javascript">PDFJS.workerSrc = '${page.url.context}/res/extras/components/preview/pdfjs/pdf<#if DEBUG==false>-min.js<#else>.js</#if>';</script> 
