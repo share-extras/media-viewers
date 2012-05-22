@@ -13,7 +13,7 @@ var PDFJS = {};
   // Use strict in our context only - users might not want it
   'use strict';
 
-  PDFJS.build = '58be8a0';
+  PDFJS.build = '5ac7513';
 
   // Files are inserted below - see Makefile
 /* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
@@ -12985,38 +12985,20 @@ var PartialEvaluator = (function PartialEvaluatorClosure() {
 
     // Compatibility
     BX: 'beginCompat',
-    EX: 'endCompat'
+    EX: 'endCompat',
+
+    // (reserved partial commands for the lexer)
+    BM: null,
+    BD: null,
+    'true': null,
+    fa: null,
+    fal: null,
+    fals: null,
+    'false': null,
+    nu: null,
+    nul: null,
+    'null': null
   };
-
-  function splitCombinedOperations(operations) {
-    // Two or more operations can be combined together, trying to find which
-    // operations were concatenated.
-    var result = [];
-    var opIndex = 0;
-
-    if (!operations) {
-      return null;
-    }
-
-    while (opIndex < operations.length) {
-      var currentOp = '';
-      for (var op in OP_MAP) {
-        if (op == operations.substr(opIndex, op.length) &&
-            op.length > currentOp.length) {
-          currentOp = op;
-        }
-      }
-
-      if (currentOp.length > 0) {
-        result.push(operations.substr(opIndex, currentOp.length));
-        opIndex += currentOp.length;
-      } else {
-        return null;
-      }
-    }
-
-    return result;
-  }
 
   PartialEvaluator.prototype = {
     getOperatorList: function PartialEvaluator_getOperatorList(stream,
@@ -13161,39 +13143,19 @@ var PartialEvaluator = (function PartialEvaluatorClosure() {
       resources = resources || new Dict();
       var xobjs = resources.get('XObject') || new Dict();
       var patterns = resources.get('Pattern') || new Dict();
-      var parser = new Parser(new Lexer(stream), false, xref);
+      var parser = new Parser(new Lexer(stream, OP_MAP), false, xref);
       var res = resources;
-      var hasNextObj = false, nextObjs;
       var args = [], obj;
       var TILING_PATTERN = 1, SHADING_PATTERN = 2;
 
       while (true) {
-        if (hasNextObj) {
-          obj = nextObjs.pop();
-          hasNextObj = (nextObjs.length > 0);
-        } else {
-          obj = parser.getObj();
-          if (isEOF(obj))
-            break;
-        }
+        obj = parser.getObj();
+        if (isEOF(obj))
+          break;
 
         if (isCmd(obj)) {
           var cmd = obj.cmd;
           var fn = OP_MAP[cmd];
-          if (!fn) {
-            // invalid content command, trying to recover
-            var cmds = splitCombinedOperations(cmd);
-            if (cmds) {
-              cmd = cmds[0];
-              fn = OP_MAP[cmd];
-              // feeding other command on the next iteration
-              hasNextObj = true;
-              nextObjs = [];
-              for (var idx = 1; idx < cmds.length; idx++) {
-                 nextObjs.push(Cmd.get(cmds[idx]));
-              }
-            }
-          }
           assertWellFormed(fn, 'Unknown command "' + cmd + '"');
           // TODO figure out how to type-check vararg functions
 
@@ -17291,7 +17253,7 @@ var CFFFont = (function CFFFontClosure() {
     this.properties = properties;
 
     var parser = new CFFParser(file, properties);
-    var cff = parser.parse();
+    var cff = parser.parse(true);
     var compiler = new CFFCompiler(cff);
     this.readExtra(cff);
     try {
@@ -17382,7 +17344,7 @@ var CFFParser = (function CFFParserClosure() {
     this.properties = properties;
   }
   CFFParser.prototype = {
-    parse: function CFFParser_parse() {
+    parse: function CFFParser_parse(normalizeCIDData) {
       var properties = this.properties;
       var cff = new CFF();
       this.cff = cff;
@@ -17436,6 +17398,21 @@ var CFFParser = (function CFFParserClosure() {
       }
       cff.charset = charset;
       cff.encoding = encoding;
+
+      if (!cff.isCIDFont || !normalizeCIDData)
+        return cff;
+
+      // DirectWrite does not like CID fonts data. Trying to convert/flatten
+      // the font data and remove CID properties.
+      if (cff.fdArray.length !== 1)
+        error('Unable to normalize CID font in CFF data');
+
+      var fontDict = cff.fdArray[0];
+      fontDict.setByKey(17, topDict.getByName('CharStrings'));
+      cff.topDict = fontDict;
+      cff.isCIDFont = false;
+      delete cff.fdArray;
+      delete cff.fdSelect;
 
       return cff;
     },
@@ -18035,9 +18012,9 @@ var CFFPrivateDict = (function CFFPrivateDictClosure() {
     [[12, 17], 'LanguageGroup', 'num', 0],
     [[12, 18], 'ExpansionFactor', 'num', 0.06],
     [[12, 19], 'initialRandomSeed', 'num', 0],
-    [19, 'Subrs', 'offset', null],
     [20, 'defaultWidthX', 'num', 0],
-    [21, 'nominalWidthX', 'num', 0]
+    [21, 'nominalWidthX', 'num', 0],
+    [19, 'Subrs', 'offset', null]
   ];
   var tables = null;
   function CFFPrivateDict(strings) {
@@ -26299,8 +26276,16 @@ var Parser = (function ParserClosure() {
 })();
 
 var Lexer = (function LexerClosure() {
-  function Lexer(stream) {
+  function Lexer(stream, knownCommands) {
     this.stream = stream;
+    // The PDFs might have "glued" commands with other commands, operands or
+    // literals, e.g. "q1". The knownCommands is a dictionary of the valid
+    // commands and their prefixes. The prefixes are built the following way:
+    // if there a command that is a prefix of the other valid command or
+    // literal (e.g. 'f' and 'false') the following prefixes must be included,
+    // 'fa', 'fal', 'fals'. The prefixes are not needed, if the command has no
+    // other commands or literals as a prefix. The knowCommands is optional.
+    this.knownCommands = knownCommands;
   }
 
   Lexer.isSpace = function Lexer_isSpace(ch) {
@@ -26564,12 +26549,18 @@ var Lexer = (function LexerClosure() {
 
       // command
       var str = ch;
+      var knownCommands = this.knownCommands;
+      var knownCommandFound = knownCommands && (str in knownCommands);
       while (!!(ch = stream.lookChar()) && !specialChars[ch.charCodeAt(0)]) {
+        // stop if known command is found and next character does not make
+        // the str a command
+        if (knownCommandFound && !((str + ch) in knownCommands))
+          break;
         stream.skip();
         if (str.length == 128)
           error('Command token too long: ' + str.length);
-
         str += ch;
+        knownCommandFound = knownCommands && (str in knownCommands);
       }
       if (str == 'true')
         return true;

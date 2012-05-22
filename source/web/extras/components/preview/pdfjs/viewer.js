@@ -1380,9 +1380,9 @@ window.addEventListener('load', function webViewerLoad(evt) {
 //Always hide file input
 //  if (PDFJS.isFirefoxExtension || !window.File || !window.FileReader ||
 //      !window.FileList || !window.Blob) {
-    document.getElementById('fileInput').setAttribute('hidden', 'true');
+    document.getElementById('openFile').setAttribute('hidden', 'true');
 //  } else {
-//    document.getElementById('fileInput').value = null;
+    document.getElementById('fileInput').setAttribute('hidden', 'true');
 //  }
     
 //ShareExtras Changes End
