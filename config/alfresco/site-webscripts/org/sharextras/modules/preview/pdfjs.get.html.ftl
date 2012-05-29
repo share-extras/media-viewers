@@ -1,6 +1,6 @@
 <#-- This file is part of the Share Extras PdfJs Viewer project -->
 <#assign el=args.htmlid?html>
-    <div id="${el}-controls" class="controls">
+    <div id="${el}-controls" class="controls flat-button">
       <button id="${el}-previous">
         <img src="${url.context}/res/components/images/back-arrow.png" align="top" height="16"/>
         ${msg("button.previous")}

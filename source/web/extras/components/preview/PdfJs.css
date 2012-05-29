@@ -27,12 +27,10 @@
 
 /* === Toolbar === */
 .previewer.PdfJs .controls {
-  background-color: #eee;
-  background: -o-linear-gradient(bottom,#eee 0%,#fff 100%);
-  background: -moz-linear-gradient(center bottom, #eee 0%, #fff 100%);
-  background: -webkit-gradient(linear, left bottom, left top, color-stop(0.0, #ddd), color-stop(1.0, #fff));
+  background-color: #F6F6F6;
+  border-top: 1px solid #CCCCCC;
   border-bottom: 1px solid #666;
-  padding: 3px 3px 3px 0px;
+  padding: 5px 3px 3px 0;
   height: 2.2em;
   width: 100%;
   white-space: nowrap;
@@ -59,6 +57,7 @@
     border-color: #B7B7B7;
     border-width: 1px;
     background-color: transparent;
+    padding: 0 0;
 }
 
 .previewer.PdfJs .controls span, .previewer.PdfJs .controls input, .previewer.PdfJs .controls select {
