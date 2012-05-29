@@ -73,7 +73,15 @@
     border-color: #B7B7B7;
     border-style: solid;
     border-width: 1px;
+    width: auto;
+    font-size: 0.9em;
 }
+
+.previewer.PdfJs .controls input {
+	width: 2em;
+    font-size: 0.9em;
+}
+
 .previewer.PdfJs .controls > button > img {
   width: 16px;
   height: 16px;
