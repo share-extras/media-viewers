@@ -116,8 +116,108 @@
            * 
            * @property queueMissingRenditions
            * @type string
+           * @default "true"
            */
           queueMissingRenditions: "true",
+
+          /**
+           * Whether to auto-play the video on page load, "true" or "false"
+           * 
+           * @property autoplay
+           * @type string
+           * @default "false"
+           */
+          autoplay: "false",
+
+          /**
+           * Whether to auto-load the video on page load, "true" or "false"
+           * 
+           * @property autoload
+           * @type string
+           * @default "true"
+           */
+          autoload: "true",
+
+          /**
+           * Color of the player in hex notation, without the initial '#'
+           * 
+           * @property playercolor
+           * @type string
+           * @default "e1e3e5"
+           */
+          playercolor: "e1e3e5",
+
+          /**
+           * Color of the player button icons in hex notation
+           * 
+           * @property buttoncolor
+           * @type string
+           * @default "000000"
+           */
+          buttoncolor: "000000",
+
+          /**
+           * Hover color of the player buttons in hex notation
+           * 
+           * @property buttonovercolor
+           * @type string
+           * @default "0088de"
+           */
+          buttonovercolor: "0088de",
+
+          /**
+           * Hover color of the player slider in hex notation
+           * 
+           * @property slidercolor
+           * @type string
+           * @default "0088de"
+           */
+          sliderovercolor: "0088de",
+
+          /**
+           * Whether to show the full screen button, "true" or "false"
+           * 
+           * @property showfullscreen
+           * @type string
+           * @default "true"
+           */
+          showfullscreen: "true",
+
+          /**
+           * Whether to show the play button, "true" or "false"
+           * 
+           * @property showiconplay
+           * @type string
+           * @default "true"
+           */
+          showiconplay: "true",
+
+          /**
+           * Whether to show the volume control, "true" or "false"
+           * 
+           * @property showvolume
+           * @type string
+           * @default "true"
+           */
+          showvolume: "true",
+
+          /**
+           * Whether to show the play button, "true" or "false"
+           * 
+           * @property showplay
+           * @type string
+           * @default "true"
+           */
+          showtime: "true",
+
+          /**
+           * Whether to show the play button, "true" or "false"
+           * 
+           * @property showplay
+           * @type string
+           * @default "0"
+           */
+          playermargin: "0",
           
           /**
            * Mimetypes supported by the player, including thumbnail names and versions of flash required for each type
@@ -373,16 +473,18 @@
           {
              so.addVariable("startimage", previewCtx.imageurl);
           }
-          so.addVariable("showfullscreen", 1);
-          so.addVariable("showiconplay", 1);
+          so.addVariable("autoplay", this.attributes.autoplay == "true" ? 1 : 0);
+          so.addVariable("autoload", this.attributes.autoload == "true" ? 1 : 0);
+          so.addVariable("showfullscreen", this.attributes.showfullscreen == "true" ? 1 : 0);
+          so.addVariable("showiconplay", this.attributes.showiconplay == "true" ? 1 : 0);
+          so.addVariable("showvolume", this.attributes.showvolume == "true" ? 1 : 0);
+          so.addVariable("showtime", this.attributes.showtime == "true" ? 1 : 0);
+          so.addVariable("playercolor", this.attributes.playercolor);
+          so.addVariable("buttoncolor", this.attributes.buttoncolor);
+          so.addVariable("buttonovercolor", this.attributes.buttonovercolor);
+          so.addVariable("sliderovercolor", this.attributes.sliderovercolor);
+          so.addVariable("margin", this.attributes.playermargin);
           so.addVariable("showplayer", "always");
-          so.addVariable("showvolume", 1);
-          so.addVariable("showtime", 1);
-          so.addVariable("playercolor", "e1e3e5");
-          so.addVariable("margin", "0");
-          so.addVariable("buttoncolor", "000000");
-          so.addVariable("buttonovercolor", "0088de");
-          so.addVariable("sliderovercolor", "0088de");
           so.addParam("allowScriptAccess", "sameDomain");
           so.addParam("allowFullScreen", "true");
           so.addParam("quality", "autohigh");
