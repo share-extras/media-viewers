@@ -234,6 +234,10 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
       }
       else
       {
+         // Set page number
+         var urlParams = Alfresco.util.getQueryStringParameters(window.location.hash.replace("#", ""));
+         this.pageNum = urlParams.page || this.pageNum;
+         
          // Viewer HTML is contained in an external web script, which we load via XHR, then onViewerLoad() does the rest
          Alfresco.util.Ajax.request({
             url: Alfresco.constants.URL_SERVICECONTEXT + 'extras/components/preview/pdfjs?htmlid=' + encodeURIComponent(this.wp.id),
@@ -246,6 +250,9 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
          
          // Window resize behaviour
          Event.addListener(window, "resize", this.onRecalculatePreviewLayout, this, true);
+         
+         // Hash change behaviour
+         Event.addListener(window, "hashchange", this.onWindowHashChange, this, true);
          
          // Return null means WebPreview instance will not overwrite the innerHTML of the preview area
          return null;
@@ -288,6 +295,7 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
       this._setPreviewerElementHeight();
       this._setViewerHeight();
       
+      // Load the PDF itself
       this._loadPdf();
    },
    
@@ -774,7 +782,7 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
        {
           Alfresco.util.PopupManager.displayPrompt({
              text: this.wp.msg('error.badpage')
-          }) 
+          });
        }
        else
        {
@@ -862,6 +870,11 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
        this._renderVisiblePages();
     },
     
+    /**
+     * Handler for window resize event
+     * 
+     * @method onRecalculatePreviewLayout
+     */
     onRecalculatePreviewLayout: function PdfJs_onRecalculatePreviewLayout(p_obj)
     {
        this._setPreviewerElementHeight();
@@ -870,6 +883,35 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
        this._alignViewerRows();
        // Render any pages that have appeared
        this._renderVisiblePages();
+    },
+    
+    /**
+     * Handler for window hashchange event
+     * 
+     * See http://caniuse.com/#search=hash
+     * 
+     * @method onWindowHashChange
+     */
+    onWindowHashChange: function PdfJs_onWindowHashChange(p_obj)
+    {
+       // Set page number
+       var urlParams = Alfresco.util.getQueryStringParameters(window.location.hash.replace("#", ""));
+       pn = urlParams.page;
+       
+       if (pn)
+       {
+          if (pn > this.pdfDoc.numPages || pn < 1)
+          {
+             Alfresco.util.PopupManager.displayPrompt({
+                text: this.wp.msg('error.badpage')
+             });
+          }
+          else
+          {
+             this.pageNum = pn;
+             this._scrollToPage(this.pageNum);
+          }
+       }
     }
 };
 
