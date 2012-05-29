@@ -49,6 +49,10 @@
         ${msg("button.maximize")}
       </button>
 
+      <button id="${el}-link" title="${msg("button.link")}">
+        <img src="${url.context}/res/components/images/link-16.png" align="top" height="16"/>
+      </button>
+      
     </div>
 
     <div id="${el}-viewer" class="viewer">

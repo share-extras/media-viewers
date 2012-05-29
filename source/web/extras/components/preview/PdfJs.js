@@ -290,6 +290,7 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
       Event.addListener(this.wp.id + "-scaleSelect", "change", this.onZoomChange, this, true);
       this.widgets.downloadButton = Alfresco.util.createYUIButton(this, "download", this.onDownloadClick);
       this.widgets.maximize = Alfresco.util.createYUIButton(this, "fullpage", this.onMaximizeClick);
+      this.widgets.linkBn = Alfresco.util.createYUIButton(this, "link", this.onLinkClick);
       
       // Set height of the container and the viewer area
       this._setPreviewerElementHeight();
@@ -868,6 +869,20 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
        this._alignViewerRows();
        // Render any pages that have appeared
        this._renderVisiblePages();
+    },
+    
+    /**
+     * Link button click handler
+     * 
+     * @method onLinkClick
+     */
+    onLinkClick: function PdfJs_onLinkClick(p_obj)
+    {
+       Alfresco.util.PopupManager.displayPrompt({
+          title: "Link to document",
+          text: "<p>Copy the following link to your clipboard:</p><p><input value=\"" + window.location.href.replace(window.location.hash, "") + "#page=" + this.pageNum + "\" /></p>",
+          noEscape: true
+       });
     },
     
     /**
