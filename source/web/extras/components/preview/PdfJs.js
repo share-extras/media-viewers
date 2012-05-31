@@ -287,8 +287,23 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
       Event.addListener(this.wp.id + "-pageNumber", "change", this.onPageChange, this, true);
       this.widgets.zoomOutButton = Alfresco.util.createYUIButton(this, "zoomOut", this.onZoomOut);
       this.widgets.zoomInButton = Alfresco.util.createYUIButton(this, "zoomIn", this.onZoomIn);
-      Event.addListener(this.wp.id + "-scaleSelect", "change", this.onZoomChange, this, true);
-      this.widgets.downloadButton = Alfresco.util.createYUIButton(this, "download", this.onDownloadClick);
+      this.widgets.scaleMenu = new YAHOO.widget.Button(this.id + "-scaleSelectBtn", {
+         type: "menu",
+         menu: this.id + "-scaleSelect"
+      });
+      this.widgets.scaleMenu.getMenu().subscribe("click", this.onZoomChange, null, this);
+      //Event.addListener(this.wp.id + "-scaleSelect", "change", this.onZoomChange, this, true);
+      var downloadMenu = [
+         { text: this.wp.msg("link.download"), value: "", onclick: { fn: this.onDownloadClick, scope: this } },
+      ];
+      if (this.attributes.src)
+      {
+         downloadMenu.push({ text: this.wp.msg("link.downloadPdf"), value: "", onclick: { fn: this.onDownloadPDFClick, scope: this } });
+      }
+      this.widgets.downloadButton = new YAHOO.widget.Button(this.id + "-download", {
+         type: "menu",
+         menu: downloadMenu
+      });
       this.widgets.maximize = Alfresco.util.createYUIButton(this, "fullpage", this.onMaximizeClick);
       this.widgets.linkBn = Alfresco.util.createYUIButton(this, "link", this.onLinkClick);
       
@@ -712,6 +727,7 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
       // Update zoom controls
       this.widgets.zoomInButton.set("disabled", this.currentScale * this.attributes.scaleDelta > K_MAX_SCALE);
       this.widgets.zoomOutButton.set("disabled", this.currentScale / this.attributes.scaleDelta < K_MIN_SCALE);
+      /*
       var select = Dom.get(this.wp.id + "-scaleSelect");
       for (var i = 0; i < select.options.length; i++)
       {
@@ -720,6 +736,8 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
             select.selectedIndex = i;
          }
       }
+      */
+      this.widgets.scaleMenu.set("label", "" + Math.round(this.currentScale * 100) + "%");
    },
     
     /**
@@ -834,9 +852,12 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
        this._updateZoomControls();
     },
     
-    onZoomChange: function PdfJs_onZoomChange(p_obj)
+    onZoomChange: function PdfJs_onZoomChange(p_sType, p_aArgs)
     {
-       var newScale = p_obj.currentTarget.options[p_obj.currentTarget.selectedIndex].value;
+       var oEvent = p_aArgs[0], // DOM event
+          oMenuItem = p_aArgs[1]; // MenuItem instance that was the target of the event
+       
+       var newScale = oMenuItem.value;
        this._setScale(this._parseScale(newScale));
        this.currentScaleValue = newScale;
        this._scrollToPage(this.pageNum);
@@ -845,7 +866,17 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
     
     onDownloadClick: function PdfJs_onDownloadClick(p_obj)
     {
-       window.location.href = this.wp.getContentUrl();
+       window.location.href = this.wp.getContentUrl(true);
+    },
+    
+    /**
+     * Download PDF click handler (for thumbnailed content only)
+     * 
+     * @method onDownloadPDFClick
+     */
+    onDownloadPDFClick: function PdfJs_onDownloadPDFClick(p_obj)
+    {
+       window.location.href = this.wp.getThumbnailUrl(this.attributes.src) + "&a=true";
     },
     
     onMaximizeClick: function PdfJs_onMaximizeClick(p_obj)

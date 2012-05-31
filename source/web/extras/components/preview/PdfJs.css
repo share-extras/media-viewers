@@ -38,13 +38,17 @@
   font-size: 0.9em;
 }
 
-.previewer.PdfJs .separator {
+.previewer.PdfJs .controls .separator {
   display: inline;
   border-left: 1px solid #d3d3d3;
   border-right: 1px solid #fff;
   height: 16px;
   width:0px;
   margin: 4px 4px 4px 1px;
+}
+
+.previewer.PdfJs .controls .numPages {
+	padding-right: 5px;
 }
 
 .previewer.PdfJs .controls > a > img {
@@ -57,7 +61,12 @@
     border-color: #B7B7B7;
     border-width: 1px;
     background-color: transparent;
-    padding: 0 0;
+    padding: 0 2px;
+}
+
+/* Add extra padding for down-arrow on RHS of menu buttons, otherwise removed by previous rule */
+.previewer.PdfJs .controls .yui-menu-button button {
+	padding-right: 20px;
 }
 
 .previewer.PdfJs .controls span, .previewer.PdfJs .controls input, .previewer.PdfJs .controls select {
@@ -78,7 +87,7 @@
 }
 
 .previewer.PdfJs .controls input {
-	width: 2em;
+	width: 3em;
     font-size: 0.9em;
 }
 
