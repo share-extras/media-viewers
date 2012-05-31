@@ -54,6 +54,20 @@
       </button>
       
     </div>
+    
+    <div id="${el}-linkDialog" class="linkDialog">
+        <div class="hd"></div>
+        <div class="bd">
+            <div id="${el}-linkDialog-bg" class="yui-buttongroup">
+                <input type="radio" name="target" id="${el}-doc" value="${msg("link.document")}" />
+                <input type="radio" name="target" id="${el}-page" value="${msg("link.page")}" checked="checked" />
+            </div>
+            <div>
+                <input type="text" id="${el}-linkDialog-input" value="" />
+            </div>
+            <div>${msg("link.info")}</div>
+        </div>
+    </div>
 
     <div id="${el}-viewer" class="viewer">
         <a name="${el}"></a>

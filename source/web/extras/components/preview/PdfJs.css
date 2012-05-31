@@ -95,6 +95,27 @@
   text-align: right;
 }
 
+.linkDialog {
+	visibility:hidden;
+    position: absolute;
+}
+
+.yui-skin-default .yui-panel.linkDialog .bd {
+    padding: 0.5em 1em;
+}
+
+.yui-skin-default .yui-panel.linkDialog .bd > div {
+    padding: 0.5em 0;
+}
+
+.yui-skin-default .yui-panel.linkDialog .ft {
+    display: none;
+}
+
+.linkDialog .bd input[type=text] {
+    width: 35em;
+}
+
 /* === Sidebar === */
 .previewer.PdfJs .sidebar {
 	display: none;

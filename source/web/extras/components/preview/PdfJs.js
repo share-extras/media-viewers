@@ -878,11 +878,56 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
      */
     onLinkClick: function PdfJs_onLinkClick(p_obj)
     {
-       Alfresco.util.PopupManager.displayPrompt({
-          title: "Link to document",
-          text: "<p>Copy the following link to your clipboard:</p><p><input value=\"" + window.location.href.replace(window.location.hash, "") + "#page=" + this.pageNum + "\" /></p>",
-          noEscape: true
-       });
+       var dialogid = this.id + "-linkDialog",
+          inputid = dialogid + "-input";
+       
+       var fnSelectLink = function PdfJs_onLinkClick_fnSelectLink() {
+          var btnid = this.widgets.linkDialogBg.get('checkedButton').get('id');
+          var link = window.location.href.replace(window.location.hash, "") + (btnid.indexOf("-doc") > 0 ? "" : "#page=" + this.pageNum);
+          var iel = Dom.get(inputid);
+          iel.value = link;
+          iel.focus();
+          iel.select();
+       };
+       
+       if (!this.widgets.linkDialog)
+       {
+          var linkDialog = new YAHOO.widget.SimpleDialog(dialogid,
+          {
+             close: true,
+             draggable: false,
+             effect: null,
+             modal: false,
+             visible: false,
+             context: [this.viewer, "tr", "tr", ["beforeShow", "windowResize"]],
+             width: "40em"
+          });
+          var slideurl = window.location.href.replace(window.location.hash, "") + "#page=" + this.pageNum;
+          linkDialog.render();
+          
+          var linkDialogBg = new YAHOO.widget.ButtonGroup(dialogid + "-bg");
+          for (var i = 0; i < linkDialogBg.getCount(); i++)
+          {
+             linkDialogBg.getButton(i).addListener("click", fnSelectLink, null, this);
+          }
+          
+          this.widgets.linkDialogBg = linkDialogBg;
+          this.widgets.linkDialog = linkDialog;
+          
+          YAHOO.util.Event.addListener(inputid, "click", function() {
+             this.focus();
+             this.select();
+          });
+       }
+       if (!this.widgets.linkDialog.cfg.getProperty("visible"))
+       {
+          this.widgets.linkDialog.show();
+          fnSelectLink.call(this);
+       }
+       else
+       {
+          this.widgets.linkDialog.hide();
+       }
     },
     
     /**
