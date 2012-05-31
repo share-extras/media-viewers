@@ -448,34 +448,34 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
 	       
 	       if ('page-width' == value)
 	       {
-	          var pageWidthScale = (clientWidth - hmargin) / contentWidth;
+	          var pageWidthScale = (clientWidth - hmargin*2) / contentWidth;
 	          return pageWidthScale;
 	       }
 	       else if ('two-page-width' == value)
 	       {
-	          var pageWidthScale = (clientWidth - hmargin*2) / contentWidth;
+	          var pageWidthScale = (clientWidth - hmargin*3) / contentWidth;
 	          return pageWidthScale / 2;
 	       }
 	       else if ('page-height' == value)
 	       {
-	          var pageHeightScale = (clientHeight - vmargin) / contentHeight;
+	          var pageHeightScale = (clientHeight - vmargin*2) / contentHeight;
 	          return pageHeightScale;
 	       }
 	       else if ('page-fit' == value)
 	       {
-	          var pageWidthScale = (clientWidth - hmargin) / contentWidth,
-	             pageHeightScale = (clientHeight - vmargin) / contentHeight;
+	          var pageWidthScale = (clientWidth - hmargin*2) / contentWidth,
+	             pageHeightScale = (clientHeight - vmargin*2) / contentHeight;
 	          return Math.min(pageWidthScale, pageHeightScale);
 	       }
 	       else if ('two-page-fit' == value)
 	       {
-	          var pageWidthScale = (clientWidth - hmargin*2) / contentWidth,
-	             pageHeightScale = (clientHeight - vmargin) / contentHeight;
+	          var pageWidthScale = (clientWidth - hmargin*3) / contentWidth,
+	             pageHeightScale = (clientHeight - vmargin*2) / contentHeight;
 	          return Math.min(pageWidthScale / 2, pageHeightScale);
 	       }
 	       else if ('auto' == value)
 	       {
-	          var pageWidthScale = (clientWidth - hmargin) / contentWidth;
+	          var pageWidthScale = (clientWidth - hmargin*2) / contentWidth;
 	          return Math.min(1.0, pageWidthScale);
 	       }
 	       else
@@ -526,9 +526,9 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
             // If multi-page mode is on, we need to add custom extra margin to the LHS of the 1st item in the row to make it centred
             if (vpos != rowPos)
             {
-               rowWidth = 0;
+               rowWidth = parseInt(Dom.getStyle(container, "margin-left")); // Rather than start from zero assume equal right padding on last row item
             }
-            rowWidth += Dom.getRegion(container).width + parseInt(Dom.getStyle(container, "margin-left")) * 2;
+            rowWidth += Dom.getRegion(container).width + parseInt(Dom.getStyle(container, "margin-left"));
             largestRow = Math.max(largestRow, rowWidth);
             rowPos = vpos;
          }

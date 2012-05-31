@@ -297,8 +297,12 @@ canvas {
 }
 
 .previewer.PdfJs .viewer.multiPage .page {
-  margin: 10px 10px;
+  margin: 10px 0 0 10px;
   float: left;
+}
+
+.previewer.PdfJs .viewer.multiPage .page:last-child {
+  margin-bottom: 10px;
 }
 
 .page > a {
