@@ -1,6 +1,11 @@
 <#-- This file is part of the Share Extras PdfJs Viewer project -->
 <#assign el=args.htmlid?html>
     <div id="${el}-controls" class="controls flat-button">
+    
+      <button id="${el}-sidebarBtn">
+        <img src="${url.context}/res/extras/components/preview/pdfjs/images/sidebar-show-16.png" align="top" height="16" title="${msg("button.sidebar")}" />
+      </button>
+      
       <button id="${el}-previous">
         <img src="${url.context}/res/components/images/back-arrow.png" align="top" height="16"/>
         ${msg("button.previous")}
@@ -76,6 +81,24 @@
         </div>
     </div>
 
-    <div id="${el}-viewer" class="viewer">
+    <div id="${el}-sidebar" class="sidebar">
+        <div id="${el}-sidebarTabView" class="yui-navset">
+            <ul class="yui-nav">
+                <li class="selected"><a href="#${el}-outlineView"><em><img src="${url.context}/res/extras/components/preview/pdfjs/images/outline-view-16.png" height="16" /></em></a></li>
+                <li><a href="#${el}-thumbnailView"><em><img src="${url.context}/res/extras/components/preview/pdfjs/images/thumbnail-view-16.png" height="16" /></em></a></li>
+                <li><a href="#${el}-searchView"><em><img src="${url.context}/res/extras/components/preview/pdfjs/images/search-view-16.png" height="16" /></em></a></li>
+            </ul>
+            <div class="yui-content">
+                <div id="${el}-outlineView" class="outlineView"></div>
+                <div id="${el}-thumbnailView" class="thumbnailView documentView"></div>
+                <div id="${el}-searchView" class="searchView">
+                    <input type="text" name="searchBox" id="${el}-searchBox" />
+                    <div id="${el}-searchResults" class="searchResults"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="${el}-viewer" class="viewer documentView">
         <a name="${el}"></a>
     </div>

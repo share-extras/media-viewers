@@ -132,10 +132,6 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
    
    thumbnails: [],
    
-   currentScale: K_UNKNOWN_SCALE,
-   
-   currentScaleValue: null,
-   
    widgets: {},
    
    maximized: false,
@@ -203,7 +199,19 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
     * @method display
     * @public
     */
-   display : function PdfJs_display()
+   display: function()
+   {
+      Alfresco.util.YUILoaderHelper.require(["tabview"], this.onComponentsLoaded, this);
+      Alfresco.util.YUILoaderHelper.loadComponents();
+   },
+
+   /**
+    * Required YUI components have been loaded
+    * 
+    * @method onComponentsLoaded
+    * @public
+    */
+   onComponentsLoaded : function PdfJs_onComponentsLoaded()
    {
       // html5 is supported, display with pdf.js
       // id and name needs to be equal, easier if you need scripting access
@@ -272,6 +280,7 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
       // Cache references to commonly-used elements
       this.controls = Dom.get(this.wp.id + "-controls");
       this.pageNumber = Dom.get(this.wp.id + "-pageNumber");
+      this.sidebar = Dom.get(this.wp.id + "-sidebar");
       this.viewer = Dom.get(this.wp.id + "-viewer");
       Event.addListener(this.viewer, "scroll", this.onViewerScroll, this, true);
       
@@ -282,6 +291,7 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
       }
       
       // Set up toolbar
+      this.widgets.sidebarButton = Alfresco.util.createYUIButton(this, "sidebarBtn", this.onSidebarToggle, {type: "checkbox"});
       this.widgets.nextButton = Alfresco.util.createYUIButton(this, "next", this.onPageNext);
       this.widgets.previousButton = Alfresco.util.createYUIButton(this, "previous", this.onPagePrevious);
       Event.addListener(this.wp.id + "-pageNumber", "change", this.onPageChange, this, true);
@@ -292,7 +302,6 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
          menu: this.id + "-scaleSelect"
       });
       this.widgets.scaleMenu.getMenu().subscribe("click", this.onZoomChange, null, this);
-      //Event.addListener(this.wp.id + "-scaleSelect", "change", this.onZoomChange, this, true);
       var downloadMenu = [
          { text: this.wp.msg("link.download"), value: "", onclick: { fn: this.onDownloadClick, scope: this } },
       ];
@@ -343,10 +352,11 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
     */
    _setViewerHeight: function _setViewerHeight()
    {
-      var previewRegion = Dom.getRegion(this.viewer.parentNode);
-      var controlRegion = Dom.getRegion(this.controls);
-      Dom.setStyle(this.viewer, "height", (previewRegion.height - controlRegion.height).toString() + "px");
-      this.viewerRegion = Dom.getRegion(this.viewer);
+      var previewRegion = Dom.getRegion(this.viewer.parentNode),
+         controlRegion = Dom.getRegion(this.controls),
+         newHeight = (previewRegion.height - controlRegion.height).toString() + "px";
+      Dom.setStyle(this.viewer, "height", newHeight);
+      Dom.setStyle(this.sidebar, "height", newHeight);
    },
    
    /**
@@ -384,327 +394,65 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
    {
       this.loading = true;
       
-      var pagePromises = [], pagesCount = this.pdfDoc.numPages;
+      var pagePromises = [], pagesRefMap = {}, pagesCount = this.numPages;
       for (var i = 1; i <= pagesCount; i++){
         pagePromises.push(this.pdfDoc.getPage(i));
       }
       var pagesPromise = PDFJS.Promise.all(pagePromises);
+
+      var destinationsPromise = this.pdfDoc.getDestinations();
       
-      var renderPageContainer = Alfresco.util.bind(function (promisedPages) {
+      var renderPageContainer = Alfresco.util.bind(function (promisedPages)
+      {
+         this.documentView = new DocumentView(this.id + "-viewer", {
+            pageLayout: this.attributes.pageLayout,
+            defaultScale: this.attributes.defaultScale,
+            disableTextLayer: this.attributes.disableTextLayer == "true"
+         });
+         this.thumbnailView = new DocumentView(this.id + "-thumbnailView", {
+            pageLayout: "single",
+            defaultScale: "page-width",
+            disableTextLayer: true
+         });
+         this.documentView.addPages(promisedPages);
+         this.thumbnailView.addPages(promisedPages);
          
-         for (var i = 1; i <= pagesCount; i++) {
-            var page = promisedPages[i - 1];
-            this._renderPageContainer(i,page);
-          }
-         
-         // Set scale, if not already set
-         if (this.currentScale === K_UNKNOWN_SCALE)
+         for (var i = 0; i < promisedPages.length; i++)
          {
-            // Scale was not initialized: invalid bookmark or scale was not specified.
-            // Setting the default one.
-            this._setScale(this._parseScale(this.attributes.defaultScale));
-            this.currentScaleValue = this.attributes.defaultScale;
+            var page = promisedPages[i], pageRef = page.ref;
+            pagesRefMap[pageRef.num + ' ' + pageRef.gen + ' R'] = i;
          }
+
+         this.documentView.render();
+         // Scroll to the current page, this will force the visible content to render
+         this.documentView.scrollTo(this.pageNum);
          
-         this.loading = false;
-         
-         
-         this._scrollToPage(this.pageNum);
+         // Enable the sidebar
          
          // Update toolbar
          this._updateZoomControls();
          Dom.get(this.wp.id + "-numPages").textContent = this.numPages;
         }, this);
+      
+      var setDestinations = Alfresco.util.bind(function (destinations) {
+         this.destinations = destinations;
+      }, this);
+
+      var getOutline = Alfresco.util.bind(function (outline) {
+         this._addOutline(outline);
+      }, this);
+      var setupOutline = Alfresco.util.bind(function () {
+         this.pdfDoc.getOutline().then(getOutline);
+      }, this);
      
       pagesPromise.then(renderPageContainer);
+
+      this.pagesRefMap = pagesRefMap;
       
-   },
-   
-   /**
-    * Calculate page zoom level based on the supplied value. Recognises numerical values and special string constants, e.g. 'page-fit'.
-    * Normally used in conjunction with setScale(), since this method does not set the current value.
-    * 
-    * @method _parseScale
-    * @private
-    * @return {float} Numerical scale value
-    */
-   _parseScale: function PdfJs__parseScale(value)
-   {
-       var scale = parseFloat(value);
-       if (scale)
-       {
-          return scale;
-       }
+      destinationsPromise.then(setDestinations);
 
-       if(this.pages.length>0){
-	          var currentPage = this.pages[this.pageNum - 1],
-	          container = currentPage.container,
-	          hmargin = parseInt(Dom.getStyle(container, "margin-left")) + parseInt(Dom.getStyle(container, "margin-right")),
-	          vmargin = parseInt(Dom.getStyle(container, "margin-top")) + parseInt(Dom.getStyle(container, "margin-bottom")),
-	          contentWidth = parseInt(currentPage.content.pageInfo.view[2]),
-	          contentHeight = parseInt(currentPage.content.pageInfo.view[3]),
-	          clientWidth = this.viewer.clientWidth - 1, // allow an extra pixel in width otherwise 2-up view wraps
-	          clientHeight = this.viewer.clientHeight;
-	       
-	       if ('page-width' == value)
-	       {
-	          var pageWidthScale = (clientWidth - hmargin*2) / contentWidth;
-	          return pageWidthScale;
-	       }
-	       else if ('two-page-width' == value)
-	       {
-	          var pageWidthScale = (clientWidth - hmargin*3) / contentWidth;
-	          return pageWidthScale / 2;
-	       }
-	       else if ('page-height' == value)
-	       {
-	          var pageHeightScale = (clientHeight - vmargin*2) / contentHeight;
-	          return pageHeightScale;
-	       }
-	       else if ('page-fit' == value)
-	       {
-	          var pageWidthScale = (clientWidth - hmargin*2) / contentWidth,
-	             pageHeightScale = (clientHeight - vmargin*2) / contentHeight;
-	          return Math.min(pageWidthScale, pageHeightScale);
-	       }
-	       else if ('two-page-fit' == value)
-	       {
-	          var pageWidthScale = (clientWidth - hmargin*3) / contentWidth,
-	             pageHeightScale = (clientHeight - vmargin*2) / contentHeight;
-	          return Math.min(pageWidthScale / 2, pageHeightScale);
-	       }
-	       else if ('auto' == value)
-	       {
-	          var pageWidthScale = (clientWidth - hmargin*2) / contentWidth;
-	          return Math.min(1.0, pageWidthScale);
-	       }
-	       else
-	       {
-	          throw "Unrecognised zoom level '" + value + "'";
-	       }
-       } else
-       {
-          throw "Unrecognised zoom level - no pages";
-       }
-
-   },
-   
-   /**
-    * 
-    */
-   _setScale: function PdfJs__setScale(value)
-   {
-      if (value == this.currentScale)
-      {
-         return;
-      }
-      this.currentScale = value;
-      
-      // Remove all the existing canvas elements
-      for (var i = 0; i < this.pages.length; i++)
-      {
-         var page = this.pages[i];
-         this._resetPage(page);
-      }
-
-      // Now redefine the row margins
-      this._alignViewerRows();
-   },
-   
-   /**
-    * 
-    */
-   _alignViewerRows: function PdfJs__alignViewerRows()
-   {
-      var rowPos = -1, rowWidth = 0, largestRow = 0;
-      if (this.attributes.pageLayout == "multi")
-      {
-         Dom.setStyle(this.viewer, "padding-left", "0px");
-         for (var i = 0; i < this.pages.length; i++)
-         {
-            var page = this.pages[i], container = page.container, vpos = this._getPageVPos(page);
-            // If multi-page mode is on, we need to add custom extra margin to the LHS of the 1st item in the row to make it centred
-            if (vpos != rowPos)
-            {
-               rowWidth = parseInt(Dom.getStyle(container, "margin-left")); // Rather than start from zero assume equal right padding on last row item
-            }
-            rowWidth += Dom.getRegion(container).width + parseInt(Dom.getStyle(container, "margin-left"));
-            largestRow = Math.max(largestRow, rowWidth);
-            rowPos = vpos;
-         }
-         Dom.setStyle(this.viewer, "padding-left", "" + Math.floor(((this.viewer.clientWidth - largestRow) / 2)) + "px");
-      }
-   },
-   
-   /**
-    * 
-    */
-   _renderVisiblePages: function PdfJs__renderVisiblePages()
-   {
-      var marginTop = parseInt(Dom.getStyle(this.pages[this.pageNum - 1].container, "margin-top")),
-         scrollTop = this.viewer.scrollTop;
-      
-      // Render visible pages
-      for (var i = 0; i < this.pages.length; i++)
-      {
-         var page = this.pages[i];
-         if (!page.canvas && this._getPageVPos(page) < this.viewerRegion.height * 1.5)
-         {
-            this._renderPage(page);
-         }
-      }
-   },
-   
-   /*
-    * PAGE METHODS
-    */
-   
-   /**
-    * Render a specific page in the container
-    * 
-    * @method _renderPageContainer
-    * @private
-    */
-   _renderPageContainer: function PdfJs__renderPageContainer(pageNum, page)
-   {
-      var content = page;
-      
-       var div = document.createElement('div');
-       div.id = this.wp.id + '-pageContainer-' + pageNum;
-       Dom.addClass(div, "page");
-       this.viewer.appendChild(div);
-
-       // Create the loading indicator div
-       var loadingIconDiv = document.createElement('div');
-       Dom.addClass(loadingIconDiv, 'loadingIcon');
-       div.appendChild(loadingIconDiv);
-       
-       var pageObj = {
-             id: '',
-             content: content,
-             canvas: null,
-             container: div,
-             loadingIconDiv: loadingIconDiv
-          };
-       
-       this._setPageSize(pageObj);
-
-       // Add to the list of pages
-       this.pages.push(pageObj);
-    },
-    
-    /**
-     * 
-     */
-    _getPageVPos: function PdfJs__getPageVPos(page)
-    {
-       var vregion = this.viewerRegion,
-          pregion = Dom.getRegion(page.container);
-       
-       return pregion.top - vregion.top;
-    },
-    
-    /**
-     * 
-     */
-    _setPageVPos: function PdfJs__setPageVPos(page)
-    {
-       var vregion = this.viewerRegion,
-          pregion = Dom.getRegion(page.container);
-       
-       page.vpos = pregion.top - vregion.top;
-    },
-    
-    /**
-     * Render a specific page in the container
-     * 
-     * @method __renderPage
-     * @private
-     */
-    _renderPage: function PdfJs__renderPage(page)
-    {
-       if (page.loadingIconDiv)
-       {
-          Dom.setStyle(page.loadingIconDiv, "display", "none");
-       }
-       var region = Dom.getRegion(page.container),
-          canvas = document.createElement('canvas');
-       canvas.id = page.container.id.replace('-pageContainer-', '-canvas-');
-       canvas.mozOpaque = true;
-       page.container.appendChild(canvas);
-       
-       page.canvas = canvas;
-       
-       // Add text layer
-       var textLayerDiv = null;
-       if (this.attributes.disableTextLayer != "true")
-       {
-          textLayerDiv = document.createElement('div');
-          textLayerDiv.className = 'textLayer';
-          page.container.appendChild(textLayerDiv);
-       }
-       var textLayer = textLayerDiv ? new TextLayerBuilder(textLayerDiv) : null;
-       
-       var content = page.content,
-          view = content.view,
-          ctx = canvas.getContext('2d');
-
-       canvas.width = region.width;
-       canvas.height = region.height;
-
-       // Fill canvas with a white background
-       ctx.save();
-       ctx.fillStyle = 'rgb(255, 255, 255)';
-       ctx.fillRect(0, 0, canvas.width, canvas.height);
-       ctx.restore();
-       ctx.translate(-view[0] * this.currentScale, -view[1] * this.currentScale);
-       
-       // Render the content itself
-       var renderContext = {
-      	      canvasContext: ctx,
-      	      viewport: page.content.getViewport(this._parseScale(this.currentScale)),
-      	      textLayer: textLayer
-      	    };
-      content.render(renderContext);
-    },
-   
-   /**
-    * Set page container size
-    * 
-    * @method _setPageSize
-    * @private
-    */
-   _setPageSize: function PdfJs__setPageSize(page)
-   {
-      var pageContainer = page.container, content = page.content,
-         viewPort = content.getViewport(this.currentScale||this.attributes.defaultScale);;
-      Dom.setStyle(pageContainer, "height", "" + Math.floor(viewPort.height) + "px");
-      Dom.setStyle(pageContainer, "width", "" + Math.floor(viewPort.width) + "px");
-   },
-   
-   /**
-    * Remove page canvas and reset dimensions
-    * 
-    * @method _resetPage
-    * @private
-    */
-   _resetPage: function PdfJs__resetPage(page)
-   {
-       this._setPageSize(page);
-       
-       // Remove any existing page canvas
-       if (page.canvas)
-       {
-          page.container.removeChild(page.canvas);
-          delete page.canvas;
-          page.canvas = null;
-       }
-       
-       if (page.loadingIconDiv)
-       {
-          Dom.setStyle(page.loadingIconDiv, "display", "block");
-       }
-
+      // outline view depends on destinations and pagesRefMap
+      PDFJS.Promise.all([pagesPromise, destinationsPromise]).then(setupOutline);
    },
    
    /**
@@ -725,49 +473,157 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
    _updateZoomControls: function PdfJs__updateZoomControls(n)
    {
       // Update zoom controls
-      this.widgets.zoomInButton.set("disabled", this.currentScale * this.attributes.scaleDelta > K_MAX_SCALE);
-      this.widgets.zoomOutButton.set("disabled", this.currentScale / this.attributes.scaleDelta < K_MIN_SCALE);
-      /*
-      var select = Dom.get(this.wp.id + "-scaleSelect");
-      for (var i = 0; i < select.options.length; i++)
+      var scale = this.documentView.currentScale;
+      this.widgets.zoomInButton.set("disabled", scale * this.attributes.scaleDelta > K_MAX_SCALE);
+      this.widgets.zoomOutButton.set("disabled", scale / this.attributes.scaleDelta < K_MIN_SCALE);
+      this.widgets.scaleMenu.set("label", "" + Math.round(scale * 100) + "%");
+   },
+   
+   /**
+    * 
+    */
+   _scrollToPage: function PdfJs__scrollToPage(n)
+   {
+      this.documentView.scrollTo(n);
+      this.pageNum = n;
+      
+      // Update toolbar controls
+      this._updatePageControls();
+   },
+   
+   _addOutline: function PdfJs__addOutline(outline)
+   {
+     var queue = [{parent: Dom.get(this.id + "-outlineView"), items: outline}];
+     while (queue.length > 0) {
+       var levelData = queue.shift();
+       var i, n = levelData.items.length;
+       for (i = 0; i < n; i++) {
+         var item = levelData.items[i];
+         var div = document.createElement('div');
+         div.className = 'outlineItem';
+         var a = document.createElement('a');
+         Dom.setAttribute(a, "href", "#");
+         YAHOO.util.Event.addListener(a, "click", function(e, obj) {
+            this._navigateTo(obj);
+         }, item.dest, this);
+         a.textContent = item.title;
+         div.appendChild(a);
+
+         if (item.items.length > 0) {
+           var itemsDiv = document.createElement('div');
+           itemsDiv.className = 'outlineItems';
+           div.appendChild(itemsDiv);
+           queue.push({parent: itemsDiv, items: item.items});
+         }
+
+         levelData.parent.appendChild(div);
+       }
+     }
+   },
+   
+   _navigateTo: function PdfJs__navigateTo(dest) {
+     if (typeof dest === 'string')
+       dest = this.destinations[dest];
+     if (!(dest instanceof Array))
+       return; // invalid destination
+     // dest array looks like that: <page-ref> </XYZ|FitXXX> <args..>
+     var destRef = dest[0];
+     var pageNumber = destRef instanceof Object ?
+       this.pagesRefMap[destRef.num + ' ' + destRef.gen + ' R'] : (destRef + 1);
+     if (pageNumber > this.documentView.pages.length - 1)
+       pageNumber = this.documentView.pages.length - 1;
+     if (typeof pageNumber == "number") {
+        this._scrollToPage(pageNumber + 1);
+     }
+   },
+   
+   _textSearch: function PdfJs__textSearch(searchTerm)
+   {
+      var results = [];
+      for (var i = 0; i < this.documentView.pages.length; i++)
       {
-         if (this.currentScaleValue == select.options[i].value)
+         var page = this.documentView.pages[i];
+         if (page.textLayerDiv && page.textLayerDiv.firstChild)
          {
-            select.selectedIndex = i;
+            for (var j = 0; j < page.textLayerDiv.childNodes.length; j++)
+            {
+               var childEl = page.textLayerDiv.childNodes[j],
+                  textContent = childEl.textContent || childEl.innerText,
+                  matchPos = textContent.toLowerCase().indexOf(searchTerm.toLowerCase());
+               if (matchPos > -1)
+               {
+                  results.push({pageNum: i+1, text: textContent, matchPos: matchPos});
+               }
+            }
          }
       }
-      */
-      this.widgets.scaleMenu.set("label", "" + Math.round(this.currentScale * 100) + "%");
+      return results;
    },
-    
-    /**
-     * 
-     */
-    _scrollToPage: function PdfJs__scrollToPage(n)
-    {
-       var marginTop = parseInt(Dom.getStyle(this.pages[n - 1].container, "margin-top")),
-          scrollTop = this._getPageVPos(this.pages[n - 1]) - marginTop;
-       this.viewer.scrollTop += scrollTop;
-       this.pageNum = n;
-       
-       // Update toolbar controls
-       this._updatePageControls();
-       
-       // Render visible pages
-       this._renderVisiblePages();
-    },
-    
-    /**
-     * 
-     */
-    _setZoomLevel: function PdfJs__setZoomLevel()
-    {
-       
-    },
     
     /*
      * EVENT HANDLERS
      */
+    
+    /**
+     * Toggle sidebar button click handler
+     * 
+     * @method onSidebarToggle
+     */
+    onSidebarToggle: function PdfJs_onSidebarToggle(e_obj)
+    {
+       var sbshown = Dom.getStyle(this.sidebar, "display") == "block";
+       Dom.setStyle(this.sidebar, "display", sbshown ? "none" : "block");
+       if (sbshown)
+       {
+          Dom.removeClass(this.viewer, "sideBarVisible");
+       }
+       else
+       {
+          Dom.addClass(this.viewer, "sideBarVisible");
+       }
+       this.documentView.alignRows();
+       
+       // Lazily instantiate the TabView
+       this.widgets.tabview = this.widgets.tabview || new YAHOO.widget.TabView(this.id + "-sidebarTabView");
+       
+       this.widgets.tabview.getTab(1).addListener("click", function() {
+          if (this.thumbnailView.pages.length > 0 && !this.thumbnailView.pages[0].container)
+          {
+             this.thumbnailView.render();
+             for (var i = 0; i < this.thumbnailView.pages.length; i++)
+             {
+                YAHOO.util.Event.addListener(this.thumbnailView.pages[i].container, "click", function(e, obj) {
+                   this.documentView.scrollTo(obj.pn);
+                }, {pn: i+1}, this);
+             }
+             // Scroll to the first page, this will force the visible content to render
+             this.thumbnailView.scrollTo(1);
+             YAHOO.util.Event.addListener(this.id + "-thumbnailView", "scroll", this.onThumbnailsScroll, this, true);
+          }
+       }, null, this);
+       
+       var goToPage = function goToPage(e, obj) {
+          this._scrollToPage(obj.pn);
+       };
+       
+       YAHOO.util.Event.addListener(this.id + "-searchBox", "change", function(e, obj) {
+          var term = e.currentTarget.value,
+             results = this._textSearch(term),
+             resultsEl = Dom.get(this.id + "-searchResults");
+          resultsEl.innerHTML = "<p>Found " + results.length + " matches</p>";
+          for (var i = 0; i < results.length; i++)
+          {
+             var result = results[i];
+             var divEl = document.createElement("div");
+             var linkEl = document.createElement("a");
+             divEl.appendChild(linkEl);
+             linkEl.innerHTML = "<span>Page " + result.pageNum + "</span>: " + result.text;
+             Dom.setAttribute(linkEl, "href", "#");
+             YAHOO.util.Event.addListener(linkEl, "click", goToPage, {pn: result.pageNum}, this);
+             resultsEl.appendChild(divEl);
+          }
+       }, null, this);
+    },
     
     /**
      * 
@@ -813,31 +669,26 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
     onViewerScroll: function PdfJs_onViewerScroll(e_obj)
     {
        // Render visible pages
-       this._renderVisiblePages();
+       this.documentView.renderVisiblePages();
        
-       // Calculate new page number
-       var currVpos = this._getPageVPos(this.pages[this.pageNum - 1]);
-       for (var i = 0; i < this.pages.length; i++)
+       var newPn = this.documentView.getScrolledPageNumber();
+       if (this.pageNum != newPn)
        {
-          var page = this.pages[i],
-             vpos = this._getPageVPos(page);
-          if (vpos + parseInt(page.container.style.height) / 2 > 0)
-          {
-             if (vpos != currVpos)
-             {
-                this.pageNum = i + 1;
-                this._updatePageControls();
-             }
-             break;
-          }
+          this.pageNum = newPn;
+          this._updatePageControls();
        }
+    },
+    
+    onThumbnailsScroll: function PdfJs_onThumbnailsScroll(e_obj)
+    {
+       // Render visible pages
+       this.thumbnailView.renderVisiblePages();
     },
     
     onZoomOut: function PdfJs_onZoomOut(p_obj)
     {
-       var newScale = Math.max(K_MIN_SCALE, this.currentScale / this.attributes.scaleDelta);
-       this._setScale(this._parseScale(newScale));
-       this.currentScaleValue = newScale;
+       var newScale = Math.max(K_MIN_SCALE, this.documentView.currentScale / this.attributes.scaleDelta);
+       this.documentView.setScale(this.documentView.parseScale(newScale));
        this._scrollToPage(this.pageNum);
        this._updateZoomControls();
        
@@ -845,9 +696,8 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
     
     onZoomIn: function PdfJs_onZoomIn(p_obj)
     {
-       var newScale = Math.min(K_MAX_SCALE, this.currentScale * this.attributes.scaleDelta);
-       this._setScale(this._parseScale(newScale));
-       this.currentScaleValue = newScale;
+       var newScale = Math.min(K_MAX_SCALE, this.documentView.currentScale * this.attributes.scaleDelta);
+       this.documentView.setScale(this.documentView.parseScale(newScale));
        this._scrollToPage(this.pageNum);
        this._updateZoomControls();
     },
@@ -858,8 +708,7 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
           oMenuItem = p_aArgs[1]; // MenuItem instance that was the target of the event
        
        var newScale = oMenuItem.value;
-       this._setScale(this._parseScale(newScale));
-       this.currentScaleValue = newScale;
+       this.documentView.setScale(this.documentView.parseScale(newScale));
        this._scrollToPage(this.pageNum);
        this._updateZoomControls();
     },
@@ -896,10 +745,12 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
        
        this._setPreviewerElementHeight();
        this._setViewerHeight();
+       // TODO viewerRegion should be populated by an event?
+       this.documentView.viewerRegion = Dom.getRegion(this.viewer);
        // Now redefine the row margins
-       this._alignViewerRows();
+       this.documentView.alignRows();
        // Render any pages that have appeared
-       this._renderVisiblePages();
+       this.documentView.renderVisiblePages();
     },
     
     /**
@@ -970,10 +821,12 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
     {
        this._setPreviewerElementHeight();
        this._setViewerHeight();
+       // TODO viewerRegion should be populated by an event?
+       this.documentView.viewerRegion = Dom.getRegion(this.viewer);
        // Now redefine the row margins
-       this._alignViewerRows();
+       this.documentView.alignRows();
        // Render any pages that have appeared
-       this._renderVisiblePages();
+       this.documentView.renderVisiblePages();
     },
     
     /**
@@ -1005,6 +858,367 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
        }
     }
 };
+
+/**
+ * Page helper class
+ */
+var DocumentPage = function(id, content, parent, config)
+{
+   this.id = id;
+   this.content = content;
+   this.parent = parent;
+   this.canvas = null;
+   this.container = null;
+   this.loadingIconDiv = null;
+   this.textLayerDiv = null;
+   this.config = config || {};
+}
+
+DocumentPage.prototype =
+{
+   /**
+    * Render a specific page in the container
+    * 
+    * @method _renderPageContainer
+    * @private
+    */
+   render: function DocumentPage_render()
+   {
+       var div = document.createElement('div');
+       div.id = this.parent.id + '-pageContainer-' + this.id;
+       Dom.addClass(div, "page");
+       this.parent.viewer.appendChild(div);
+
+       // Create the loading indicator div
+       var loadingIconDiv = document.createElement('div');
+       Dom.addClass(loadingIconDiv, 'loadingIcon');
+       div.appendChild(loadingIconDiv);
+       
+       this.container = div;
+       this.loadingIconDiv = loadingIconDiv;
+       
+       this._setPageSize();
+    },
+    
+    /**
+     * 
+     */
+    getVPos: function DocumentPage_getVPos(page)
+    {
+       var vregion = this.parent.viewerRegion,
+          pregion = Dom.getRegion(this.container);
+       
+       return pregion.top - vregion.top;
+    },
+    
+    /**
+     * Render page content
+     * 
+     * @method renderContent
+     * @private
+     */
+    renderContent: function DocumentPage_renderContent()
+    {
+       if (this.loadingIconDiv)
+       {
+          Dom.setStyle(this.loadingIconDiv, "display", "none");
+       }
+       var region = Dom.getRegion(this.container),
+          canvas = document.createElement('canvas');
+       canvas.id = this.container.id.replace('-pageContainer-', '-canvas-');
+       canvas.mozOpaque = true;
+       this.container.appendChild(canvas);
+       
+       this.canvas = canvas;
+       
+       // Add text layer
+       var textLayerDiv = null;
+       if (!this.parent.config.disableTextLayer)
+       {
+          textLayerDiv = document.createElement('div');
+          textLayerDiv.className = 'textLayer';
+          this.container.appendChild(textLayerDiv);
+       }
+       this.textLayerDiv = textLayerDiv;
+       var textLayer = textLayerDiv ? new TextLayerBuilder(textLayerDiv) : null;
+       
+       var content = this.content,
+          view = content.view,
+          ctx = canvas.getContext('2d');
+
+       canvas.width = region.width;
+       canvas.height = region.height;
+
+       // Fill canvas with a white background
+       ctx.save();
+       ctx.fillStyle = 'rgb(255, 255, 255)';
+       ctx.fillRect(0, 0, canvas.width, canvas.height);
+       ctx.restore();
+       ctx.translate(-view[0] * this.parent.currentScale, -view[1] * this.parent.currentScale);
+       
+       // Render the content itself
+       var renderContext = {
+               canvasContext: ctx,
+               viewport: this.content.getViewport(this.parent.parseScale(this.parent.currentScale)),
+               textLayer: textLayer
+             };
+      content.render(renderContext);
+    },
+   
+   /**
+    * Set page container size
+    * 
+    * @method _setPageSize
+    * @private
+    */
+   _setPageSize: function DocumentPage__setPageSize(page)
+   {
+      var pageContainer = this.container, content = this.content,
+         viewPort = content.getViewport(this.parent.currentScale);
+      Dom.setStyle(pageContainer, "height", "" + Math.floor(viewPort.height) + "px");
+      Dom.setStyle(pageContainer, "width", "" + Math.floor(viewPort.width) + "px");
+   },
+   
+   /**
+    * Remove page canvas and reset dimensions
+    * 
+    * @method _reset
+    * @private
+    */
+   reset: function DocumentPage_reset()
+   {
+       this._setPageSize();
+       
+       // Remove any existing page canvas
+       if (this.canvas)
+       {
+          this.container.removeChild(this.canvas);
+          delete this.canvas;
+          this.canvas = null;
+       }
+       
+       if (this.loadingIconDiv)
+       {
+          Dom.setStyle(this.loadingIconDiv, "display", "block");
+       }
+   }
+}
+
+/**
+ * Document View utility class. Used for main view and thumbnail view.
+ */
+var DocumentView = function(elId, config) {
+   this.id = elId;
+   this.config = config || {};
+   this.pages = [];
+   this.viewer = Dom.get(elId);
+   this.viewerRegion = Dom.getRegion(this.viewer);
+   this.currentScale = K_UNKNOWN_SCALE;
+}
+
+DocumentView.prototype =
+{
+   addPage: function DocumentView_addPage(id, content)
+   {
+      var page = new DocumentPage(id, content, this, {});
+      this.pages.push(page);
+   },
+   
+   addPages: function DocumentView_addPages(pages)
+   {
+      for (var i = 0; i < pages.length; i++)
+      {
+         var page = pages[i];
+         this.addPage(i + 1, page);
+      }
+   },
+   
+   render: function DocumentView_render()
+   {
+      // Render each page (not canvas or text layers)
+      for (var i = 0; i < this.pages.length; i++)
+      {
+         this.pages[i].render();
+      }
+      
+      // Set scale, if not already set
+      if (this.currentScale === K_UNKNOWN_SCALE)
+      {
+         // Scale was not initialized: invalid bookmark or scale was not specified.
+         // Setting the default one.
+         this.setScale(this.parseScale(this.config.defaultScale));
+      }
+   },
+   
+   reset: function DocumentView_reset()
+   {
+      // Remove all the existing canvas elements
+      for (var i = 0; i < this.pages.length; i++)
+      {
+         this.pages[i].reset();
+      }
+
+      // Now redefine the row margins
+      this.alignRows();
+   },
+   
+   alignRows: function DocumentView_alignRows()
+   {
+      var rowPos = -1, rowWidth = 0, largestRow = 0;
+      if (this.config.pageLayout == "multi")
+      {
+         Dom.setStyle(this.viewer, "padding-left", "0px");
+         for (var i = 0; i < this.pages.length; i++)
+         {
+            var page = this.pages[i], container = page.container, vpos = page.getVPos();
+            // If multi-page mode is on, we need to add custom extra margin to the LHS of the 1st item in the row to make it centred
+            if (vpos != rowPos)
+            {
+               rowWidth = parseInt(Dom.getStyle(container, "margin-left")); // Rather than start from zero assume equal right padding on last row item
+            }
+            rowWidth += Dom.getRegion(container).width + parseInt(Dom.getStyle(container, "margin-left"));
+            largestRow = Math.max(largestRow, rowWidth);
+            rowPos = vpos;
+         }
+         Dom.setStyle(this.viewer, "padding-left", "" + Math.floor(((this.viewer.clientWidth - largestRow) / 2)) + "px");
+      }
+   },
+   
+   /**
+    * 
+    */
+   renderVisiblePages: function DocumentView_renderVisiblePages()
+   {
+      // region may not be populated properly if the div was hidden
+      this.viewerRegion = Dom.getRegion(this.viewer);
+      
+      // Render visible pages
+      for (var i = 0; i < this.pages.length; i++)
+      {
+         var page = this.pages[i];
+         if (!page.canvas && page.getVPos() < this.viewerRegion.height * 1.5)
+         {
+            page.renderContent();
+         }
+      }
+   },
+   
+   /**
+    * 
+    */
+   scrollTo: function DocumentView_scrollTo(n)
+   {
+      var marginTop = parseInt(Dom.getStyle(this.pages[n - 1].container, "margin-top")),
+         scrollTop = this.pages[n - 1].getVPos() - marginTop;
+      this.viewer.scrollTop += scrollTop;
+      this.pageNum = n;
+      
+      // Render visible pages
+      this.renderVisiblePages();
+   },
+   
+   /**
+    * 
+    */
+   setScale: function DocumentView_setScale(value)
+   {
+      if (value == this.currentScale)
+      {
+         return;
+      }
+      this.currentScale = value;
+      
+      // Remove all the existing canvas elements
+      this.reset();
+
+      // Now redefine the row margins
+      this.alignRows();
+   },
+   
+   /**
+    * Calculate page zoom level based on the supplied value. Recognises numerical values and special string constants, e.g. 'page-fit'.
+    * Normally used in conjunction with setScale(), since this method does not set the current value.
+    * 
+    * @method parseScale
+    * @private
+    * @return {float} Numerical scale value
+    */
+   parseScale: function DocumentView_parseScale(value)
+   {
+       var scale = parseFloat(value);
+       if (scale)
+       {
+          return scale;
+       }
+
+       if(this.pages.length > 0)
+       {
+             var currentPage = this.pages[0],
+             container = currentPage.container,
+             hmargin = parseInt(Dom.getStyle(container, "margin-left")) + parseInt(Dom.getStyle(container, "margin-right")),
+             vmargin = parseInt(Dom.getStyle(container, "margin-top")) + parseInt(Dom.getStyle(container, "margin-bottom")),
+             contentWidth = parseInt(currentPage.content.pageInfo.view[2]),
+             contentHeight = parseInt(currentPage.content.pageInfo.view[3]),
+             clientWidth = this.viewer.clientWidth - 1, // allow an extra pixel in width otherwise 2-up view wraps
+             clientHeight = this.viewer.clientHeight;
+          
+          if ('page-width' == value)
+          {
+             var pageWidthScale = (clientWidth - hmargin*2) / contentWidth;
+             return pageWidthScale;
+          }
+          else if ('two-page-width' == value)
+          {
+             var pageWidthScale = (clientWidth - hmargin*3) / contentWidth;
+             return pageWidthScale / 2;
+          }
+          else if ('page-height' == value)
+          {
+             var pageHeightScale = (clientHeight - vmargin*2) / contentHeight;
+             return pageHeightScale;
+          }
+          else if ('page-fit' == value)
+          {
+             var pageWidthScale = (clientWidth - hmargin*2) / contentWidth,
+                pageHeightScale = (clientHeight - vmargin*2) / contentHeight;
+             return Math.min(pageWidthScale, pageHeightScale);
+          }
+          else if ('two-page-fit' == value)
+          {
+             var pageWidthScale = (clientWidth - hmargin*3) / contentWidth,
+                pageHeightScale = (clientHeight - vmargin*2) / contentHeight;
+             return Math.min(pageWidthScale / 2, pageHeightScale);
+          }
+          else if ('auto' == value)
+          {
+             var pageWidthScale = (clientWidth - hmargin*2) / contentWidth;
+             return Math.min(1.0, pageWidthScale);
+          }
+          else
+          {
+             throw "Unrecognised zoom level '" + value + "'";
+          }
+       } else
+       {
+          throw "Unrecognised zoom level - no pages";
+       }
+   },
+   
+   getScrolledPageNumber: function getScrolledPageNumber_getScrolledPageNumber()
+   {
+      // Calculate new page number
+      for (var i = 0; i < this.pages.length; i++)
+      {
+         var page = this.pages[i],
+            vpos = page.getVPos();
+         if (vpos + parseInt(page.container.style.height) / 2 > 0)
+         {
+            return i + 1;
+         }
+      }
+      return this.pages.length;
+   }
+}
 
 var TextLayerBuilder = function textLayerBuilder(textLayerDiv) {
    this.textLayerDiv = textLayerDiv;
