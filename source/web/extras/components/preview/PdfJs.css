@@ -18,7 +18,7 @@
 }
 
 .previewer.PdfJs .viewer {
-	overflow: scroll;
+	overflow-y: scroll;
 }
 
 .previewer.PdfJs [hidden] {
@@ -31,7 +31,7 @@
   border-top: 1px solid #CCCCCC;
   border-bottom: 1px solid #666;
   padding: 5px 3px 3px 0;
-  height: 2.2em;
+  height: 25px;
   width: 100%;
   white-space: nowrap;
   overflow: hidden;
@@ -100,13 +100,18 @@
   opacity: 0.5;
 }
 
-.previewer.PdfJs .pageNumber {
+.previewer.PdfJs .controls .pageNumber {
   text-align: right;
+}
+
+.previewer.PdfJs .controls .sidebarBtn {
+	float: left;
 }
 
 .linkDialog {
 	visibility:hidden;
     position: absolute;
+    font-size: 0.9em;
 }
 
 .yui-skin-default .yui-panel.linkDialog .bd {
@@ -134,7 +139,8 @@
     border-right: 1px solid #666;
     float: left;
     font-size: 0.9;
-    overflow: scroll;
+    text-align: left;
+    padding: 2px;
 }
 
 .previewer.PdfJs .viewer.sideBarVisible {
@@ -142,15 +148,50 @@
 }
 
 .previewer.PdfJs .sidebar > div {
+    height: 100%;
 }
 
+/* Need .yui-skin-default to ensure background is overridden from base CSS */
 .yui-skin-default .sidebar .yui-navset .yui-content {
 	background-color: transparent;
-	border-width: 0;
+	border-width: 1px;
+	position: absolute;
+	top: 25px;
+	bottom: 0px;
+	left: 0px;
+	right: 0px;
+	padding: 0;
 }
 
-.previewer.PdfJs .sidebar .outlineView {
-    text-align: left;
+/* Need .yui-skin-default to ensure background is overridden from base CSS */
+.yui-skin-default .sidebar .yui-navset .yui-nav {
+	border-width: 0 0 1px;
+}
+
+.yui-skin-default .sidebar .yui-navset .yui-nav a em, .yui-skin-default .sidebar .yui-navset .yui-navset-top .yui-nav a em {
+	padding: 0.25em 0.75em;
+    height: 16px;
+}
+
+.yui-skin-default .sidebar .yui-navset .yui-content > div {
+	height: 100%;
+	overflow-y: scroll;
+}
+
+.previewer.PdfJs .sidebar .outlineView, .previewer.PdfJs .sidebar .searchView {
+    padding: 0 0.5em;
+}
+
+.previewer.PdfJs .sidebar .outlineView > div, .previewer.PdfJs .sidebar .searchResults > div {
+    margin-top: 0.25em;
+}
+
+.previewer.PdfJs .sidebar .outlineView > :first-child, .previewer.PdfJs .sidebar .searchView > :first-child {
+    margin-top: 0.5em;
+}
+
+.previewer.PdfJs .sidebar .outlineView > :last-child, .previewer.PdfJs .sidebar .searchView > :last-child {
+    margin-bottom: 0.5em;
 }
 
 .previewer.PdfJs .sidebar .searchView input {
@@ -160,6 +201,29 @@
 .previewer.PdfJs .sidebar .searchResults {
     text-align: left;
     font-size: 0.9em;
+}
+
+.yui-skin-default .sidebar .thumbnailView {
+}
+
+.yui-skin-default .sidebar .thumbnailView .page {
+	box-shadow: 0 2px 5px #666666;
+    cursor: pointer;
+    margin: 10px 0 0 10px;
+}
+
+.previewer.PdfJs .sidebar .thumbnailView .page.activePage {
+    margin: 8px 0 0 8px;
+    border: 2px solid #6CA5CE;
+}
+
+.previewer.PdfJs .thumbnailView .page:last-child {
+     margin-bottom: 10px;
+}
+
+.yui-skin-default .sidebar .thumbnailView .page.highlighted {
+    border: 3px solid #0093FF;
+    border-radius: 3px 3px 3px 3px;
 }
 
 #sidebar {

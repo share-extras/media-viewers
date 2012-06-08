@@ -489,39 +489,58 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
       
       // Update toolbar controls
       this._updatePageControls();
+      
+      // Update sidebar, if visible
+      // TODO define an isRendered() method on the view object
+      if (this.thumbnailView.pages && this.thumbnailView.pages[0] && this.thumbnailView.pages[0].container)
+      {
+         this.thumbnailView.setActivePage(this.pageNum);
+      }
    },
    
    _addOutline: function PdfJs__addOutline(outline)
    {
-     var queue = [{parent: Dom.get(this.id + "-outlineView"), items: outline}];
-     while (queue.length > 0) {
-       var levelData = queue.shift();
-       var i, n = levelData.items.length;
-       for (i = 0; i < n; i++) {
-         var item = levelData.items[i];
-         var div = document.createElement('div');
-         div.className = 'outlineItem';
-         var a = document.createElement('a');
-         Dom.setAttribute(a, "href", "#");
-         YAHOO.util.Event.addListener(a, "click", function(e, obj) {
-            this._navigateTo(obj);
-         }, item.dest, this);
-         a.textContent = item.title;
-         div.appendChild(a);
+      var pEl = Dom.get(this.id + "-outlineView");
+      
+      if (outline && outline.length > 0)
+      {
+         var queue = [{parent: pEl, items: outline}];
+         while (queue.length > 0)
+         {
+            var levelData = queue.shift();
+            var i, n = levelData.items.length;
+            for (i = 0; i < n; i++)
+            {
+               var item = levelData.items[i];
+               var div = document.createElement('div');
+               div.className = 'outlineItem';
+               var a = document.createElement('a');
+               Dom.setAttribute(a, "href", "#");
+               YAHOO.util.Event.addListener(a, "click", function(e, obj) {
+                  this._navigateTo(obj);
+                  }, item.dest, this);
+               a.textContent = item.title;
+               div.appendChild(a);
+               
+               if (item.items.length > 0) {
+                  var itemsDiv = document.createElement('div');
+                  itemsDiv.className = 'outlineItems';
+                  div.appendChild(itemsDiv);
+                  queue.push({parent: itemsDiv, items: item.items});
+               }
 
-         if (item.items.length > 0) {
-           var itemsDiv = document.createElement('div');
-           itemsDiv.className = 'outlineItems';
-           div.appendChild(itemsDiv);
-           queue.push({parent: itemsDiv, items: item.items});
+               levelData.parent.appendChild(div);
+            }
          }
-
-         levelData.parent.appendChild(div);
-       }
-     }
+      }
+      else
+      {
+         pEl.innerHTML = "<p>" + this.wp.msg("msg.noOutline") + "</p>";
+      }
    },
    
-   _navigateTo: function PdfJs__navigateTo(dest) {
+   _navigateTo: function PdfJs__navigateTo(dest)
+   {
      if (typeof dest === 'string')
        dest = this.destinations[dest];
      if (!(dest instanceof Array))
@@ -548,7 +567,7 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
             for (var j = 0; j < page.textLayerDiv.childNodes.length; j++)
             {
                var childEl = page.textLayerDiv.childNodes[j],
-                  textContent = childEl.textContent || childEl.innerText,
+                  textContent = (childEl.textContent || childEl.innerText).replace("&nbsp;", " "),
                   matchPos = textContent.toLowerCase().indexOf(searchTerm.toLowerCase());
                if (matchPos > -1)
                {
@@ -585,22 +604,23 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
        
        // Lazily instantiate the TabView
        this.widgets.tabview = this.widgets.tabview || new YAHOO.widget.TabView(this.id + "-sidebarTabView");
-       
-       this.widgets.tabview.getTab(1).addListener("click", function() {
-          if (this.thumbnailView.pages.length > 0 && !this.thumbnailView.pages[0].container)
+
+       // Set up the thumbnail view
+       if (this.thumbnailView.pages.length > 0 && !this.thumbnailView.pages[0].container)
+       {
+          this.thumbnailView.render();
+          for (var i = 0; i < this.thumbnailView.pages.length; i++)
           {
-             this.thumbnailView.render();
-             for (var i = 0; i < this.thumbnailView.pages.length; i++)
-             {
-                YAHOO.util.Event.addListener(this.thumbnailView.pages[i].container, "click", function(e, obj) {
-                   this.documentView.scrollTo(obj.pn);
-                }, {pn: i+1}, this);
-             }
-             // Scroll to the first page, this will force the visible content to render
-             this.thumbnailView.scrollTo(1);
-             YAHOO.util.Event.addListener(this.id + "-thumbnailView", "scroll", this.onThumbnailsScroll, this, true);
+             YAHOO.util.Event.addListener(this.thumbnailView.pages[i].container, "click", function(e, obj) {
+                this.thumbnailView.setActivePage(obj.pn);
+                this.documentView.scrollTo(obj.pn);
+             }, {pn: i+1}, this);
           }
-       }, null, this);
+          // Scroll to the current page, this will force the visible content to render
+          this.thumbnailView.scrollTo(this.pageNum);
+          this.thumbnailView.setActivePage(this.pageNum);
+          YAHOO.util.Event.addListener(this.id + "-thumbnailView", "scroll", this.onThumbnailsScroll, this, true);
+       }
        
        var goToPage = function goToPage(e, obj) {
           this._scrollToPage(obj.pn);
@@ -610,17 +630,25 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
           var term = e.currentTarget.value,
              results = this._textSearch(term),
              resultsEl = Dom.get(this.id + "-searchResults");
-          resultsEl.innerHTML = "<p>Found " + results.length + " matches</p>";
-          for (var i = 0; i < results.length; i++)
+          
+          if (results.length > 0)
           {
-             var result = results[i];
-             var divEl = document.createElement("div");
-             var linkEl = document.createElement("a");
-             divEl.appendChild(linkEl);
-             linkEl.innerHTML = "<span>Page " + result.pageNum + "</span>: " + result.text;
-             Dom.setAttribute(linkEl, "href", "#");
-             YAHOO.util.Event.addListener(linkEl, "click", goToPage, {pn: result.pageNum}, this);
-             resultsEl.appendChild(divEl);
+             resultsEl.innerHTML = "<p>" + this.wp.msg("msg.results", results.length) + "</p>";
+             for (var i = 0; i < results.length; i++)
+             {
+                var result = results[i];
+                var divEl = document.createElement("div");
+                var linkEl = document.createElement("a");
+                divEl.appendChild(linkEl);
+                linkEl.innerHTML = "<span>" + this.wp.msg("msg.resultPage", result.pageNum) + "</span>: " + result.text;
+                Dom.setAttribute(linkEl, "href", "#");
+                YAHOO.util.Event.addListener(linkEl, "click", goToPage, {pn: result.pageNum}, this);
+                resultsEl.appendChild(divEl);
+             }
+          }
+          else
+          {
+             resultsEl.innerHTML = "<p>" + this.wp.msg("msg.noResults") + "</p>";
           }
        }, null, this);
     },
@@ -751,6 +779,7 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
        this.documentView.alignRows();
        // Render any pages that have appeared
        this.documentView.renderVisiblePages();
+       this.thumbnailView.renderVisiblePages();
     },
     
     /**
@@ -827,6 +856,7 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
        this.documentView.alignRows();
        // Render any pages that have appeared
        this.documentView.renderVisiblePages();
+       this.thumbnailView.renderVisiblePages();
     },
     
     /**
@@ -1018,6 +1048,8 @@ var DocumentView = function(elId, config) {
 
 DocumentView.prototype =
 {
+   activePage: null,
+      
    addPage: function DocumentView_addPage(id, content)
    {
       var page = new DocumentPage(id, content, this, {});
@@ -1096,7 +1128,7 @@ DocumentView.prototype =
       for (var i = 0; i < this.pages.length; i++)
       {
          var page = this.pages[i];
-         if (!page.canvas && page.getVPos() < this.viewerRegion.height * 1.5)
+         if (page.container && !page.canvas && page.getVPos() < this.viewerRegion.height * 1.5)
          {
             page.renderContent();
          }
@@ -1108,9 +1140,24 @@ DocumentView.prototype =
     */
    scrollTo: function DocumentView_scrollTo(n)
    {
-      var marginTop = parseInt(Dom.getStyle(this.pages[n - 1].container, "margin-top")),
-         scrollTop = this.pages[n - 1].getVPos() - marginTop;
-      this.viewer.scrollTop += scrollTop;
+      var newPos = this.pages[n - 1].getVPos(),
+         firstPos = this.pages[0].getVPos();
+      
+      if (Alfresco.logger.isDebugEnabled())
+      {
+         Alfresco.logger.debug("Scrolling to page " + n);
+         Alfresco.logger.debug("New page top is " + newPos + "px");
+         Alfresco.logger.debug("First page top is " + firstPos + "px");
+      }
+      
+      var scrollTop = newPos - firstPos;
+
+      if (Alfresco.logger.isDebugEnabled())
+      {
+         Alfresco.logger.debug("Old scrollTop was " + this.viewer.scrollTop + "px");
+         Alfresco.logger.debug("Set scrollTop to " + scrollTop + "px");
+      }
+      this.viewer.scrollTop = scrollTop;
       this.pageNum = n;
       
       // Render visible pages
@@ -1204,7 +1251,7 @@ DocumentView.prototype =
        }
    },
    
-   getScrolledPageNumber: function getScrolledPageNumber_getScrolledPageNumber()
+   getScrolledPageNumber: function DocumentView_getScrolledPageNumber()
    {
       // Calculate new page number
       for (var i = 0; i < this.pages.length; i++)
@@ -1217,6 +1264,21 @@ DocumentView.prototype =
          }
       }
       return this.pages.length;
+   },
+   
+   /**
+    * Set the currently-active page number
+    * 
+    * @method setActivePage
+    */
+   setActivePage: function DocumentView_setActivePage(n)
+   {
+      if (this.activePage)
+      {
+         Dom.removeClass(this.activePage.container, "activePage");
+      }
+      Dom.addClass(this.pages[n-1].container, "activePage");
+      this.activePage = this.pages[n-1];
    }
 }
 
