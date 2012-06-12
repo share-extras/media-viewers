@@ -82,7 +82,7 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
        * @type String
        * @default "iframe"
        */
-      mode: "iframe",
+      mode: "block",
 
       /**
        * Default zoom level
