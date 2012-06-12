@@ -601,6 +601,8 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
           Dom.addClass(this.viewer, "sideBarVisible");
        }
        this.documentView.alignRows();
+       // Render any pages that have appeared
+       this.documentView.renderVisiblePages();
        
        // Lazily instantiate the TabView
        this.widgets.tabview = this.widgets.tabview || new YAHOO.widget.TabView(this.id + "-sidebarTabView");
