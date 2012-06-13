@@ -687,6 +687,11 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
        }
 
        Alfresco.util.createYUIButton(this, "searchBtn", doSearch);
+       new YAHOO.util.KeyListener(this.id + "-searchBox", { keys: 13 }, { // enter
+          fn: doSearch, 
+          scope: this, 
+          correctScope: true
+       }).enable();
     },
     
     /**
