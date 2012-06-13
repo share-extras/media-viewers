@@ -94,7 +94,7 @@
                 <div id="${el}-thumbnailView" class="thumbnailView documentView"></div>
                 <div id="${el}-outlineView" class="outlineView"></div>
                 <div id="${el}-searchView" class="searchView">
-                    <div><input type="text" name="searchBox" id="${el}-searchBox" /></div>
+                    <div><input type="text" name="searchBox" id="${el}-searchBox" /> <button id="${el}-searchBtn">${msg("button.search")}</button></div>
                     <div id="${el}-searchResults" class="searchResults"></div>
                 </div>
             </div>

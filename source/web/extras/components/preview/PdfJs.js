@@ -628,11 +628,11 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
           this._scrollToPage(obj.pn);
        };
        
-       YAHOO.util.Event.addListener(this.id + "-searchBox", "change", function(e, obj) {
-          var term = e.currentTarget.value,
-             results = this._textSearch(term),
-             resultsEl = Dom.get(this.id + "-searchResults");
-          
+       var doSearch = function PdfJs_doSearch(e, obj) {
+          var term = Dom.get(this.id + "-searchBox").value,
+          results = this._textSearch(term),
+          resultsEl = Dom.get(this.id + "-searchResults");
+       
           if (results.length > 0)
           {
              resultsEl.innerHTML = "<p>" + this.wp.msg("msg.results", results.length) + "</p>";
@@ -652,7 +652,9 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
           {
              resultsEl.innerHTML = "<p>" + this.wp.msg("msg.noResults") + "</p>";
           }
-       }, null, this);
+       }
+
+       Alfresco.util.createYUIButton(this, "searchBtn", doSearch);
     },
     
     /**

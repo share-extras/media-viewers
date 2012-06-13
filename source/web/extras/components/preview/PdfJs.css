@@ -178,7 +178,7 @@
 	overflow-y: scroll;
 }
 
-.previewer.PdfJs .sidebar .outlineView, .previewer.PdfJs .sidebar .searchView {
+.previewer.PdfJs .sidebar .outlineView {
     padding: 0 0.5em;
 }
 
@@ -186,21 +186,36 @@
     margin-top: 0.25em;
 }
 
-.previewer.PdfJs .sidebar .outlineView > :first-child, .previewer.PdfJs .sidebar .searchView > :first-child {
+.previewer.PdfJs .sidebar .outlineView > :first-child {
     margin-top: 0.5em;
 }
 
-.previewer.PdfJs .sidebar .outlineView > :last-child, .previewer.PdfJs .sidebar .searchView > :last-child {
+.previewer.PdfJs .sidebar .outlineView > :last-child {
     margin-bottom: 0.5em;
 }
 
 .previewer.PdfJs .sidebar .searchView input {
-    width: 160px;
+    width: 90px;
+    vertical-align: text-bottom;
+}
+
+.previewer.PdfJs .sidebar .searchView button {
+    font-size: 0.9em;
+    padding: 0 4px;
+    line-height: 0.9em;
+    height: 10px;
+}
+
+.previewer.PdfJs .sidebar .searchView > div {
+    padding: 0.5em;
+}
+
+.previewer.PdfJs .sidebar .searchView > div:first-child {
+    background-color: #cccccc;
 }
 
 .previewer.PdfJs .sidebar .searchResults {
     text-align: left;
-    font-size: 0.9em;
 }
 
 .yui-skin-default .sidebar .thumbnailView {
