@@ -329,6 +329,28 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
       
       // Load the PDF itself
       this._loadPdf();
+      
+      // Keyboard shortcuts
+      new YAHOO.util.KeyListener(document, { keys: 37 }, { // left arrow
+         fn: this.onPagePrevious, 
+         scope: this, 
+         correctScope: true
+      }).enable();
+      new YAHOO.util.KeyListener(document, { keys: 39 }, { // right arrow
+         fn: this.onPageNext, 
+         scope: this, 
+         correctScope: true
+      }).enable();
+      new YAHOO.util.KeyListener(document, { keys: 27 }, { // escape
+         fn: function (e) {
+            if (this.maximized)
+            {
+               this.onMaximizeClick();
+            }
+         }, 
+         scope: this, 
+         correctScope: true
+      }).enable();
    },
    
    /**
