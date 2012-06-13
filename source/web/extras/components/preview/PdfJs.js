@@ -135,6 +135,10 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
    widgets: {},
    
    maximized: false,
+   
+   renderOnScrollZero: 0,
+   
+   renderOnThumbnailsScrollZero: 0,
 
    /**
     * Tests if the plugin can be used in the users browser.
@@ -282,7 +286,10 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
       this.pageNumber = Dom.get(this.wp.id + "-pageNumber");
       this.sidebar = Dom.get(this.wp.id + "-sidebar");
       this.viewer = Dom.get(this.wp.id + "-viewer");
-      Event.addListener(this.viewer, "scroll", this.onViewerScroll, this, true);
+      Event.addListener(this.viewer, "scroll", function (e) {
+         this.renderOnScrollZero++;
+         YAHOO.lang.later(500, this, this.onViewerScroll);
+      }, this, true);
       
       // Set up viewer
       if (this.attributes.pageLayout == "multi")
@@ -621,7 +628,10 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
           // Scroll to the current page, this will force the visible content to render
           this.thumbnailView.scrollTo(this.pageNum);
           this.thumbnailView.setActivePage(this.pageNum);
-          YAHOO.util.Event.addListener(this.id + "-thumbnailView", "scroll", this.onThumbnailsScroll, this, true);
+          YAHOO.util.Event.addListener(this.id + "-thumbnailView", "scroll", function (e) {
+             this.renderOnThumbnailsScrollZero++;
+             YAHOO.lang.later(500, this, this.onThumbnailsScroll);
+          }, this, true);
        }
        
        var goToPage = function goToPage(e, obj) {
@@ -700,21 +710,29 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
     
     onViewerScroll: function PdfJs_onViewerScroll(e_obj)
     {
-       // Render visible pages
-       this.documentView.renderVisiblePages();
-       
-       var newPn = this.documentView.getScrolledPageNumber();
-       if (this.pageNum != newPn)
+       this.renderOnScrollZero --;
+       if (this.renderOnScrollZero == 0)
        {
-          this.pageNum = newPn;
-          this._updatePageControls();
+          // Render visible pages
+          this.documentView.renderVisiblePages();
+          
+          var newPn = this.documentView.getScrolledPageNumber();
+          if (this.pageNum != newPn)
+          {
+             this.pageNum = newPn;
+             this._updatePageControls();
+          }
        }
     },
     
     onThumbnailsScroll: function PdfJs_onThumbnailsScroll(e_obj)
     {
-       // Render visible pages
-       this.thumbnailView.renderVisiblePages();
+       this.renderOnThumbnailsScrollZero --;
+       if (this.renderOnThumbnailsScrollZero == 0)
+       {
+          // Render visible pages
+          this.thumbnailView.renderVisiblePages();
+       }
     },
     
     onZoomOut: function PdfJs_onZoomOut(p_obj)
