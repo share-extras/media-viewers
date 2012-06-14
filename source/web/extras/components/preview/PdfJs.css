@@ -2,7 +2,7 @@
 /* vim: set shiftwidth=4 tabstop=8 autoindent cindent expandtab: */
 
 .previewer.PdfJs {
-  background-color: #929292;
+  background-color: #808080;
   font-family: Helvetica, Arial, Verdana, sans-serif;
   margin: 0px;
   padding: 0px;
@@ -19,6 +19,10 @@
 
 .previewer.PdfJs .viewer {
 	overflow-y: scroll;
+}
+
+.previewer.PdfJs .viewer.loading {
+	background: url('../../../themes/default/images/wait.gif') center no-repeat;
 }
 
 .previewer.PdfJs [hidden] {

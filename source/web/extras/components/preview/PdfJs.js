@@ -391,26 +391,31 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
    /**
     * Fetch the PDF content and display it
     * 
-    * @method _fetchPdf
+    * @method _loadPdf
     * @private
     */
-   _loadPdf: function PdfJs__loadPdf() {
+   _loadPdf: function PdfJs__loadPdf()
+   {
       var me = this,
          fileurl = this.attributes.src ? this.wp.getThumbnailUrl(this.attributes.src) : this.wp.getContentUrl();
+      
+      // Add the loading spinner to the viewer area
+      Dom.addClass(this.viewer, "loading");
 
-         //Set the worker source
-         PDFJS.workerSrc = Alfresco.constants.URL_CONTEXT + 'res/extras/components/preview/pdfjs/pdf' +  (Alfresco.constants.DEBUG ? '.js' : '-min.js'); 
-         
-         //Check if Safari, disable workers due to bug https://github.com/mozilla/pdf.js/issues/1627
-         if (YAHOO.env.ua.webkit > 0 && !YAHOO.env.ua.chrome){
-         	PDFJS.disableWorker = true;
-         }
-         PDFJS.getDocument(fileurl).then(function(pdf) {
-         	me.pdfDoc = pdf;
-         	me.numPages = me.pdfDoc.numPages;
-         	me._renderPdf.call(me);
-         	  
-         	});
+      //Set the worker source
+      PDFJS.workerSrc = Alfresco.constants.URL_CONTEXT + 'res/extras/components/preview/pdfjs/pdf' +  (Alfresco.constants.DEBUG ? '.js' : '-min.js'); 
+      
+      //Check if Safari, disable workers due to bug https://github.com/mozilla/pdf.js/issues/1627
+      if (YAHOO.env.ua.webkit > 0 && !YAHOO.env.ua.chrome)
+      {
+      	PDFJS.disableWorker = true;
+      }
+      
+      PDFJS.getDocument(fileurl).then(function(pdf) {
+      	me.pdfDoc = pdf;
+      	me.numPages = me.pdfDoc.numPages;
+      	me._renderPdf.call(me);
+      });
    },
    
    /**
@@ -421,10 +426,9 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
     */
    _renderPdf: function PdfJs__renderPdf()
    {
-      this.loading = true;
-      
       var pagePromises = [], pagesRefMap = {}, pagesCount = this.numPages;
-      for (var i = 1; i <= pagesCount; i++){
+      for (var i = 1; i <= pagesCount; i++)
+      {
         pagePromises.push(this.pdfDoc.getPage(i));
       }
       var pagesPromise = PDFJS.Promise.all(pagePromises);
@@ -452,6 +456,9 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
             pagesRefMap[pageRef.num + ' ' + pageRef.gen + ' R'] = i;
          }
 
+         // Remove the loading spinner
+         Dom.removeClass(this.viewer, "loading");
+         
          this.documentView.render();
          // Scroll to the current page, this will force the visible content to render
          this.documentView.scrollTo(this.pageNum);
