@@ -128,6 +128,8 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
 
    pages: [],
    
+   pageText: [],
+   
    numPages: 0,
    
    thumbnails: [],
@@ -447,6 +449,7 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
             defaultScale: "page-width",
             disableTextLayer: true
          });
+         this.pages = promisedPages;
          this.documentView.addPages(promisedPages);
          this.thumbnailView.addPages(promisedPages);
          
@@ -592,27 +595,64 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
      }
    },
    
+   _extractText: function(pageIndex) {
+      if (this.startedTextExtraction)
+         return;
+      this.startedTextExtraction = true;
+      var self = this;
+      function extractPageText(pageIndex) {
+         self.pages[pageIndex].getTextContent().then(
+            function textContentResolved(textContent) {
+               self.pageText[pageIndex] = textContent;
+               if ((pageIndex + 1) < self.pages.length)
+                  extractPageText(pageIndex + 1);
+               }
+            );
+      };
+      extractPageText(0);
+   },
+   
    _textSearch: function PdfJs__textSearch(searchTerm)
    {
-      var results = [];
-      for (var i = 0; i < this.documentView.pages.length; i++)
+      if (!searchTerm)
       {
-         var page = this.documentView.pages[i];
-         if (page.textLayerDiv && page.textLayerDiv.firstChild)
+         return;
+      }
+      var results = [];
+      searchTerm = searchTerm.replace(/[\s-]+/g, ' ');
+      for (var i = 0, ii = this.pageText.length; i < ii; i++)
+      {
+         var textContent = this.pageText[i];
+         if (!textContent)
          {
-            for (var j = 0; j < page.textLayerDiv.childNodes.length; j++)
+            continue;
+         }
+         var matchPos = textContent.replace("&nbsp;", " ").replace(/[\s-]+/g, ' ').toLowerCase().indexOf(searchTerm.toLowerCase());
+         if (matchPos > -1)
+         {
+            results.push({pageNum: i+1, text: textContent, matchPos: matchPos});
+         }
+         
+      }
+      return results;
+   },
+   
+   _textMark: function PdfJs__textMark(i)
+   {
+      var page = this.documentView.pages[i];
+      if (page.textLayerDiv && page.textLayerDiv.firstChild)
+      {
+         for (var j = 0; j < page.textLayerDiv.childNodes.length; j++)
+         {
+            var childEl = page.textLayerDiv.childNodes[j],
+               textContent = (childEl.textContent || childEl.innerText).replace("&nbsp;", " ").replace(/[\s-]+/g, ' '),
+               matchPos = textContent.toLowerCase().indexOf(searchTerm.toLowerCase());
+            if (matchPos > -1)
             {
-               var childEl = page.textLayerDiv.childNodes[j],
-                  textContent = (childEl.textContent || childEl.innerText).replace("&nbsp;", " "),
-                  matchPos = textContent.toLowerCase().indexOf(searchTerm.toLowerCase());
-               if (matchPos > -1)
-               {
-                  results.push({pageNum: i+1, text: textContent, matchPos: matchPos});
-               }
+               results.push({pageNum: i+1, text: textContent, matchPos: matchPos});
             }
          }
       }
-      return results;
    },
     
     /*
@@ -640,10 +680,55 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
        // Render any pages that have appeared
        this.documentView.renderVisiblePages();
        
+       var goToPage = function goToPage(e, obj) {
+          this._scrollToPage(obj.pn);
+       };
+       
+       var doSearch = function PdfJs_doSearch(e, obj) {
+          var term = Dom.get(this.id + "-searchBox").value,
+          results = this._textSearch(term),
+          resultsEl = Dom.get(this.id + "-searchResults");
+       
+          if (results.length > 0)
+          {
+             resultsEl.innerHTML = "<p>" + this.wp.msg("msg.results", results.length) + "</p>";
+             for (var i = 0; i < results.length; i++)
+             {
+                var result = results[i];
+                var divEl = document.createElement("div");
+                var linkEl = document.createElement("a");
+                var textSample = result.text.substr(result.matchPos, 50);
+                divEl.appendChild(linkEl);
+                linkEl.innerHTML = "<span>" + this.wp.msg("msg.resultPage", result.pageNum) + "</span>: " + textSample;
+                Dom.setAttribute(linkEl, "href", "#");
+                YAHOO.util.Event.addListener(linkEl, "click", goToPage, {pn: result.pageNum}, this);
+                resultsEl.appendChild(divEl);
+             }
+          }
+          else
+          {
+             resultsEl.innerHTML = "<p>" + this.wp.msg("msg.noResults") + "</p>";
+          }
+       }
+       
        // Lazily instantiate the TabView
        this.widgets.tabview = this.widgets.tabview || new YAHOO.widget.TabView(this.id + "-sidebarTabView");
+       
+       // Set up the search when the tab is clicked
+       this.widgets.tabview.getTab(2).addListener("click", function() {
+          // Start text extraction as soon as the search gets displayed.
+          this._extractText(0);
 
-       // Set up the thumbnail view
+          Alfresco.util.createYUIButton(this, "searchBtn", doSearch);
+          new YAHOO.util.KeyListener(this.id + "-searchBox", { keys: 13 }, { // enter
+             fn: doSearch, 
+             scope: this, 
+             correctScope: true
+          }).enable();
+          
+       }, this, true);
+
+       // Set up the thumbnail view immediately
        if (this.thumbnailView.pages.length > 0 && !this.thumbnailView.pages[0].container)
        {
           this.thumbnailView.render();
@@ -662,43 +747,6 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
              YAHOO.lang.later(500, this, this.onThumbnailsScroll);
           }, this, true);
        }
-       
-       var goToPage = function goToPage(e, obj) {
-          this._scrollToPage(obj.pn);
-       };
-       
-       var doSearch = function PdfJs_doSearch(e, obj) {
-          var term = Dom.get(this.id + "-searchBox").value,
-          results = this._textSearch(term),
-          resultsEl = Dom.get(this.id + "-searchResults");
-       
-          if (results.length > 0)
-          {
-             resultsEl.innerHTML = "<p>" + this.wp.msg("msg.results", results.length) + "</p>";
-             for (var i = 0; i < results.length; i++)
-             {
-                var result = results[i];
-                var divEl = document.createElement("div");
-                var linkEl = document.createElement("a");
-                divEl.appendChild(linkEl);
-                linkEl.innerHTML = "<span>" + this.wp.msg("msg.resultPage", result.pageNum) + "</span>: " + result.text;
-                Dom.setAttribute(linkEl, "href", "#");
-                YAHOO.util.Event.addListener(linkEl, "click", goToPage, {pn: result.pageNum}, this);
-                resultsEl.appendChild(divEl);
-             }
-          }
-          else
-          {
-             resultsEl.innerHTML = "<p>" + this.wp.msg("msg.noResults") + "</p>";
-          }
-       }
-
-       Alfresco.util.createYUIButton(this, "searchBtn", doSearch);
-       new YAHOO.util.KeyListener(this.id + "-searchBox", { keys: 13 }, { // enter
-          fn: doSearch, 
-          scope: this, 
-          correctScope: true
-       }).enable();
     },
     
     /**
