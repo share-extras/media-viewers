@@ -119,7 +119,16 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
        * @type String
        * @default "false"
        */
-      disableTextLayer: "false"
+      disableTextLayer: "false",
+      
+      /**
+       * Whether to use HTML5 browser storage to persist the page number and zoom level of previously-viewed documents
+       * 
+       * @property useLocalStorage
+       * @type String
+       * @default "true"
+       */
+      useLocalStorage: "true"
    },
    
    pdfDoc: null,
@@ -141,6 +150,8 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
    renderOnScrollZero: 0,
    
    renderOnThumbnailsScrollZero: 0,
+   
+   documentConfig: {},
 
    /**
     * Tests if the plugin can be used in the users browser.
@@ -252,9 +263,11 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
     */
    onComponentsLoaded : function PdfJs_onComponentsLoaded()
    {
+      this._loadDocumentConfig();
+      
       // Set page number
       var urlParams = Alfresco.util.getQueryStringParameters(window.location.hash.replace("#", ""));
-      this.pageNum = urlParams.page || this.pageNum;
+      this.pageNum = urlParams.page || (this.documentConfig.pageNum ? parseInt(this.documentConfig.pageNum) : this.pageNum);
       
       // Viewer HTML is contained in an external web script, which we load via XHR, then onViewerLoad() does the rest
       Alfresco.util.Ajax.request({
@@ -271,6 +284,9 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
       
       // Hash change behaviour
       Event.addListener(window, "hashchange", this.onWindowHashChange, this, true);
+      
+      // Window unload behaviour
+      Event.addListener(window, "beforeunload", this.onWindowUnload, this, true);
    },
    
    /**
@@ -417,6 +433,7 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
       	me.pdfDoc = pdf;
       	me.numPages = me.pdfDoc.numPages;
       	me._renderPdf.call(me);
+      	me._updatePageControls();
       });
    },
    
@@ -441,6 +458,7 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
       {
          this.documentView = new DocumentView(this.id + "-viewer", {
             pageLayout: this.attributes.pageLayout,
+            currentScale: this.documentConfig.scale ? parseFloat(this.documentConfig.scale) : K_UNKNOWN_SCALE,
             defaultScale: this.attributes.defaultScale,
             disableTextLayer: this.attributes.disableTextLayer == "true"
          });
@@ -652,6 +670,31 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
                results.push({pageNum: i+1, text: textContent, matchPos: matchPos});
             }
          }
+      }
+   },
+   
+   _loadDocumentConfig: function PdfJs__loadDocumentConfig()
+   {
+      if (this.attributes.useLocalStorage != "true" || !this._browserSupportsHtml5Storage())
+      {
+         this.documentConfig = {};
+      }
+      var base = "org.sharextras.media-viewers.pdfjs.document." + this.wp.options.nodeRef.replace(":/", "").replace("/", ".") + ".";
+      this.documentConfig = {
+         pageNum: window.localStorage[base + "pageNum"],
+         scale: window.localStorage[base + "scale"]
+      };
+   },
+   
+   _browserSupportsHtml5Storage: function PdfJs__browserSupportsHtml5Storage()
+   {
+      try
+      {
+        return 'localStorage' in window && window['localStorage'] !== null;
+      }
+      catch (e)
+      {
+        return false;
       }
    },
     
@@ -990,6 +1033,21 @@ Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
              this._scrollToPage(this.pageNum);
           }
        }
+    },
+
+    /**
+     * Window unload event handler to save document configuration to local storage
+     * 
+     * @method onWindowUnload
+     */
+    onWindowUnload: function PdfJs_onWindowUnload()
+    {
+       if (this.attributes.useLocalStorage == "true" && this._browserSupportsHtml5Storage())
+       {
+          var base = "org.sharextras.media-viewers.pdfjs.document." + this.wp.options.nodeRef.replace(":/", "").replace("/", ".") + ".";
+          window.localStorage[base + "pageNum"] = this.pageNum;
+          window.localStorage[base + "scale"] = this.documentView.currentScale;
+       }
     }
 };
 
@@ -1011,7 +1069,7 @@ var DocumentPage = function(id, content, parent, config)
 DocumentPage.prototype =
 {
    /**
-    * Render a specific page in the container
+    * Render a specific page in the container. This does not render the content of the page itself, just the container divs.
     * 
     * @method _renderPageContainer
     * @private
@@ -1035,7 +1093,10 @@ DocumentPage.prototype =
     },
     
     /**
+     * Get the vertical position of the pae relative to the top of the parent element. A negative number
+     * means that the page is above the current scroll position, a positive number means it is below.
      * 
+     * @method getVPos
      */
     getVPos: function DocumentPage_getVPos(page)
     {
@@ -1049,7 +1110,6 @@ DocumentPage.prototype =
      * Render page content
      * 
      * @method renderContent
-     * @private
      */
     renderContent: function DocumentPage_renderContent()
     {
@@ -1147,7 +1207,7 @@ var DocumentView = function(elId, config) {
    this.pages = [];
    this.viewer = Dom.get(elId);
    this.viewerRegion = Dom.getRegion(this.viewer);
-   this.currentScale = K_UNKNOWN_SCALE;
+   this.currentScale = config.currentScale || K_UNKNOWN_SCALE;
 }
 
 DocumentView.prototype =
@@ -1183,6 +1243,10 @@ DocumentView.prototype =
          // Scale was not initialized: invalid bookmark or scale was not specified.
          // Setting the default one.
          this.setScale(this.parseScale(this.config.defaultScale));
+      }
+      else
+      {
+         this.alignRows();
       }
    },
    
@@ -1232,7 +1296,7 @@ DocumentView.prototype =
       for (var i = 0; i < this.pages.length; i++)
       {
          var page = this.pages[i];
-         if (page.container && !page.canvas && page.getVPos() < this.viewerRegion.height * 1.5)
+         if (page.container && !page.canvas && page.getVPos() < this.viewerRegion.height * 1.5 && page.getVPos() > this.viewerRegion.height * -1.5)
          {
             page.renderContent();
          }
