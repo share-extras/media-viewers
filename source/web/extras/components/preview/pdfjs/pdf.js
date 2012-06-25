@@ -1,9 +1,3 @@
-/**
- * This file is from Mozilla pdf.js project
- * https://github.com/mozilla/pdf.js
- * Licensed under Mozilla License
- * https://github.com/mozilla/pdf.js/blob/master/LICENSE
- */
 /* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
 
@@ -13,7 +7,7 @@ var PDFJS = {};
   // Use strict in our context only - users might not want it
   'use strict';
 
-  PDFJS.build = '8ae9c7d';
+  PDFJS.build = 'e2b0c76';
 
   // Files are inserted below - see Makefile
 /* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
@@ -1311,6 +1305,15 @@ var PDFDocumentProxy = (function PDFDocumentProxyClosure() {
       promise.resolve(this.pdfInfo.encrypted);
       return promise;
     },
+    /**
+     * @return {Promise} A promise that is resolved with a TypedArray that has
+     * the raw data from the PDF.
+     */
+    getData: function PDFDocumentProxy_getData() {
+      var promise = new PDFJS.Promise();
+      this.transport.getData(promise);
+      return promise;
+    },
     destroy: function PDFDocumentProxy_destroy() {
       this.transport.destroy();
     }
@@ -1774,6 +1777,12 @@ var WorkerTransport = (function WorkerTransportClosure() {
 
     sendData: function WorkerTransport_sendData(data, params) {
       this.messageHandler.send('GetDocRequest', {data: data, params: params});
+    },
+
+    getData: function WorkerTransport_sendData(promise) {
+      this.messageHandler.send('GetData', null, function(data) {
+        promise.resolve(data);
+      });
     },
 
     getPage: function WorkerTransport_getPage(pageNumber, promise) {
@@ -2894,6 +2903,40 @@ var CanvasGraphics = (function CanvasGraphicsClosure() {
           }
         }
       }
+      function rescaleImage(pixels, widthScale, heightScale) {
+        var scaledWidth = Math.ceil(width / widthScale);
+        var scaledHeight = Math.ceil(height / heightScale);
+
+        var itemsSum = new Uint32Array(scaledWidth * scaledHeight * 4);
+        var itemsCount = new Uint32Array(scaledWidth * scaledHeight);
+        for (var i = 0, position = 0; i < height; i++) {
+          var lineOffset = (0 | (i / heightScale)) * scaledWidth;
+          for (var j = 0; j < width; j++) {
+            var countOffset = lineOffset + (0 | (j / widthScale));
+            var sumOffset = countOffset << 2;
+            itemsSum[sumOffset] += pixels[position];
+            itemsSum[sumOffset + 1] += pixels[position + 1];
+            itemsSum[sumOffset + 2] += pixels[position + 2];
+            itemsSum[sumOffset + 3] += pixels[position + 3];
+            itemsCount[countOffset]++;
+            position += 4;
+          }
+        }
+        var tmpCanvas = createScratchCanvas(scaledWidth, scaledHeight);
+        var tmpCtx = tmpCanvas.getContext('2d');
+        var imgData = tmpCtx.getImageData(0, 0, scaledWidth, scaledHeight);
+        pixels = imgData.data;
+        for (var i = 0, j = 0, ii = scaledWidth * scaledHeight; i < ii; i++) {
+          var count = itemsCount[i];
+          pixels[j] = itemsSum[j] / count;
+          pixels[j + 1] = itemsSum[j + 1] / count;
+          pixels[j + 2] = itemsSum[j + 2] / count;
+          pixels[j + 3] = itemsSum[j + 3] / count;
+          j += 4;
+        }
+        tmpCtx.putImageData(imgData, 0, 0);
+        return tmpCanvas;
+      }
 
       this.save();
 
@@ -2916,8 +2959,19 @@ var CanvasGraphics = (function CanvasGraphicsClosure() {
 
       applyStencilMask(pixels, inverseDecode);
 
-      tmpCtx.putImageData(imgData, 0, 0);
-      ctx.drawImage(tmpCanvas, 0, -h);
+      var currentTransform = ctx.mozCurrentTransformInverse;
+      var widthScale = Math.max(Math.abs(currentTransform[0]), 1);
+      var heightScale = Math.max(Math.abs(currentTransform[3]), 1);
+      if (widthScale >= 2 || heightScale >= 2) {
+        // canvas does not resize well large images to small -- using simple
+        // algorithm to perform pre-scaling
+        tmpCanvas = rescaleImage(imgData.data, widthScale, heightScale);
+        ctx.scale(widthScale, heightScale);
+        ctx.drawImage(tmpCanvas, 0, -h / heightScale);
+      } else {
+        tmpCtx.putImageData(imgData, 0, 0);
+        ctx.drawImage(tmpCanvas, 0, -h);
+      }
       this.restore();
     },
 
@@ -13207,8 +13261,10 @@ var PartialEvaluator = (function PartialEvaluatorClosure() {
         insertDependency([objId]);
         args = [objId, w, h];
 
-        var softMask = dict.get('SMask', 'IM') || false;
-        if (!softMask && image instanceof JpegStream &&
+        var softMask = dict.get('SMask', 'SM') || false;
+        var mask = dict.get('Mask') || false;
+
+        if (!softMask && !mask && image instanceof JpegStream &&
             image.isNativelySupported(xref, resources)) {
           // These JPEGs don't need any more processing so we can just send it.
           fn = 'paintJpegXObject';
@@ -14348,7 +14404,7 @@ var serifFonts = {
   'Seagull': true, 'Sistina': true, 'Souvenir': true,
   'STIX': true, 'Stone Informal': true, 'Stone Serif': true,
   'Sylfaen': true, 'Times': true, 'Trajan': true,
-  'Trinité': true, 'Trump Mediaeval': true, 'Utopia': true,
+  'Trinit√©': true, 'Trump Mediaeval': true, 'Utopia': true,
   'Vale Type': true, 'Bitstream Vera': true, 'Vera Serif': true,
   'Versailles': true, 'Wanted': true, 'Weiss': true,
   'Wide Latin': true, 'Windsor': true, 'XITS': true
@@ -17072,9 +17128,13 @@ var Font = (function FontClosure() {
                  window.btoa(data) + ');');
       var rule = "@font-face { font-family:'" + fontName + "';src:" + url + '}';
 
-      var styleElement = document.createElement('style');
-      document.documentElement.getElementsByTagName('head')[0].appendChild(
-        styleElement);
+      var styleElement = document.getElementById('PDFJS_FONT_STYLE_TAG');
+      if (!styleElement) {
+          styleElement = document.createElement('style');
+          styleElement.id = 'PDFJS_FONT_STYLE_TAG';
+          document.documentElement.getElementsByTagName('head')[0].appendChild(
+            styleElement);
+      }
 
       var styleSheet = styleElement.sheet;
       styleSheet.insertRule(rule, styleSheet.cssRules.length);
@@ -23644,7 +23704,7 @@ var PDFImage = (function PDFImageClosure() {
     // Clamp the value to the range
     return value < 0 ? 0 : value > max ? max : value;
   }
-  function PDFImage(xref, res, image, inline, smask) {
+  function PDFImage(xref, res, image, inline, smask, mask) {
     this.image = image;
     if (image.getParams) {
       // JPX/JPEG2000 streams directly contain bits per component
@@ -23705,12 +23765,10 @@ var PDFImage = (function PDFImageClosure() {
       }
     }
 
-    var mask = dict.get('Mask');
-
-    if (mask) {
-      TODO('masked images');
-    } else if (smask) {
+    if (smask) {
       this.smask = new PDFImage(xref, res, smask, false);
+    } else if (mask) {
+      this.mask = new PDFImage(xref, res, mask, false);
     }
   }
   /**
@@ -23721,21 +23779,36 @@ var PDFImage = (function PDFImageClosure() {
                                                      res, image, inline) {
     var imageDataPromise = new Promise();
     var smaskPromise = new Promise();
+    var maskPromise = new Promise();
     // The image data and smask data may not be ready yet, wait till both are
     // resolved.
-    Promise.all([imageDataPromise, smaskPromise]).then(function(results) {
-      var imageData = results[0], smaskData = results[1];
-      var image = new PDFImage(xref, res, imageData, inline, smaskData);
+    Promise.all([imageDataPromise, smaskPromise, maskPromise]).then(
+        function(results) {
+      var imageData = results[0], smaskData = results[1], maskData = results[2];
+      var image = new PDFImage(xref, res, imageData, inline, smaskData,
+                               maskData);
       callback(image);
     });
 
     handleImageData(handler, xref, res, image, imageDataPromise);
 
     var smask = image.dict.get('SMask');
-    if (smask)
+    var mask = image.dict.get('Mask');
+
+    if (smask) {
       handleImageData(handler, xref, res, smask, smaskPromise);
-    else
+      maskPromise.resolve(null);
+    } else {
       smaskPromise.resolve(null);
+      if (mask && isStream(mask)) {
+        handleImageData(handler, xref, res, mask, maskPromise);
+      } else if (mask) {
+        TODO('handle color key masking');
+        maskPromise.resolve(null);
+      } else {
+        maskPromise.resolve(null);
+      }
+    }
   };
 
   /**
@@ -23879,6 +23952,7 @@ var PDFImage = (function PDFImageClosure() {
     },
     getOpacity: function PDFImage_getOpacity(width, height) {
       var smask = this.smask;
+      var mask = this.mask;
       var originalWidth = this.width;
       var originalHeight = this.height;
       var buf;
@@ -23889,7 +23963,20 @@ var PDFImage = (function PDFImageClosure() {
         buf = new Uint8Array(sw * sh);
         smask.fillGrayBuffer(buf);
         if (sw != width || sh != height)
-          buf = PDFImage.resize(buf, smask.bps, 1, sw, sh, width, height);
+          buf = PDFImage.resize(buf, smask.bpc, 1, sw, sh, width, height);
+      } else if (mask) {
+        var sw = mask.width;
+        var sh = mask.height;
+        buf = new Uint8Array(sw * sh);
+        mask.numComps = 1;
+        mask.fillGrayBuffer(buf);
+
+        // Need to invert values in buffer
+        for (var i = 0, ii = sw * sh; i < ii; ++i)
+          buf[i] = 255 - buf[i];
+
+        if (sw != width || sh != height)
+          buf = PDFImage.resize(buf, mask.bpc, 1, sw, sh, width, height);
       } else {
         buf = new Uint8Array(width * height);
         for (var i = 0, ii = width * height; i < ii; ++i)
@@ -30325,6 +30412,10 @@ var WorkerMessageHandler = {
         view: pdfPage.view
       };
       handler.send('GetPage', {pageInfo: page});
+    });
+
+    handler.on('GetData', function wphSetupGetData(data, promise) {
+      promise.resolve(pdfModel.stream.bytes);
     });
 
     handler.on('GetAnnotationsRequest', function wphSetupGetAnnotations(data) {
