@@ -25,7 +25,7 @@
     <div id="outerContainer">
 
       <div id="sidebarContainer">
-        <div id="toolbarSidebar">
+        <div id="toolbarSidebar" class="splitToolbarButton toggled">
           <button id="viewThumbnail" class="toolbarButton group toggled" title="Show Thumbnails" onclick="PDFView.switchSidebarView('thumbs')" tabindex="1" data-l10n-id="thumbs">
              <span data-l10n-id="thumbs_label">Thumbnails</span>
           </button>
@@ -43,8 +43,8 @@
           </div>
           <div id="searchView" class="hidden">
             <div id="searchToolbar">
-              <input id="searchTermsInput" onkeydown='if (event.keyCode == 13) PDFView.search()'>
-              <button id="searchButton" onclick='PDFView.search()' data-l10n-id="search">Find</button>
+              <input id="searchTermsInput" class="toolbarField" onkeydown='if (event.keyCode == 13) PDFView.search()'>
+              <button id="searchButton" class="textButton toolbarButton" onclick='PDFView.search()' data-l10n-id="search">Find</button>
             </div>
             <div id="searchResults"></div>
           </div>
@@ -130,8 +130,8 @@
         </div>
 
         <div id="loadingBox">
-            <div id="loading" data-l10n-id="loading" data-l10n-args='{"percent": 0}'>Loading... 0%</div>
-            <div id="loadingBar"><div class="progress"></div></div>
+          <div id="loading"></div>
+          <div id="loadingBar"><div class="progress"></div></div>
         </div>
 
         <div id="errorWrapper" hidden='true'>

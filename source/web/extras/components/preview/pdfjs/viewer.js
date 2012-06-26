@@ -122,16 +122,19 @@ var RenderingQueue = (function RenderingQueueClosure() {
 var FirefoxCom = (function FirefoxComClosure() {
   return {
     /**
-     * Creates an event that hopefully the extension is listening for and will
+     * Creates an event that the extension is listening for and will
      * synchronously respond to.
+     * NOTE: It is reccomended to use request() instead since one day we may not
+     * be able to synchronously reply.
      * @param {String} action The action to trigger.
      * @param {String} data Optional data to send.
      * @return {*} The response.
      */
-    request: function(action, data) {
+    requestSync: function(action, data) {
       var request = document.createTextNode('');
       request.setUserData('action', action, null);
       request.setUserData('data', data, null);
+      request.setUserData('sync', true, null);
       document.documentElement.appendChild(request);
 
       var sender = document.createEvent('Events');
@@ -140,6 +143,39 @@ var FirefoxCom = (function FirefoxComClosure() {
       var response = request.getUserData('response');
       document.documentElement.removeChild(request);
       return response;
+    },
+    /**
+     * Creates an event that the extension is listening for and will
+     * asynchronously respond by calling the callback.
+     * @param {String} action The action to trigger.
+     * @param {String} data Optional data to send.
+     * @param {Function} callback Optional response callback that will be called
+     * with one data argument.
+     */
+    request: function(action, data, callback) {
+      var request = document.createTextNode('');
+      request.setUserData('action', action, null);
+      request.setUserData('data', data, null);
+      request.setUserData('sync', false, null);
+      if (callback) {
+        request.setUserData('callback', callback, null);
+
+        document.addEventListener('pdf.js.response', function listener(event) {
+          var node = event.target,
+              callback = node.getUserData('callback'),
+              response = node.getUserData('response');
+
+          document.documentElement.removeChild(node);
+
+          document.removeEventListener('pdf.js.response', listener, false);
+          return callback(response);
+        }, false);
+      }
+      document.documentElement.appendChild(request);
+
+      var sender = document.createEvent('HTMLEvents');
+      sender.initEvent('pdf.js.message', true, false);
+      return request.dispatchEvent(sender);
     }
   };
 })();
@@ -166,7 +202,7 @@ var Settings = (function SettingsClosure() {
     var database = null;
     var index;
     if (isFirefoxExtension)
-      database = FirefoxCom.request('getDatabase', null) || '{}';
+      database = FirefoxCom.requestSync('getDatabase', null) || '{}';
     else if (isLocalStorageEnabled)
       database = localStorage.getItem('database') || '{}';
     else
@@ -199,7 +235,7 @@ var Settings = (function SettingsClosure() {
       file[name] = val;
       var database = JSON.stringify(this.database);
       if (isFirefoxExtension)
-        FirefoxCom.request('setDatabase', database);
+        FirefoxCom.requestSync('setDatabase', database);
       else if (isLocalStorageEnabled)
         localStorage.setItem('database', database);
     },
@@ -230,6 +266,7 @@ var PDFView = {
   container: null,
   initialized: false,
   fellback: false,
+  pdfDocument: null,
   // called once when the document is loaded
   initialize: function pdfViewInitialize() {
     this.container = document.getElementById('viewerContainer');
@@ -357,6 +394,7 @@ var PDFView = {
       PDFView.loadingBar = new ProgressBar('#loadingBar', {});
     }
 
+    this.pdfDocument = null;
     var self = this;
     self.loading = true;
     PDFJS.getDocument(parameters).then(
@@ -365,7 +403,7 @@ var PDFView = {
         self.loading = false;
       },
       function getDocumentError(message, exception) {
-        if (exception.name === 'PasswordException') {
+        if (exception && exception.name === 'PasswordException') {
           if (exception.code === 'needpassword') {
             var promptString = mozL10n.get('request_password', null,
                                       'PDF is protected by a password:');
@@ -393,9 +431,37 @@ var PDFView = {
   },
 
   download: function pdfViewDownload() {
+    function noData() {
+      FirefoxCom.request('download', { originalUrl: url });
+    }
+
     var url = this.url.split('#')[0];
     if (PDFJS.isFirefoxExtension) {
-      FirefoxCom.request('download', url);
+      // Document isn't ready just try to download with the url.
+      if (!this.pdfDocument) {
+        noData();
+        return;
+      }
+      this.pdfDocument.getData().then(
+        function getDataSuccess(data) {
+          var bb = new MozBlobBuilder();
+          bb.append(data.buffer);
+          var blobUrl = window.URL.createObjectURL(
+                          bb.getBlob('application/pdf'));
+
+          FirefoxCom.request('download', { blobUrl: blobUrl, originalUrl: url },
+            function response(err) {
+              if (err) {
+                // This error won't really be helpful because it's likely the
+                // fallback won't work either (or is already open).
+                PDFView.error('PDF failed to download.');
+              }
+              window.URL.revokeObjectURL(blobUrl);
+            }
+          );
+        },
+        noData // Error ocurred try downloading with just the url.
+      );
     } else {
       url += '#pdfjs.action=download', '_parent';
       window.open(url, '_parent');
@@ -411,7 +477,11 @@ var PDFView = {
       return;
     this.fellback = true;
     var url = this.url.split('#')[0];
-    FirefoxCom.request('fallback', url);
+    FirefoxCom.request('fallback', url, function response(download) {
+      if (!download)
+        return;
+      PDFView.download();
+    });
   },
 
   navigateTo: function pdfViewNavigateTo(dest) {
@@ -537,10 +607,6 @@ var PDFView = {
 
   progress: function pdfViewProgress(level) {
     var percent = Math.round(level * 100);
-    var loadingIndicator = document.getElementById('loading');
-    loadingIndicator.textContent = mozL10n.get('loading', {percent: percent},
-      'Loading... {{percent}}%');
-
     PDFView.loadingBar.percent = percent;
   },
 
@@ -553,11 +619,15 @@ var PDFView = {
       };
     }
 
+    this.pdfDocument = pdfDocument;
+
     var errorWrapper = document.getElementById('errorWrapper');
     errorWrapper.setAttribute('hidden', 'true');
 
     var loadingBox = document.getElementById('loadingBox');
     loadingBox.setAttribute('hidden', 'true');
+    var loadingIndicator = document.getElementById('loading');
+    loadingIndicator.textContent = '';
 
     var thumbsView = document.getElementById('thumbnailView');
     thumbsView.parentNode.scrollTop = 0;
@@ -729,8 +799,12 @@ var PDFView = {
       pageFound = true;
     }
     if (!pageFound) {
-      searchResults.textContent = mozL10n.get('search_terms_not_found', null,
+      searchResults.textContent = '';
+      var noResults = document.createElement('div');
+      noResults.classList.add('noResults');
+      noResults.textContent = mozL10n.get('search_terms_not_found', null,
                                               '(Not found)');
+      searchResults.appendChild(noResults);
     }
   },
 
@@ -1054,7 +1128,8 @@ var PageView = function pageView(container, pdfPage, id, scale,
               div.appendChild(comment);
             break;
           case 'Widget':
-            TODO('support forms');
+            // TODO: support forms
+            PDFView.fallback();
             break;
         }
       }
@@ -1543,7 +1618,7 @@ window.addEventListener('load', function webViewerLoad(evt) {
     PDFJS.disableTextLayer = (hashParams['disableTextLayer'] === 'true');
 
   if ('pdfBug' in hashParams &&
-      (!PDFJS.isFirefoxExtension || FirefoxCom.request('pdfBugEnabled'))) {
+      (!PDFJS.isFirefoxExtension || FirefoxCom.requestSync('pdfBugEnabled'))) {
     PDFJS.pdfBug = true;
     var pdfBug = hashParams['pdfBug'];
     var enabled = pdfBug.split(',');
@@ -1552,7 +1627,7 @@ window.addEventListener('load', function webViewerLoad(evt) {
   }
 
   if (!PDFJS.isFirefoxExtension ||
-    (PDFJS.isFirefoxExtension && FirefoxCom.request('searchEnabled'))) {
+    (PDFJS.isFirefoxExtension && FirefoxCom.requestSync('searchEnabled'))) {
     document.querySelector('#viewSearch').classList.remove('hidden');
   }
 
@@ -1819,6 +1894,18 @@ window.addEventListener('pagechange', function pagechange(evt) {
   document.getElementById('previous').disabled = (page <= 1);
   document.getElementById('next').disabled = (page >= PDFView.pages.length);
 }, true);
+
+// Firefox specific event, so that we can prevent browser from zooming
+window.addEventListener('DOMMouseScroll', function(evt) {
+  if (evt.ctrlKey) {
+    evt.preventDefault();
+
+    var ticks = evt.detail;
+    var direction = (ticks > 0) ? 'zoomOut' : 'zoomIn';
+    for (var i = 0, length = Math.abs(ticks); i < length; i++)
+      PDFView[direction]();
+  }
+}, false);
 
 window.addEventListener('keydown', function keydown(evt) {
   var handled = false;
