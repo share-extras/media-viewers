@@ -52,8 +52,19 @@
         <module>
             <id>PdfJs Viewer</id>
             <customizations>
+                <!-- Enable PdfJs.js plugin in web-previewer, plus additional messages -->
                 <customization>
                     <targetPackageRoot>org.alfresco.components.preview</targetPackageRoot>
+                    <sourcePackageRoot>org.sharextras.customization.media-previews.pdfjs</sourcePackageRoot>
+                </customization>
+                <!-- Enable PdfJs.js plugin in Document Viewer dashlet -->
+                <customization>
+                    <targetPackageRoot>org.sharextras.components.dashlets</targetPackageRoot>
+                    <sourcePackageRoot>org.sharextras.customization.media-previews.pdfjs</sourcePackageRoot>
+                </customization>
+                <!-- Enable PdfJs.js plugin in wiki pages - for Wiki Rich Content add-on -->
+                <customization>
+                    <targetPackageRoot>org.sharextras.components.wiki</targetPackageRoot>
                     <sourcePackageRoot>org.sharextras.customization.media-previews.pdfjs</sourcePackageRoot>
                 </customization>
             </customizations>
@@ -63,8 +74,19 @@
         <module>
             <id>Embed Viewer</id>
             <customizations>
+                <!-- Enable Embed.js plugin in web-previewer, plus additional messages -->
                 <customization>
                     <targetPackageRoot>org.alfresco.components.preview</targetPackageRoot>
+                    <sourcePackageRoot>org.sharextras.customization.media-previews.embed</sourcePackageRoot>
+                </customization>
+                <!-- Enable Embed.js plugin in Document Viewer dashlet -->
+                <customization>
+                    <targetPackageRoot>org.sharextras.components.dashlets</targetPackageRoot>
+                    <sourcePackageRoot>org.sharextras.customization.media-previews.embed</sourcePackageRoot>
+                </customization>
+                <!-- Enable Embed.js plugin in wiki pages - for Wiki Rich Content add-on -->
+                <customization>
+                    <targetPackageRoot>org.sharextras.components.wiki</targetPackageRoot>
                     <sourcePackageRoot>org.sharextras.customization.media-previews.embed</sourcePackageRoot>
                 </customization>
             </customizations>
@@ -74,8 +96,19 @@
         <module>
             <id>WebODF Viewer</id>
             <customizations>
+                <!-- Enable WebODF.js plugin in web-previewer, plus additional messages -->
                 <customization>
                     <targetPackageRoot>org.alfresco.components.preview</targetPackageRoot>
+                    <sourcePackageRoot>org.sharextras.customization.media-previews.webodf</sourcePackageRoot>
+                </customization>
+                <!-- Enable WebODF.js plugin in Document Viewer dashlet -->
+                <customization>
+                    <targetPackageRoot>org.sharextras.components.dashlets</targetPackageRoot>
+                    <sourcePackageRoot>org.sharextras.customization.media-previews.webodf</sourcePackageRoot>
+                </customization>
+                <!-- Enable WebODF.js plugin in wiki pages - for Wiki Rich Content add-on -->
+                <customization>
+                    <targetPackageRoot>org.sharextras.components.wiki</targetPackageRoot>
                     <sourcePackageRoot>org.sharextras.customization.media-previews.webodf</sourcePackageRoot>
                 </customization>
             </customizations>
@@ -85,8 +118,19 @@
         <module>
             <id>Prettify Viewer</id>
             <customizations>
+                <!-- Enable Prettify.js plugin in web-previewer, plus additional messages -->
                 <customization>
                     <targetPackageRoot>org.alfresco.components.preview</targetPackageRoot>
+                    <sourcePackageRoot>org.sharextras.customization.media-previews.prettify</sourcePackageRoot>
+                </customization>
+                <!-- Enable Prettify.js plugin in Document Viewer dashlet -->
+                <customization>
+                    <targetPackageRoot>org.sharextras.components.dashlets</targetPackageRoot>
+                    <sourcePackageRoot>org.sharextras.customization.media-previews.prettify</sourcePackageRoot>
+                </customization>
+                <!-- Enable Prettify.js plugin in wiki pages - for Wiki Rich Content add-on -->
+                <customization>
+                    <targetPackageRoot>org.sharextras.components.wiki</targetPackageRoot>
                     <sourcePackageRoot>org.sharextras.customization.media-previews.prettify</sourcePackageRoot>
                 </customization>
             </customizations>
