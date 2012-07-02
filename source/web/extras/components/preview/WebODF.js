@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2010-2011 Share Extras Contributors.
+ * Copyright (C) 2010-2012 Share Extras Contributors.
  *
  */
 
