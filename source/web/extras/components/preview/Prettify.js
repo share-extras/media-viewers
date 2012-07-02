@@ -83,7 +83,7 @@
                fn: this.onContentLoaded,
                scope: this
             },
-            failureMessage: this.wp.msg("error.viewerload")
+            failureMessage: this.wp.msg("error.contentLoadFailure")
          });
          
          // Return null means WebPreview instance will not overwrite the innerHTML of the preview area, which we want the callback to do
