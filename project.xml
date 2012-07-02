@@ -46,7 +46,7 @@
 	<target name="compress-jar" description="Compress client side javascripts">
 		<!-- Minify JS -->
 		<yuicompress fromdir="${res.dir}" todir="${build.jar.dir}/META-INF" excludes="**/*-min.js" warn="${yuicompress.warn}">
-			<include name="extras/components/**/*.js" />
+			<include name="extras/**/*.js" />
 			<exclude name="extras/components/preview/pdfjs/*" />
 		</yuicompress>
 		<!-- There is a bug in yuicompress that breaks get in prototypes
