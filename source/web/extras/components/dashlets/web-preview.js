@@ -225,19 +225,67 @@
                  {
                     fn: function VideoWidget__createFromHTML_success(p_response, p_obj)
                     {
+                       var addHeadResources = function(markup, fn) {
+                          var numloadedObj = { numLoaded: 0 };
+                          var hd = document.getElementsByTagName("head")[0];
+                          var scripts = [];
+                          var script = null;
+                          var stylesheet = null;
+                          var css = [];
+                          var csstext = null;
+                          var scriptsregexp = /<script[^>]*src="([\s\S]*?)"[^>]*><\/script>/gi;
+                          while ((script = scriptsregexp.exec(markup)))
+                          {
+                             scripts.push(script[1]);
+                          }
+                          var cssregexp = /<style[^>]*media="screen"[^>]*>([\s\S]*?)<\/style>/gi;
+                          while ((script = cssregexp.exec(markup)))
+                          {
+                             css.push(script[1]);
+                          }
+                          csstext = css.join("\n");
+                          
+                          // Load handler for the scripts. This makes sure that the 'done' handler passed in as 'fn' is only executed when all dependencies have loaded
+                          var loadfn = function(e, obj) {
+                             obj.numLoaded ++;
+                             if (scripts.length == obj.numLoaded) {
+                                fn.call(this);
+                             }
+                          };
+                          
+                          // Add JS scripts to the page
+                          for (var i = 0; i < scripts.length; i++)
+                          {
+                             var scriptEl=document.createElement('script');
+                             scriptEl.setAttribute("type", "text/javascript");
+                             scriptEl.setAttribute("src", scripts[i]);
+                             Event.addListener(scriptEl, "load", loadfn, numloadedObj, this);
+                             hd.appendChild(scriptEl);
+                          }
+                          
+                          // Add CSS to the page
+                          var styleEl=document.createElement('style');
+                          styleEl.setAttribute("type", "text/css");
+                          styleEl.setAttribute("media", "screen");
+                          styleEl.innerHTML = csstext;
+                          hd.appendChild(styleEl);
+                       };
                        var phtml = p_response.serverResponse.responseText.replace(/template_x002e_web-preview/g, p_response.config.object.elId),
                           result = Alfresco.util.Ajax.sanitizeMarkup(phtml);
                        // Following code borrowed from Alfresco.util.Ajax._successHandler
                        // Use setTimeout to execute the script. Note scope will always be "window"
-                       var scripts = result[1];
-                       if (YAHOO.lang.trim(scripts).length > 0)
-                       {
-                          window.setTimeout(scripts, 0);
-                          // Delay-call the PostExec function to continue response processing after the setTimeout above
-                          YAHOO.lang.later(0, this, function() {
-                             Alfresco.util.YUILoaderHelper.loadComponents();
-                          }, p_response.serverResponse);
-                       }
+                       var onloadedfn = function() {
+                          var scripts = result[1];
+                          if (YAHOO.lang.trim(scripts).length > 0)
+                          {
+                             window.setTimeout(scripts, 0);
+                             // Delay-call the PostExec function to continue response processing after the setTimeout above
+                             YAHOO.lang.later(0, this, function() {
+                                Alfresco.util.YUILoaderHelper.loadComponents();
+                             }, p_response.serverResponse);
+                          }
+                       };
+                       addHeadResources(phtml, onloadedfn);
                        p_response.config.object.previewEl.innerHTML = result[0];
                     },
                     scope: this
@@ -251,6 +299,7 @@
                     elId: elId,
                     previewEl: this.previewEl
                  },
+                 execScripts: false,
                  noReloadOnAuthFailure: true
               });
           }
