@@ -56,21 +56,21 @@ Alfresco.WebPreview.prototype.Plugins.Embed.prototype = {
 		 * Comma separated string of Windows ActiveX id:s. Used in Internet
 		 * Explorer only to test for plugin presence.
 		 * 
-		 * @property IEactiveX
+		 * @property ieActiveX
 		 * @type String
-		 * @default AcroPDF.PDF,PDF.PdfCtrl,FOXITREADEROCX.FoxitReaderOCXCtrl.1
+		 * @default "AcroPDF.PDF,PDF.PdfCtrl,FOXITREADEROCX.FoxitReaderOCXCtrl.1"
 		 */
-		IEactiveX : 'AcroPDF.PDF,PDF.PdfCtrl,FOXITREADEROCX.FoxitReaderOCXCtrl.1',
+		ieActiveX : "AcroPDF.PDF,PDF.PdfCtrl,FOXITREADEROCX.FoxitReaderOCXCtrl.1",
 
 		/**
 		 * Test if a plugin is available. Use for mime types that need a plugin
 		 * to display for example application/pdf.
 		 * 
-		 * @property TestPluginAvailability
+		 * @property testPluginAvailability
 		 * @type String
 		 * @default "false"
 		 */
-		TestPluginAvailability : "false"
+		testPluginAvailability : "false"
 	},
 
 	/**
@@ -85,7 +85,7 @@ Alfresco.WebPreview.prototype.Plugins.Embed.prototype = {
 	report : function Embed_report()
 	{
 
-		var plugininstalled = false, testPluginAvailability = (this.attributes.TestPluginAvailability && this.attributes.TestPluginAvailability === "true") ? true : false;;
+		var plugininstalled = false, testPluginAvailability = (this.attributes.testPluginAvailability && this.attributes.testPluginAvailability === "true") ? true : false;;
 
 		if (testPluginAvailability === true)
 		{
@@ -151,7 +151,7 @@ Alfresco.WebPreview.prototype.Plugins.Embed.prototype = {
 
 		if (window.ActiveXObject)
 		{
-			var control = null, activeXIE = this.attributes.IEactiveX.split(','), plugininstalled = false;
+			var control = null, activeXIE = this.attributes.ieActiveX.split(','), plugininstalled = false;
 
 			// Loop the ActiveX id collection
 			for ( var i = 0, activeXIELength = activeXIE.length; i < activeXIELength; i++)

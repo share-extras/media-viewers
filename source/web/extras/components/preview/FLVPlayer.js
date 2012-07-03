@@ -168,7 +168,7 @@
           /**
            * Hover color of the player slider in hex notation
            * 
-           * @property slidercolor
+           * @property sliderovercolor
            * @type string
            * @default "0088de"
            */
@@ -202,18 +202,18 @@
           showvolume: "true",
 
           /**
-           * Whether to show the play button, "true" or "false"
+           * Whether to show the elapsed time in the player, "true" or "false"
            * 
-           * @property showplay
+           * @property showtime
            * @type string
            * @default "true"
            */
           showtime: "true",
 
           /**
-           * Whether to show the play button, "true" or "false"
+           * Margin in pixels around the player
            * 
-           * @property showplay
+           * @property playermargin
            * @type string
            * @default "0"
            */

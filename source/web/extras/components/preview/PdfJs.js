@@ -99,16 +99,16 @@
           * 
           * @property mode
           * @type String
-          * @default "iframe"
+          * @default "block"
           */
          mode: "block",
    
          /**
-          * Default zoom level
+          * Default zoom level for new documents
           * 
           * @property defaultScale
           * @type String
-          * @default "auto"
+          * @default "two-page-fit"
           */
          defaultScale: "two-page-fit",
          
@@ -122,7 +122,7 @@
          scaleDelta: "1.1",
    
          /**
-          * Layout to use to display pages, "single" or "multi"
+          * Layout to use to display pages, "single" (one page per row) or "multi" (multiple pages per row)
           * 
           * @property pageLayout
           * @type String

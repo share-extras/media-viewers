@@ -78,25 +78,6 @@
           srcMaxSize: "100000000",
 
           /**
-           * Decides if flash previewers shall disable the i18n input fix all browsers.
-           * If it shall be disabled for certain a certain os/browser override the disableI18nInputFix() method.
-           *
-           * Fix solves the Flash i18n input keyCode bug when "wmode" is set to "transparent"
-           * http://bugs.adobe.com/jira/browse/FP-479
-           * http://issues.alfresco.com/jira/browse/ALF-1351
-           *
-           * ...see "Browser Testing" on this page to see supported browser/language combinations for AS2 version
-           * http://analogcode.com/p/JSTextReader/
-           *
-           * ... We are using the AS3 version of the same fix
-           * http://blog.madebypi.co.uk/2009/04/21/transparent-flash-text-entry/
-           *
-           * @property disableI18nInputFix
-           * @type boolean
-           */
-          disableI18nInputFix: "false",
-
-          /**
            * Name of the thumbnail which, if present, is used to display a static image representing the audio
            * before the play button is pressed. Use 'imgpreview' for the scaled-down thumbnail provided by the
            * OOTB config, or 'imgpreviewfull' for the full-size version (config provided by this add-on)
@@ -105,18 +86,39 @@
 
           /**
            * Name of the thumbnail which, if present, contains a MP3 audio rendition of the file
+           * 
+           * @property mp3ThumbnailName
+           * @type String
+           * @default "mp3preview"
            */
           mp3ThumbnailName: "mp3preview",
           
           /**
-           * Name of the thumbnail which, if present, contains a H264 rendition of the video
+           * Whether to queue missing audio renditions. "true" for queue, "false" for do not queue.
+           * 
+           * @property queueMissingRenditions
+           * @type String
+           * @default "true"
            */
-          h264ThumbnailName: "h264preview",
-          
+          queueMissingRenditions: true,
+
           /**
-           * Whether to queue missing audio renditions
+           * Whether to auto-play the audio on page load, "true" or "false"
+           * 
+           * @property autoplay
+           * @type string
+           * @default "false"
            */
-          queueMissingRenditions: true
+          autoplay: "false",
+
+          /**
+           * Whether to auto-load the audio on page load, "true" or "false"
+           * 
+           * @property autoload
+           * @type string
+           * @default "true"
+           */
+          autoload: "true"
        },
     
        /**
@@ -269,6 +271,8 @@
            so.addVariable("buttoncolor", "333333");
            so.addVariable("buttonovercolor", "0088de");
            so.addVariable("sliderovercolor", "0088de");
+           so.addVariable("autoplay", this.attributes.autoplay == "true" ? 1 : 0);
+           so.addVariable("autoload", this.attributes.autoload == "true" ? 1 : 0);
            so.addParam("allowScriptAccess", "sameDomain");
            so.addParam("allowFullScreen", "true");
            so.addParam("quality", "autohigh");
