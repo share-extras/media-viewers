@@ -112,6 +112,11 @@
 	float: left;
 }
 
+/* Hide the link button in the dashlet, as the panel CSS is broken */
+.body .previewer.PdfJs .controls .linkbutton {
+    display: none;
+}
+
 .linkDialog {
 	visibility:hidden;
     position: absolute;

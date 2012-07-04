@@ -470,10 +470,20 @@
        */
       _setPreviewerElementHeight: function _setPreviewerElementHeight()
       {
+         // Is the viewer maximized?
          if (!this.maximized)
          {
-            var previewHeight = this.wp.setupPreviewSize();
-            Dom.setStyle(this.wp.getPreviewerElement(), "height", (previewHeight - 10).toString() + "px");
+            // Check if we are running in a dashlet
+            var dashletBody = Dom.getAncestorByClassName(this.wp.getPreviewerElement(), "body");
+            if (dashletBody)
+            {
+               Dom.setStyle(this.wp.getPreviewerElement(), "height", "100%");
+            }
+            else
+            {
+               var previewHeight = this.wp.setupPreviewSize();
+               Dom.setStyle(this.wp.getPreviewerElement(), "height", (previewHeight - 10).toString() + "px");
+            }
          }
          else
          {

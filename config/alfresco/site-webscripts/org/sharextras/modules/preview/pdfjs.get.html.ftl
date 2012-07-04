@@ -63,9 +63,11 @@
         ${msg("button.download")}
       </button>
 
-      <button id="${el}-link" title="${msg("button.link")}">
-        <img src="${url.context}/res/components/images/link-16.png" align="top" height="16"/>
-      </button>
+      <span class="linkbutton">
+         <button id="${el}-link" title="${msg("button.link")}">
+           <img src="${url.context}/res/components/images/link-16.png" align="top" height="16"/>
+         </button>
+      </span>
       
     </div>
     
