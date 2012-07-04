@@ -1,7 +1,7 @@
 Media Viewers for Alfresco Share
 ================================
 
-Authors: Will Abson (Alfresco), Peter Lšfgren (Loftux AB)
+Authors: Will Abson (Alfresco), Peter LÃ¶fgren (Loftux AB)
 
 This add-on project for Alfresco Share provides a number of content viewers to 
 complement the out-of-the box set supplied with Share. It was previously named
@@ -94,7 +94,13 @@ support the widest range of formats, and for thumbnail image generation.
 
 To enable FFmpeg support you must
 
-1. Install FFmpeg (with x264) on the server
+1. Install FFmpeg (with [x264](http://www.videolan.org/developers/x264.html)) on the server
+   
+   It is unlikely that your standard package manager will install this for you. The 
+   [FFmpeg documentation](https://ffmpeg.org/trac/ffmpeg/wiki) does however contain detailed documentation for compiling on
+   [Ubuntu](https://ffmpeg.org/trac/ffmpeg/wiki/UbuntuCompilationGuide) and [other operating systems](https://ffmpeg.org/trac/ffmpeg/wiki/CompilationGuide)
+   and the project also makes pre-built binaries available for [download](http://ffmpeg.org/download.html).
+   
 2. Edit your `alfresco-global.properties` file to define the location
    of the FFmpeg executable and base directory (should not contain spaces)
 
@@ -437,6 +443,37 @@ To use the Document Viewer dashlet, navigate to a site dashboard. Then, click th
 _Customize Dashboard_ button to edit the contents of the dashboard and drag 
 the dashlet into one of the columns from the list of dashlets.
 
+Troubleshooting
+---------------
+
+###Web Previews
+
+The most common problem that you may see when using the viewers is that the text _Preparing Previewer..._ is shown on the screen. This is usually
+accompanied by an error in the browser JavaScript console indicating that the plugin instance could not be created.
+
+If you see this on your system, check that the add-on is installed correctly and that you have enabled the relevant viewers
+in the Module Deployment console.
+
+###FFmpeg
+
+If you have problems with audio and video previews or thumbnails not working, first check your `alfresco.log` for any errors being thrown at startup, relating to FFmpeg. 
+If no errors are shown, you can force the transformers to give you a little more information by adding the 
+following lines to the file `webapps/alfresco/WEB-INF/classes/log4j.properties`.
+
+    log4j.logger.org.alfresco.util.exec.RuntimeExec=debug
+    log4j.logger.org.alfresco.repo.content.transform=debug
+    log4j.logger.org.alfresco.repo.thumbnail=debug
+
+If no problems are obvious and you _still_ find that thumbnails do not get generated or the player does not render, 
+you can make a direct request for the specific renditions to help diagnose the problem. In the URLs below you 
+will need to replace the `{nodeId}` token with the GUID of the problematic file (which you can grab from the end of 
+the Document Details page URL), and substitute in the hostname of your server in place of `{hostname}`.
+
+ * For thumbnail problems, hit [http://{hostname}/share/proxy/alfresco/api/node/workspace/SpacesStore/{nodeId}/content/thumbnails/doclib?c=force](http://{hostname}/share/proxy/alfresco/api/node/workspace/SpacesStore/{nodeId}/content/thumbnails/doclib?c=force)
+ * For player problems, hit [http://{hostname}/share/proxy/alfresco/api/node/workspace/SpacesStore/{nodeId}/content/thumbnails/h264preview?c=force](http://{hostname}/share/proxy/alfresco/api/node/workspace/SpacesStore/{nodeId}/content/thumbnails/h264preview?c=force)
+
+This should force the thumbnails to be generated syncronously, and a stack trace will be visible in the page response or in `alfresco.log`.
+
 Known Issues
 ------------
 
@@ -444,3 +481,14 @@ Known Issues
   viewer. This is due to a [Chrome bug](http://code.google.com/p/chromium/issues/detail?id=122465). The viewer therefore tests for this combination of browser and operating 
   system and declines to display the content. Fortunately the Embed viewer is able to render the content
   via Chrome's built-in PDF support.
+
+* In versions 3.3, 3.4.a, 3.4.b and 3.4.c, the video player only supports previews of MP4 and FLV content, due to 
+  a bug whereby the thumbnail service [https://issues.alfresco.com/jira/browse/ALF-4214](cannot produce renditions 
+  using a RuntimeExec transformer). The workaround for this is to apply the fix in the JIRA issue to patch your 
+  own `alfresco-repository.jar`. This is fixed in version 3.4.d.
+
+* Prior to Alfresco Community 3.4.b, adding the additional thumbnail definitions to the thumbnail registry required 
+  overriding the entire thumbnailRegistry bean. The supplied Spring configuration still uses this old method for now 
+  in order to support the widest range of versions, but if this causes you problems you can use the new 
+  `org.alfresco.repo.thumbnail.ThumbnailDefinitionSpringRegistrer` bean instead 
+  ([example config](http://fisheye.alfresco.com/browse/alfresco_open_mirror/alfresco/HEAD/root/projects/repository/config/alfresco/extension/video-transformation-context.xml.sample?r=22817))
