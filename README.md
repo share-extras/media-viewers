@@ -11,7 +11,7 @@ Viewers can be configured into the Web Preview component of the Document
 Details Page. In addition, the add-on supplies a custom dashlet which can be
 used to display any chosen document or content item on a site dashboard.
 
-The following viewers are supplied in the v2.x add-on
+The following viewers are supplied in the v2.x add-on for use on Alfresco 4
 
 * **PdfJs** displays documents, presentations and any other file capable of being 
   transformed to PDF in-line in the web browser using the excellent [pdf.js](http://mozilla.github.com/pdf.js/)
@@ -56,7 +56,7 @@ The following viewers are supplied in the v2.x add-on
   download the latest JAR file from the supporting [share-webodf project](https://github.com/wabson/webodf-share/downloads) and
   install it in the same way as the main media-viewers JAR file.
   
-The v0.x/1.x add-on supplies only the FLVPlayer and MP3Player add-ons.
+The v0.x/1.x add-on supplies only the FLVPlayer and MP3Player add-ons and works on Alfresco 3.3/3.4.
 
 In addition to the Share component extensions the add-on supplies repository extension configuration
 for defining 'thumbnailed' content in PDF, H264/FLV and MP3 formats, a full-size image thumbnail for 
@@ -483,8 +483,8 @@ Known Issues
   via Chrome's built-in PDF support.
 
 * In versions 3.3, 3.4.a, 3.4.b and 3.4.c, the video player only supports previews of MP4 and FLV content, due to 
-  a bug whereby the thumbnail service [https://issues.alfresco.com/jira/browse/ALF-4214](cannot produce renditions 
-  using a RuntimeExec transformer). The workaround for this is to apply the fix in the JIRA issue to patch your 
+  a bug whereby the thumbnail service [cannot produce renditions using a RuntimeExec transformer](https://issues.alfresco.com/jira/browse/ALF-4214). 
+  The workaround for this is to apply the fix in the JIRA issue to patch your 
   own `alfresco-repository.jar`. This is fixed in version 3.4.d.
 
 * Prior to Alfresco Community 3.4.b, adding the additional thumbnail definitions to the thumbnail registry required 
