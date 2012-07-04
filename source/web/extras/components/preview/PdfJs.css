@@ -147,9 +147,12 @@
     padding: 2px;
 }
 
+/* Causes Safari to add padding on RHS as well as LHS and seemingly not needed anyway */
+/*
 .previewer.PdfJs .viewer.sideBarVisible {
     margin-left: 200px;
 }
+*/
 
 .previewer.PdfJs .sidebar > div {
     height: 100%;
