@@ -76,7 +76,7 @@ For Alfresco 3.x, download the 0.x or 1.0 version of Media Preview.
 Installation
 ------------
 
-Copy the JAR file into the `tomcat/shared/lib` folder of your Alfresco installation. If you are hosting
+Copy the JAR file into the `tomcat/shared/lib` folder of your Alfresco installation (create the `lib` directory if it does not exist). If you are hosting
 the repository and Share in different Tomcat containers then you should install it in both.
 
 See _Configuration_ below, for instructions on how to enable the viewers in Share.
@@ -430,7 +430,7 @@ Alfresco 3.
     
     </config>
 
-Lastly you must enable the relevant modules in the Share Module Deployment console, after Alfresco
+Lastly you must enable the relevant modules in the Share [Module Deployment console](http://code.google.com/p/share-extras/wiki/ModuleDeployment), after Alfresco
 has started up. You can access this page from the main Web Scripts index page.
 
 Usage
