@@ -81,11 +81,9 @@
                    <span data-l10n-id="open_file_label">Open</span>
                 </button>
 
-                <!--
                 <button id="print" class="toolbarButton print" title="Print" tabindex="11" data-l10n-id="print" onclick="window.print()">
                   <span data-l10n-id="print_label">Print</span>
                 </button>
-                -->
 
                 <button id="download" class="toolbarButton download" title="Download" onclick="PDFView.download();" tabindex="12" data-l10n-id="download">
                   <span data-l10n-id="download_label">Download</span>
@@ -155,6 +153,7 @@
       </div> <!-- mainContainer -->
 
     </div> <!-- outerContainer -->
+    <div id="printContainer"></div>
     
 </body>
 </html>

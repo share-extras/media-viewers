@@ -524,12 +524,6 @@
          //Set the worker source
          PDFJS.workerSrc = Alfresco.constants.URL_CONTEXT + 'res/extras/components/preview/pdfjs/pdf' +  (Alfresco.constants.DEBUG ? '.js' : '-min.js'); 
          
-         //Check if Safari, disable workers due to bug https://github.com/mozilla/pdf.js/issues/1627
-         if (YAHOO.env.ua.webkit > 0 && !YAHOO.env.ua.chrome)
-         {
-         	PDFJS.disableWorker = true;
-         }
-         
          PDFJS.getDocument(fileurl).then(function(pdf) {
          	me.pdfDoc = pdf;
          	me.numPages = me.pdfDoc.numPages;
