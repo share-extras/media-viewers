@@ -841,11 +841,14 @@
          {
             this.documentConfig = {};
          }
-         var base = "org.sharextras.media-viewers.pdfjs.document." + this.wp.options.nodeRef.replace(":/", "").replace("/", ".") + ".";
-         this.documentConfig = {
-            pageNum: window.localStorage[base + "pageNum"],
-            scale: window.localStorage[base + "scale"]
-         };
+         else
+         {
+            var base = "org.sharextras.media-viewers.pdfjs.document." + this.wp.options.nodeRef.replace(":/", "").replace("/", ".") + ".";
+            this.documentConfig = {
+               pageNum: window.localStorage[base + "pageNum"],
+               scale: window.localStorage[base + "scale"]
+            };
+         }
       },
       
       /**
