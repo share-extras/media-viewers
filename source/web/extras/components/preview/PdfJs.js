@@ -108,9 +108,9 @@
           * 
           * @property defaultScale
           * @type String
-          * @default "two-page-fit"
+          * @default "auto"
           */
-         defaultScale: "two-page-fit",
+         defaultScale: "auto",
          
          /**
           * Multipler for zooming in/out
@@ -120,6 +120,15 @@
           * @default "1.1"
           */
          scaleDelta: "1.1",
+         
+         /**
+          * Minimum scale level to use when auto-scaling a document
+          * 
+          * @property autoMinScale
+          * @type String
+          * @default "0.7"
+          */
+         autoMinScale: "0.7",
    
          /**
           * Layout to use to display pages, "single" (one page per row) or "multi" (multiple pages per row)
@@ -555,7 +564,8 @@
                pageLayout: this.attributes.pageLayout,
                currentScale: this.documentConfig.scale ? parseFloat(this.documentConfig.scale) : K_UNKNOWN_SCALE,
                defaultScale: this.attributes.defaultScale,
-               disableTextLayer: this.attributes.disableTextLayer == "true"
+               disableTextLayer: this.attributes.disableTextLayer == "true",
+               autoMinScale: parseFloat(this.attributes.autoMinScale)
             });
             this.thumbnailView = new DocumentView(this.id + "-thumbnailView", {
                pageLayout: "single",
@@ -1597,15 +1607,15 @@
        */
       parseScale: function DocumentView_parseScale(value)
       {
-          var scale = parseFloat(value);
-          if (scale)
-          {
-             return scale;
-          }
+         var scale = parseFloat(value);
+         if (scale)
+         {
+            return scale;
+         }
    
-          if(this.pages.length > 0)
-          {
-                var currentPage = this.pages[0],
+         if (this.pages.length > 0)
+         {
+             var currentPage = this.pages[0],
                 container = currentPage.container,
                 hmargin = parseInt(Dom.getStyle(container, "margin-left")) + parseInt(Dom.getStyle(container, "margin-right")),
                 vmargin = parseInt(Dom.getStyle(container, "margin-top")) + parseInt(Dom.getStyle(container, "margin-bottom")),
@@ -1643,14 +1653,38 @@
              }
              else if ('auto' == value)
              {
-                var pageWidthScale = (clientWidth - hmargin*2) / contentWidth;
-                return Math.min(1.0, pageWidthScale);
+                var tpf = this.parseScale("two-page-fit"),
+                   opf = this.parseScale("page-fit"),
+                   opw = this.parseScale("page-width"),
+                   tpw = this.parseScale("two-page-width"),
+                   minScale = this.config.autoMinScale;
+                if (tpf > minScale)
+                {
+                   return tpf;
+                }
+                else if (opf > minScale)
+                {
+                   return opf;
+                }
+                else if (tpw > minScale)
+                {
+                   return tpw;
+                }
+                else if (opw > minScale)
+                {
+                   return opw;
+                }
+                else
+                {
+                   return minScale;
+                }
              }
              else
              {
                 throw "Unrecognised zoom level '" + value + "'";
              }
-          } else
+          }
+          else
           {
              throw "Unrecognised zoom level - no pages";
           }
