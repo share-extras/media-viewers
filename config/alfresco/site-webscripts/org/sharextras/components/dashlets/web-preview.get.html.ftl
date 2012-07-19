@@ -1,4 +1,5 @@
 <script type="text/javascript">//<![CDATA[
+(function() {
    var dashlet = new Alfresco.dashlet.VideoWidget("${args.htmlid}").setOptions(
    {
       "componentId": "${instance.object.id}",
@@ -43,6 +44,7 @@
          }
       ]
    });
+})();
 //]]></script>
 <div class="dashlet video">
    <div class="title" id="${args.htmlid}-title"><#if node??><a href="${url.context}/page/site/${page.url.templateArgs.site!''}/document-details?nodeRef=${args.nodeRef!''}">${args.name}</a><#else><#if args.name?exists>${args.name}<#else>${msg("header.video")}</#if></#if></div>
