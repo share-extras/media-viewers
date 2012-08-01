@@ -31,27 +31,27 @@
     /**
      * Flash video mimetype string
      */
-    const MIMETYPE_FLV = "video/x-flv";
+    var MIMETYPE_FLV = "video/x-flv";
     
     /**
      * H264 video mimetype string
      */
-    const MIMETYPE_H264 = "video/mp4";
+    var MIMETYPE_H264 = "video/mp4";
     
     /**
      * H264 (m4v) video mimetype string
      */
-    const MIMETYPE_M4V = "video/x-m4v";
+    var MIMETYPE_M4V = "video/x-m4v";
     
     /**
      * Cropped image preview thumbnail name
      */
-    const THUMBNAIL_IMGPREVIEW = "imgpreview";
+    var THUMBNAIL_IMGPREVIEW = "imgpreview";
     
     /**
      * Full image preview thumbnail name
      */
-    const THUMBNAIL_IMGPREVIEWFULL = "imgpreviewfull";
+    var THUMBNAIL_IMGPREVIEWFULL = "imgpreviewfull";
     
     /**
      * YUI aliases

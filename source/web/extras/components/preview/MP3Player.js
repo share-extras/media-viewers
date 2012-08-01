@@ -31,12 +31,12 @@
     /**
      * MP3 audio mimetype string
      */
-    const MIMETYPE_MP3 = "audio/mpeg";
+    var MIMETYPE_MP3 = "audio/mpeg";
     
     /**
      * H264 video mimetype string
      */
-    const MIMETYPE_H264 = "video/mp4";
+    var MIMETYPE_H264 = "video/mp4";
     
     /**
      * MP3Player plug-in constructor
