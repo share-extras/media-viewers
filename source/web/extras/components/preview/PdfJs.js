@@ -252,6 +252,15 @@
        * @default {}
        */
       documentConfig: {},
+      
+      /**
+       * Whether the previewer is embedded in a wiki page
+       * 
+       * @property inWikiPage
+       * @type boolean
+       * @default false
+       */
+      inWikiPage: false,
    
       /**
        * Tests if the plugin can be used in the users browser.
@@ -318,6 +327,9 @@
        */
       display: function PdfJs_display()
       {
+         // TODO detect dashlet context as well, rather than this being in _setPreviewerElementHeight()
+         this.inWikiPage = Dom.getAncestorByClassName(this.wp.getPreviewerElement(), "wiki-page") != null;
+         
          // html5 is supported, display with pdf.js
          // id and name needs to be equal, easier if you need scripting access
          // to iframe
@@ -379,14 +391,17 @@
             failureMessage: this.wp.msg("error.viewerload")
          });
          
-         // Window resize behaviour
-         Event.addListener(window, "resize", this.onRecalculatePreviewLayout, this, true);
-         
-         // Hash change behaviour
-         Event.addListener(window, "hashchange", this.onWindowHashChange, this, true);
-         
-         // Window unload behaviour
-         Event.addListener(window, "beforeunload", this.onWindowUnload, this, true);
+         if (!this.inWikiPage)
+         {
+            // Window resize behaviour
+            Event.addListener(window, "resize", this.onRecalculatePreviewLayout, this, true);
+            
+            // Hash change behaviour
+            Event.addListener(window, "hashchange", this.onWindowHashChange, this, true);
+            
+            // Window unload behaviour
+            Event.addListener(window, "beforeunload", this.onWindowUnload, this, true);
+         }
       },
       
       /**
@@ -488,7 +503,7 @@
             {
                Dom.setStyle(this.wp.getPreviewerElement(), "height", "100%");
             }
-            else
+            else if (!this.inWikiPage)
             {
                var previewHeight = this.wp.setupPreviewSize();
                Dom.setStyle(this.wp.getPreviewerElement(), "height", (previewHeight - 10).toString() + "px");

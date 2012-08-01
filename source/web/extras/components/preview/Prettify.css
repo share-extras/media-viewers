@@ -2,13 +2,13 @@
     text-align: left;
     height: 500px;
     overflow: scroll;
+    border: 1px solid #CCCCCC;
 }
 
 .web-preview .previewer.Prettify pre {
-    height: 100%;
 }
 
 .web-preview .previewer.Prettify pre.prettyprint {
-    border: 1px solid #CCCCCC;
     padding: 1em;
+    border: 0px;
 }
