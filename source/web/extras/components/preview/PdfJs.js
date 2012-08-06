@@ -261,6 +261,15 @@
        * @default false
        */
       inWikiPage: false,
+      
+      /**
+       * Whether the previewer is embedded in a dashlet
+       * 
+       * @property inDashlet
+       * @type boolean
+       * @default false
+       */
+      inDashlet: false,
    
       /**
        * Tests if the plugin can be used in the users browser.
@@ -327,8 +336,8 @@
        */
       display: function PdfJs_display()
       {
-         // TODO detect dashlet context as well, rather than this being in _setPreviewerElementHeight()
          this.inWikiPage = Dom.getAncestorByClassName(this.wp.getPreviewerElement(), "wiki-page") != null;
+         this.inDashlet = Dom.getAncestorByClassName(this.wp.getPreviewerElement(), "body") != null;
          
          // html5 is supported, display with pdf.js
          // id and name needs to be equal, easier if you need scripting access
@@ -375,7 +384,10 @@
        */
       onComponentsLoaded : function PdfJs_onComponentsLoaded()
       {
-         this._loadDocumentConfig();
+         if (!this.inWikiPage && !this.inDashlet)
+         {
+            this._loadDocumentConfig();
+         }
          
          // Set page number
          var urlParams = Alfresco.util.getQueryStringParameters(window.location.hash.replace("#", ""));
@@ -464,16 +476,19 @@
          this._loadPdf();
          
          // Keyboard shortcuts
-         new YAHOO.util.KeyListener(document, { keys: 37 }, { // left arrow
-            fn: this.onPagePrevious, 
-            scope: this, 
-            correctScope: true
-         }).enable();
-         new YAHOO.util.KeyListener(document, { keys: 39 }, { // right arrow
-            fn: this.onPageNext, 
-            scope: this, 
-            correctScope: true
-         }).enable();
+         if (!this.inWikiPage && !this.inDashlet)
+         {
+            new YAHOO.util.KeyListener(document, { keys: 37 }, { // left arrow
+               fn: this.onPagePrevious, 
+               scope: this, 
+               correctScope: true
+            }).enable();
+            new YAHOO.util.KeyListener(document, { keys: 39 }, { // right arrow
+               fn: this.onPageNext, 
+               scope: this, 
+               correctScope: true
+            }).enable();
+         }
          new YAHOO.util.KeyListener(document, { keys: 27 }, { // escape
             fn: function (e) {
                if (this.maximized)
@@ -497,9 +512,7 @@
          // Is the viewer maximized?
          if (!this.maximized)
          {
-            // Check if we are running in a dashlet
-            var dashletBody = Dom.getAncestorByClassName(this.wp.getPreviewerElement(), "body");
-            if (dashletBody)
+            if (this.inDashlet)
             {
                Dom.setStyle(this.wp.getPreviewerElement(), "height", "100%");
             }
