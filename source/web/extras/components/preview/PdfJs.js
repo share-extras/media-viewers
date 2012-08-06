@@ -726,6 +726,7 @@
                   var a = document.createElement('a');
                   Dom.setAttribute(a, "href", "#");
                   YAHOO.util.Event.addListener(a, "click", function(e, obj) {
+                     YAHOO.util.Event.stopEvent(e);
                      this._navigateTo(obj);
                      }, item.dest, this);
                   a.textContent = item.title;
@@ -923,6 +924,7 @@
           this.documentView.renderVisiblePages();
           
           var goToPage = function goToPage(e, obj) {
+             YAHOO.util.Event.stopEvent(e);
              this._scrollToPage(obj.pn);
           };
           
