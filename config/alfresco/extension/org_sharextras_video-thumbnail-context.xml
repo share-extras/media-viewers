@@ -1,0 +1,107 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE beans PUBLIC '-//SPRING//DTD BEAN//EN' 'http://www.springframework.org/dtd/spring-beans.dtd'>
+ 
+<beans>
+
+    <!-- FLV thumbnail options -->
+    <bean id="thumbnail.register.flvpreview" class="org.alfresco.repo.thumbnail.ThumbnailDefinitionSpringRegisterer">
+        <property name="thumbnailRegistry" ref="thumbnailRegistry" />
+        <property name="thumbnailDefinition">
+            <!-- FLV preview thumbnail options -->
+            <bean class="org.alfresco.repo.thumbnail.ThumbnailDefinition">
+                <property name="name" value="flvpreview" />
+                <property name="mimetype" value="video/x-flv"/>
+                <property name="transformationOptions">
+                    <bean class="org.alfresco.repo.content.transform.RuntimeExecutableContentTransformerOptions">
+                        <property name="propertyValues">
+                            <props>
+                                <prop key="outfile_opts">-f flv -ar 44100</prop>
+                            </props>
+                        </property>
+                    </bean>
+                </property>
+                <property name="runAs" value="System"/>
+            </bean>
+        </property>
+    </bean>
+
+    <!-- H264 thumbnail options -->
+    <bean id="thumbnail.register.h264preview" class="org.alfresco.repo.thumbnail.ThumbnailDefinitionSpringRegisterer">
+        <property name="thumbnailRegistry" ref="thumbnailRegistry" />
+        <property name="thumbnailDefinition">
+            <!-- H264 preview thumbnail options -->
+            <bean class="org.alfresco.repo.thumbnail.ThumbnailDefinition">
+                <property name="name" value="h264preview" />
+                <property name="mimetype" value="video/mp4"/>
+                <property name="transformationOptions">
+                    <bean class="org.alfresco.repo.content.transform.RuntimeExecutableContentTransformerOptions">
+                        <property name="propertyValues">
+                            <props>
+                                <!-- Following suitable for FFmpeg frem Feb 2012 onwards (r10464) -->
+                                <!--
+                                <prop key="outfile_opts">-f mp4 -ar 44100 -ab 96k -vcodec libx264 -crf 25 -g 250 -r 25 -coder 1 -flags +loop -cmp +chroma -partitions +parti8x8+parti4x4+partp8x8+partb8x8 -me_method hex -subq 7 -me_range 16 -keyint_min 25 -sc_threshold 40 -i_qfactor 0.71 -b_strategy 1 -qcomp 0.6 -qmin 10 -qmax 51 -qdiff 4 -bf 3 -refs 3 -trellis 1 -flags2 +bpyramid+mixed_refs+wpred+dct8x8+fastpskip -wpredp 2</prop>
+                                -->
+                                <!-- New options avoiding -flags2 - see http://avanti.arrozcru.com/tpl_upd.htm -->
+                                <prop key="outfile_opts">-f mp4 -ar 44100 -ab 96k -vcodec libx264 -crf 25 -g 250 -r 25 -coder 1 -flags +loop -cmp +chroma -partitions +parti8x8+parti4x4+partp8x8+partb8x8 -me_method hex -subq 7 -me_range 16 -keyint_min 25 -sc_threshold 40 -i_qfactor 0.71 -b_strategy 1 -qcomp 0.6 -qmin 10 -qmax 51 -qdiff 4 -bf 3 -refs 3 -trellis 1 -b-pyramid 1 -mixed-refs 1 -weightb 1 -8x8dct 1 -fast-pskip 1 -wpredp 2</prop>
+                            </props>
+                        </property>
+                    </bean>
+                </property>
+                <property name="runAs" value="System"/>
+            </bean>
+        </property>
+    </bean>
+
+    <!-- MP3 thumbnail options -->
+    <bean id="thumbnail.register.mp3preview" class="org.alfresco.repo.thumbnail.ThumbnailDefinitionSpringRegisterer">
+        <property name="thumbnailRegistry" ref="thumbnailRegistry" />
+        <property name="thumbnailDefinition">
+            <!-- MP3 preview thumbnail options -->
+            <bean class="org.alfresco.repo.thumbnail.ThumbnailDefinition">
+               <property name="name" value="mp3preview" />
+               <property name="mimetype" value="audio/mpeg"/>
+               <property name="transformationOptions">
+                  <bean class="org.alfresco.repo.content.transform.RuntimeExecutableContentTransformerOptions">
+                     <property name="propertyValues">
+                        <props>
+                           <prop key="outfile_opts">-f mp3 -ar 44100 -ab 128k</prop>
+                        </props>
+                     </property>
+                  </bean>
+               </property>
+               <property name="runAs" value="System"/>
+            </bean>
+        </property>
+    </bean>
+
+    <!-- Full size image thumbnail options -->
+    <bean id="thumbnail.register.imgpreviewfull" class="org.alfresco.repo.thumbnail.ThumbnailDefinitionSpringRegisterer">
+        <property name="thumbnailRegistry" ref="thumbnailRegistry" />
+        <property name="thumbnailDefinition">
+            <!-- Image preview thumbnail options -->
+            <bean class="org.alfresco.repo.thumbnail.ThumbnailDefinition">
+                <property name="name" value="imgpreviewfull" />
+                <property name="mimetype" value="image/jpeg"/>
+                <property name="transformationOptions">
+                    <bean class="org.alfresco.repo.content.transform.magick.ImageTransformationOptions">
+                        <property name="resizeOptions">
+                            <bean class="org.alfresco.repo.content.transform.magick.ImageResizeOptions">
+                                <property name="width" value="100"/>
+                                <property name="height" value="100"/>
+                                <property name="percentResize" value="true"/>
+                                <property name="maintainAspectRatio" value="false"/>
+                                <property name="resizeToThumbnail" value="false" />
+                            </bean>
+                         </property>
+                    </bean>
+                    <!--
+                    <bean class="org.alfresco.service.cmr.repository.TransformationOptions" />
+                    -->
+                </property>
+                <property name="placeHolderResourcePath" value="alfresco/thumbnail/thumbnail_placeholder_medium.jpg" />
+                <property name="runAs" value="System"/>
+            </bean>
+        </property>
+    </bean>
+
+</beans>
