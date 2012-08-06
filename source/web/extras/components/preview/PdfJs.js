@@ -516,7 +516,11 @@
             {
                Dom.setStyle(this.wp.getPreviewerElement(), "height", "100%");
             }
-            else if (!this.inWikiPage)
+            else if (this.inWikiPage)
+            {
+               Dom.setStyle(this.wp.getPreviewerElement(), "height", null);
+            }
+            else
             {
                var previewHeight = this.wp.setupPreviewSize();
                Dom.setStyle(this.wp.getPreviewerElement(), "height", (previewHeight - 10).toString() + "px");
