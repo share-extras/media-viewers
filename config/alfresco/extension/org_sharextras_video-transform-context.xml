@@ -135,6 +135,10 @@
                 <property name="sourceMimetype"><value>video/ogg</value></property>
                 <property name="targetMimetype"><value>video/x-flv</value></property>
             </bean>
+            <bean class="org.alfresco.repo.content.transform.ExplictTransformationDetails" >
+                <property name="sourceMimetype"><value>video/webm</value></property>
+                <property name="targetMimetype"><value>video/x-flv</value></property>
+            </bean>
          </list>
       </property>
       <property name="mimetypeService">
@@ -198,6 +202,10 @@
             </bean>
             <bean class="org.alfresco.repo.content.transform.ExplictTransformationDetails" >
                 <property name="sourceMimetype"><value>video/ogg</value></property>
+                <property name="targetMimetype"><value>video/mp4</value></property>
+            </bean>
+            <bean class="org.alfresco.repo.content.transform.ExplictTransformationDetails" >
+                <property name="sourceMimetype"><value>video/webm</value></property>
                 <property name="targetMimetype"><value>video/mp4</value></property>
             </bean>
          </list>
@@ -271,6 +279,10 @@
                 <property name="sourceMimetype"><value>video/ogg</value></property>
                 <property name="targetMimetype"><value>image/jpeg</value></property>
             </bean>
+            <bean class="org.alfresco.repo.content.transform.ExplictTransformationDetails" >
+                <property name="sourceMimetype"><value>video/webm</value></property>
+                <property name="targetMimetype"><value>image/jpeg</value></property>
+            </bean>
          </list>
       </property>
       <property name="mimetypeService">
@@ -317,6 +329,10 @@
             </bean>
             <bean class="org.alfresco.repo.content.transform.ExplictTransformationDetails" >
                 <property name="sourceMimetype"><value>audio/x-flac</value></property>
+                <property name="targetMimetype"><value>audio/mpeg</value></property>
+            </bean>
+            <bean class="org.alfresco.repo.content.transform.ExplictTransformationDetails" >
+                <property name="sourceMimetype"><value>audio/webm</value></property>
                 <property name="targetMimetype"><value>audio/mpeg</value></property>
             </bean>
          </list>
