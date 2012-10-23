@@ -7,7 +7,12 @@
             <img src="${url.context}/res/extras/components/preview/pdfjs/images/sidebar-show-16.png" align="top" height="16" title="${msg("button.sidebar")}" />
           </button>
       </div>
-      
+
+      <span class="searchBarToggle">
+         <button id="${el}-searchBarToggle">${msg("button.search")}
+         </button>
+      </span>    
+      <div class="separator"></div>
       <button id="${el}-previous">
         <img src="${url.context}/res/components/images/back-arrow.png" align="top" height="16"/>
         ${msg("button.previous")}
@@ -71,6 +76,27 @@
       
     </div>
     
+    <div id="${el}-searchControls" class="controls controlssearch flat-button hidden">
+    <#-- Search bar -->
+      <label for="${el}-findInput">${msg("button.search")}</label>:
+      <input id="${el}-findInput" type="search" size="30">
+      <button id="${el}-findPrevious">
+        <img src="${url.context}/res/components/images/back-arrow.png" align="top" height="16"/>
+        ${msg("button.previoushit")}
+      </button>
+
+      <button id="${el}-findNext">
+        <img src="${url.context}/res/components/images/forward-arrow-16.png" align="top" height="16"/>
+        ${msg("button.nexthit")}
+      </button>
+       <button id="${el}-findHighlightAll">
+         ${msg("button.highlightall")}
+       </button>
+       <button id="${el}-findMatchCase">
+         ${msg("button.matchcase")}
+       </button>  
+    </div>
+    
     <div id="${el}-linkDialog" class="linkDialog">
         <div class="hd"></div>
         <div class="bd">
@@ -90,15 +116,10 @@
             <ul class="yui-nav">
                 <li class="selected"><a href="#${el}-thumbnailView"><em><img src="${url.context}/res/extras/components/preview/pdfjs/images/thumbnail-view-16.png" height="16" /></em></a></li>
                 <li><a href="#${el}-outlineView"><em><img src="${url.context}/res/extras/components/preview/pdfjs/images/outline-view-16.png" height="16" /></em></a></li>
-                <li><a href="#${el}-searchView"><em><img src="${url.context}/res/extras/components/preview/pdfjs/images/search-view-16.png" height="16" /></em></a></li>
             </ul>
             <div class="yui-content">
                 <div id="${el}-thumbnailView" class="thumbnailView documentView"></div>
                 <div id="${el}-outlineView" class="outlineView"></div>
-                <div id="${el}-searchView" class="searchView">
-                    <div><input type="text" name="searchBox" id="${el}-searchBox" /> <button id="${el}-searchBtn">${msg("button.search")}</button></div>
-                    <div id="${el}-searchResults" class="searchResults"></div>
-                </div>
             </div>
         </div>
     </div>

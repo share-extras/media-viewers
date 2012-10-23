@@ -6,6 +6,20 @@
  */
 /* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
+/* Copyright 2012 Mozilla Foundation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 var PDFJS = {};
 
@@ -13,11 +27,25 @@ var PDFJS = {};
   // Use strict in our context only - users might not want it
   'use strict';
 
-  PDFJS.build = '2965bad';
+  PDFJS.build =
+'f99150b';
 
-  // Files are inserted below - see Makefile
 /* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
 /* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
+/* Copyright 2012 Mozilla Foundation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 'use strict';
 
@@ -47,9 +75,11 @@ function getPdf(arg, callback) {
   var params = arg;
   if (typeof arg === 'string')
     params = { url: arg };
-
+//#if !B2G
   var xhr = new XMLHttpRequest();
-
+//#else
+//var xhr = new XMLHttpRequest({mozSystem: true});
+//#endif
   xhr.open('GET', params.url);
 
   var headers = params.headers;
@@ -63,15 +93,23 @@ function getPdf(arg, callback) {
   }
 
   xhr.mozResponseType = xhr.responseType = 'arraybuffer';
-  var protocol = params.url.indexOf(':') < 0 ? window.location.protocol :
-    params.url.substring(0, params.url.indexOf(':') + 1);
+
+  var protocol = params.url.substring(0, params.url.indexOf(':') + 1);
   xhr.expected = (protocol === 'http:' || protocol === 'https:') ? 200 : 0;
 
   if ('progress' in params)
     xhr.onprogress = params.progress || undefined;
 
-  if ('error' in params)
-    xhr.onerror = params.error || undefined;
+  var calledErrorBack = false;
+
+  if ('error' in params) {
+    xhr.onerror = function errorBack() {
+      if (!calledErrorBack) {
+        calledErrorBack = true;
+        params.error();
+      }
+    }
+  }
 
   xhr.onreadystatechange = function getPdfOnreadystatechange(e) {
     if (xhr.readyState === 4) {
@@ -79,7 +117,8 @@ function getPdf(arg, callback) {
         var data = (xhr.mozResponseArrayBuffer || xhr.mozResponse ||
                     xhr.responseArrayBuffer || xhr.response);
         callback(data);
-      } else if (params.error) {
+      } else if (params.error && !calledErrorBack) {
+        calledErrorBack = true;
         params.error(e);
       }
     }
@@ -229,7 +268,7 @@ var Page = (function PageClosure() {
     },
     getLinks: function Page_getLinks() {
       var links = [];
-      var annotations = pageGetAnnotations();
+      var annotations = this.getAnnotations();
       var i, n = annotations.length;
       for (i = 0; i < n; ++i) {
         if (annotations[i].type != 'Link')
@@ -299,8 +338,17 @@ var Page = (function PageClosure() {
                 case 'GoTo':
                   item.dest = a.get('D');
                   break;
+                case 'GoToR':
+                  var url = a.get('F');
+                  // TODO: pdf reference says that GoToR
+                  // can also have 'NewWindow' attribute
+                  if (!isValidUrl(url))
+                    url = '';
+                  item.url = url;
+                  item.dest = a.get('D');
+                  break;
                 default:
-                  TODO('other link types');
+                  TODO('unrecognized link type: ' + a.get('S').name);
               }
             } else if (annotation.has('Dest')) {
               // simple destination link
@@ -412,6 +460,24 @@ var PDFDocument = (function PDFDocumentClosure() {
     return true; /* found */
   }
 
+  var DocumentInfoValidators = {
+    get entries() {
+      // Lazily build this since all the validation functions below are not
+      // defined until after this file loads.
+      return shadow(this, 'entries', {
+        Title: isString,
+        Author: isString,
+        Subject: isString,
+        Keywords: isString,
+        Creator: isString,
+        Producer: isString,
+        CreationDate: isString,
+        ModDate: isString,
+        Trapped: isName
+      });
+    }
+  };
+
   PDFDocument.prototype = {
     get linearization() {
       var length = this.stream.length;
@@ -504,18 +570,27 @@ var PDFDocument = (function PDFDocumentClosure() {
       return shadow(this, 'numPages', num);
     },
     getDocumentInfo: function PDFDocument_getDocumentInfo() {
-      var info;
+      var docInfo;
       if (this.xref.trailer.has('Info')) {
         var infoDict = this.xref.trailer.get('Info');
 
-        info = {};
-        infoDict.forEach(function(key, value) {
-          info[key] = typeof value !== 'string' ? value :
-            stringToPDFString(value);
-        });
+        docInfo = {};
+        var validEntries = DocumentInfoValidators.entries;
+        // Only fill the document info with valid entries from the spec.
+        for (var key in validEntries) {
+          if (infoDict.has(key)) {
+            var value = infoDict.get(key);
+            // Make sure the value conforms to the spec.
+            if (validEntries[key](value)) {
+              docInfo[key] = typeof value !== 'string' ? value :
+                             stringToPDFString(value);
+            } else {
+              info('Bad value in document info for "' + key + '"');
+            }
+          }
+        }
       }
-
-      return shadow(this, 'getDocumentInfo', info);
+      return shadow(this, 'getDocumentInfo', docInfo);
     },
     getFingerprint: function PDFDocument_getFingerprint() {
       var xref = this.xref, fileID;
@@ -547,19 +622,17 @@ var PDFDocument = (function PDFDocumentClosure() {
 })();
 
 
-/* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
-
-'use strict';
 
 // Use only for debugging purposes. This should not be used in any code that is
 // in mozilla master.
-function log(msg) {
-  if (console && console.log)
-    console.log(msg);
-  else if (print)
-    print(msg);
-}
+var log = (function() {
+  if ('console' in globalScope && 'log' in globalScope['console']) {
+    return globalScope['console']['log'].bind(globalScope['console']);
+  } else {
+    return function nop() {
+    };
+  }
+})();
 
 // A notice for devs that will not trigger the fallback UI.  These are good
 // for things that are helpful to devs, such as warning that Workers were
@@ -582,7 +655,16 @@ function warn(msg) {
 // Fatal errors that should trigger the fallback UI and halt execution by
 // throwing an exception.
 function error(msg) {
-  log('Error: ' + msg);
+  // If multiple arguments were passed, pass them all to the log function.
+  if (arguments.length > 1) {
+    var logArguments = ['Error:'];
+    logArguments.push.apply(logArguments, arguments);
+    log.apply(null, logArguments);
+    // Join the arguments into a single string for the lines below.
+    msg = [].join.call(arguments, ' ');
+  } else {
+    log('Error: ' + msg);
+  }
   log(backtrace());
   PDFJS.LogManager.notify('error', msg);
   throw new Error(msg);
@@ -604,6 +686,28 @@ function backtrace() {
 function assert(cond, msg) {
   if (!cond)
     error(msg);
+}
+
+// Combines two URLs. The baseUrl shall be absolute URL. If the url is an
+// absolute URL, it will be returned as is.
+function combineUrl(baseUrl, url) {
+  if (url.indexOf(':') >= 0)
+    return url;
+  if (url.charAt(0) == '/') {
+    // absolute path
+    var i = baseUrl.indexOf('://');
+    i = baseUrl.indexOf('/', i + 3);
+    return baseUrl.substring(0, i) + url;
+  } else {
+    // relative path
+    var pathLength = baseUrl.length, i;
+    i = baseUrl.lastIndexOf('#');
+    pathLength = i >= 0 ? i : pathLength;
+    i = baseUrl.lastIndexOf('?', pathLength);
+    pathLength = i >= 0 ? i : pathLength;
+    var prefixLength = baseUrl.lastIndexOf('/', pathLength);
+    return baseUrl.substring(0, prefixLength + 1) + url;
+  }
 }
 
 // In a well-formed PDF, |cond| holds.  If it doesn't, subsequent
@@ -786,7 +890,7 @@ var PageViewport = PDFJS.PageViewport = (function PageViewportClosure() {
     var centerX = (viewBox[2] + viewBox[0]) / 2;
     var centerY = (viewBox[3] + viewBox[1]) / 2;
     var rotateA, rotateB, rotateC, rotateD;
-    switch (rotate) {
+    switch (rotate % 360) {
       case -180:
       case 180:
         rotateA = -1; rotateB = 0; rotateC = 0; rotateD = 1;
@@ -1163,8 +1267,15 @@ var StatTimer = (function StatTimerClosure() {
   return StatTimer;
 })();
 
-/* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
+PDFJS.createBlob = function createBlob(data, contentType) {
+  if (typeof Blob === 'function')
+    return new Blob([data], { type: contentType });
+  // Blob builder is deprecated in FF14 and removed in FF18.
+  var bb = new MozBlobBuilder();
+  bb.append(data);
+  return bb.getBlob(contentType);
+};
+
 
 /**
  * This is the main entry point for loading a PDF and interacting with it.
@@ -1183,63 +1294,36 @@ var StatTimer = (function StatTimerClosure() {
  * @return {Promise} A promise that is resolved with {PDFDocumentProxy} object.
  */
 PDFJS.getDocument = function getDocument(source) {
-  var url, data, headers, password, parameters = {}, workerInitializedPromise,
-    workerReadyPromise, transport;
+  var workerInitializedPromise, workerReadyPromise, transport;
 
   if (typeof source === 'string') {
-    url = source;
+    source = { url: source };
   } else if (isArrayBuffer(source)) {
-    data = source;
-  } else if (typeof source === 'object') {
-    url = source.url;
-    data = source.data;
-    headers = source.httpHeaders;
-    password = source.password;
-    parameters.password = password || null;
-
-    if (!url && !data)
-      error('Invalid parameter array, need either .data or .url');
-  } else {
+    source = { data: source };
+  } else if (typeof source !== 'object') {
     error('Invalid parameter in getDocument, need either Uint8Array, ' +
           'string or a parameter object');
+  }
+
+  if (!source.url && !source.data)
+    error('Invalid parameter array, need either .data or .url');
+
+  // copy/use all keys as is except 'url' -- full path is required
+  var params = {};
+  for (var key in source) {
+    if (key === 'url' && typeof window !== 'undefined') {
+      params[key] = combineUrl(window.location.href, source[key]);
+      continue;
+    }
+    params[key] = source[key];
   }
 
   workerInitializedPromise = new PDFJS.Promise();
   workerReadyPromise = new PDFJS.Promise();
   transport = new WorkerTransport(workerInitializedPromise, workerReadyPromise);
-  if (data) {
-    // assuming the data is array, instantiating directly from it
-    transport.sendData(data, parameters);
-  } else if (url) {
-    // fetch url
-    PDFJS.getPdf(
-      {
-        url: url,
-        progress: function getPDFProgress(evt) {
-          if (evt.lengthComputable) {
-            workerReadyPromise.progress({
-              loaded: evt.loaded,
-              total: evt.total
-            });
-          }
-        },
-        error: function getPDFError(e) {
-          workerReadyPromise.reject('Unexpected server response of ' +
-            e.target.status + '.');
-        },
-        headers: headers
-      },
-      function getPDFLoad(data) {
-        // sometimes the pdf has finished downloading before the web worker-test
-        // has finished. In that case the rendering of the final pdf would cause
-        // errors. We have to wait for the WorkerTransport to finalize worker-
-        // support detection
-        workerInitializedPromise.then(function workerInitialized() {
-          transport.sendData(data, parameters);
-        });
-      });
-  }
-
+  workerInitializedPromise.then(function transportInitialized() {
+    transport.fetchDocument(params);
+  });
   return workerReadyPromise;
 };
 
@@ -1503,13 +1587,19 @@ var PDFPageProxy = (function PDFPageProxyClosure() {
     ensureFonts: function PDFPageProxy_ensureFonts(fonts, callback) {
       this.stats.time('Font Loading');
       // Convert the font names to the corresponding font obj.
+      var fontObjs = [];
       for (var i = 0, ii = fonts.length; i < ii; i++) {
-        fonts[i] = this.objs.objs[fonts[i]].data;
+        var obj = this.objs.objs[fonts[i]].data;
+        if (obj.error) {
+          warn('Error during font loading: ' + obj.error);
+          continue;
+        }
+        fontObjs.push(obj);
       }
 
       // Load all the fonts
       FontLoader.bind(
-        fonts,
+        fontObjs,
         function pageEnsureFontsFontObjs(fontObjs) {
           this.stats.timeEnd('Font Loading');
 
@@ -1531,8 +1621,9 @@ var PDFPageProxy = (function PDFPageProxyClosure() {
       var length = this.operatorList.fnArray.length;
       var operatorList = this.operatorList;
       var stepper = null;
-      if (PDFJS.pdfBug && StepperManager.enabled) {
-        stepper = StepperManager.create(this.pageNumber - 1);
+      if (PDFJS.pdfBug && 'StepperManager' in globalScope &&
+          globalScope['StepperManager'].enabled) {
+        stepper = globalScope['StepperManager'].create(this.pageNumber - 1);
         stepper.init(operatorList);
         stepper.nextBreakPoint = stepper.getNextBreakPoint();
       }
@@ -1622,19 +1713,18 @@ var WorkerTransport = (function WorkerTransportClosure() {
 
       try {
         var worker;
-        if (PDFJS.isFirefoxExtension) {
-          // The firefox extension can't load the worker from the resource://
-          // url so we have to inline the script and then use the blob loader.
-          var bb = new MozBlobBuilder();
-          bb.append(document.querySelector('#PDFJS_SCRIPT_TAG').textContent);
-          var blobUrl = window.URL.createObjectURL(bb.getBlob());
-          worker = new Worker(blobUrl);
-        } else {
-          // Some versions of FF can't create a worker on localhost, see:
-          // https://bugzilla.mozilla.org/show_bug.cgi?id=683280
-          worker = new Worker(workerSrc);
-        }
-
+//#if !(FIREFOX || MOZCENTRAL)
+        // Some versions of FF can't create a worker on localhost, see:
+        // https://bugzilla.mozilla.org/show_bug.cgi?id=683280
+        worker = new Worker(workerSrc);
+//#else
+//      // The firefox extension can't load the worker from the resource://
+//      // url so we have to inline the script and then use the blob loader.
+//      var script = document.querySelector('#PDFJS_SCRIPT_TAG');
+//      var blob = PDFJS.createBlob(script.textContent, script.type);
+//      var blobUrl = window.URL.createObjectURL(blob);
+//      worker = new Worker(blobUrl);
+//#endif
         var messageHandler = new MessageHandler('main', worker);
         this.messageHandler = messageHandler;
 
@@ -1673,6 +1763,7 @@ var WorkerTransport = (function WorkerTransportClosure() {
       this.pagePromises = [];
     },
     setupFakeWorker: function WorkerTransport_setupFakeWorker() {
+      warn('Setting up fake worker.');
       // If we don't use a worker, just post/sendMessage to the main thread.
       var fakeWorker = {
         postMessage: function WorkerTransport_postMessage(obj) {
@@ -1746,24 +1837,31 @@ var WorkerTransport = (function WorkerTransportClosure() {
             this.objs.resolve(id, imageData);
             break;
           case 'Font':
-            var name = data[2];
-            var file = data[3];
-            var properties = data[4];
-
-            if (file) {
-              // Rewrap the ArrayBuffer in a stream.
-              var fontFileDict = new Dict();
-              file = new Stream(file, 0, file.length, fontFileDict);
-            }
+            var exportedData = data[2];
 
             // At this point, only the font object is created but the font is
             // not yet attached to the DOM. This is done in `FontLoader.bind`.
-            var font = new Font(name, file, properties);
+            var font;
+            if ('error' in exportedData)
+              font = new ErrorFont(exportedData.error);
+            else
+              font = new Font(exportedData);
             this.objs.resolve(id, font);
             break;
           default:
             error('Got unkown object type ' + type);
         }
+      }, this);
+
+      messageHandler.on('DocProgress', function transportDocProgress(data) {
+        this.workerReadyPromise.progress({
+          loaded: data.loaded,
+          total: data.total
+        });
+      }, this);
+
+      messageHandler.on('DocError', function transportDocError(data) {
+        this.workerReadyPromise.reject(data);
       }, this);
 
       messageHandler.on('PageError', function transportError(data) {
@@ -1810,11 +1908,11 @@ var WorkerTransport = (function WorkerTransportClosure() {
       });
     },
 
-    sendData: function WorkerTransport_sendData(data, params) {
-      this.messageHandler.send('GetDocRequest', {data: data, params: params});
+    fetchDocument: function WorkerTransport_fetchDocument(source) {
+      this.messageHandler.send('GetDocRequest', {source: source});
     },
 
-    getData: function WorkerTransport_sendData(promise) {
+    getData: function WorkerTransport_getData(promise) {
       this.messageHandler.send('GetData', null, function(data) {
         promise.resolve(data);
       });
@@ -1839,10 +1937,6 @@ var WorkerTransport = (function WorkerTransportClosure() {
 
 })();
 
-/* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
-
-'use strict';
 
 // <canvas> contexts store most of the state we need natively.
 // However, PDF needs a bit more state, which we store here.
@@ -1855,7 +1949,8 @@ var TextRenderingMode = {
   FILL_ADD_TO_PATH: 4,
   STROKE_ADD_TO_PATH: 5,
   FILL_STROKE_ADD_TO_PATH: 6,
-  ADD_TO_PATH: 7
+  ADD_TO_PATH: 7,
+  ADD_TO_PATH_FLAG: 4
 };
 
 // Minimal font size that would be used during canvas fillText operations.
@@ -1998,6 +2093,7 @@ var CanvasExtraState = (function CanvasExtraStateClosure() {
     this.wordSpacing = 0;
     this.textHScale = 1;
     this.textRenderingMode = TextRenderingMode.FILL;
+    this.textRise = 0;
     // Color spaces
     this.fillColorSpace = new DeviceGrayCS();
     this.fillColorSpaceObj = null;
@@ -2240,6 +2336,10 @@ var CanvasGraphics = (function CanvasGraphicsClosure() {
       this.current = old.clone();
     },
     restore: function CanvasGraphics_restore() {
+      if ('textClipLayers' in this) {
+        this.completeTextClipping();
+      }
+
       var prev = this.stateStack.pop();
       if (prev) {
         this.current = prev;
@@ -2369,6 +2469,64 @@ var CanvasGraphics = (function CanvasGraphicsClosure() {
       this.current.y = this.current.lineY = 0;
     },
     endText: function CanvasGraphics_endText() {
+      if ('textClipLayers' in this) {
+        this.swapImageForTextClipping();
+      }
+    },
+    getCurrentTextClipping: function CanvasGraphics_getCurrentTextClipping() {
+      var ctx = this.ctx;
+      var transform = ctx.mozCurrentTransform;
+      if ('textClipLayers' in this) {
+        // we need to reset only font and transform
+        var maskCtx = this.textClipLayers.maskCtx;
+        maskCtx.setTransform.apply(maskCtx, transform);
+        maskCtx.font = ctx.font;
+        return maskCtx;
+      }
+
+      var canvasWidth = ctx.canvas.width;
+      var canvasHeight = ctx.canvas.height;
+      // keeping track of the text clipping of the separate canvas
+      var maskCanvas = createScratchCanvas(canvasWidth, canvasHeight);
+      var maskCtx = maskCanvas.getContext('2d');
+      maskCtx.setTransform.apply(maskCtx, transform);
+      maskCtx.font = ctx.font;
+      var textClipLayers = {
+        maskCanvas: maskCanvas,
+        maskCtx: maskCtx
+      };
+      this.textClipLayers = textClipLayers;
+      return maskCtx;
+    },
+    swapImageForTextClipping:
+      function CanvasGraphics_swapImageForTextClipping() {
+      var ctx = this.ctx;
+      var canvasWidth = ctx.canvas.width;
+      var canvasHeight = ctx.canvas.height;
+      // saving current image content and clearing whole canvas
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      var data = ctx.getImageData(0, 0, canvasWidth, canvasHeight);
+      this.textClipLayers.imageData = data;
+      ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+      ctx.restore();
+    },
+    completeTextClipping: function CanvasGraphics_completeTextClipping() {
+      var ctx = this.ctx;
+      // applying mask to the image (result is saved in maskCanvas)
+      var maskCtx = this.textClipLayers.maskCtx;
+      maskCtx.setTransform(1, 0, 0, 1, 0, 0);
+      maskCtx.globalCompositeOperation = 'source-in';
+      maskCtx.drawImage(ctx.canvas, 0, 0);
+
+      // restoring image data and applying the result of masked drawing
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.putImageData(this.textClipLayers.imageData, 0, 0);
+      ctx.drawImage(this.textClipLayers.maskCanvas, 0, 0);
+      ctx.restore();
+
+      delete this.textClipLayers;
     },
     setCharSpacing: function CanvasGraphics_setCharSpacing(spacing) {
       this.current.charSpacing = spacing;
@@ -2422,8 +2580,7 @@ var CanvasGraphics = (function CanvasGraphicsClosure() {
                                  (fontObj.bold ? 'bold' : 'normal');
 
       var italic = fontObj.italic ? 'italic' : 'normal';
-      var serif = fontObj.isSerifFont ? 'serif' : 'sans-serif';
-      var typeface = '"' + name + '", ' + serif;
+      var typeface = '"' + name + '", ' + fontObj.fallbackName;
 
       // Some font backends cannot handle fonts below certain size.
       // Keeping the font at minimal size and using the fontSizeScale to change
@@ -2437,12 +2594,10 @@ var CanvasGraphics = (function CanvasGraphicsClosure() {
       this.ctx.font = rule;
     },
     setTextRenderingMode: function CanvasGraphics_setTextRenderingMode(mode) {
-      if (mode >= TextRenderingMode.FILL_ADD_TO_PATH)
-        TODO('unsupported text rendering mode: ' + mode);
       this.current.textRenderingMode = mode;
     },
     setTextRise: function CanvasGraphics_setTextRise(rise) {
-      TODO('text rise: ' + rise);
+      this.current.textRise = rise;
     },
     moveText: function CanvasGraphics_moveText(x, y) {
       this.current.x = this.current.lineX += x;
@@ -2469,11 +2624,11 @@ var CanvasGraphics = (function CanvasGraphicsClosure() {
 
       ctx.transform.apply(ctx, current.textMatrix);
       ctx.scale(1, -1);
-      ctx.translate(current.x, -1 * current.y);
+      ctx.translate(current.x, -current.y - current.textRise);
       ctx.transform.apply(ctx, fontMatrix);
       ctx.scale(textHScale, 1);
     },
-    getTextGeometry: function CanvasGraphics_getTextGeometry() {
+    createTextGeometry: function CanvasGraphics_createTextGeometry() {
       var geometry = {};
       var ctx = this.ctx;
       var font = this.current.font;
@@ -2487,6 +2642,9 @@ var CanvasGraphics = (function CanvasGraphicsClosure() {
         geometry.vScale = tr[1] - bl[1];
       }
       geometry.spaceWidth = font.spaceWidth;
+      geometry.fontName = font.loadedName;
+      geometry.fontFamily = font.fallbackName;
+      geometry.fontSize = this.current.fontSize;
       return geometry;
     },
 
@@ -2504,9 +2662,10 @@ var CanvasGraphics = (function CanvasGraphicsClosure() {
       var textHScale2 = textHScale * fontMatrix[0];
       var glyphsLength = glyphs.length;
       var textLayer = this.textLayer;
-      var text = {str: '', length: 0, canvasWidth: 0, geom: {}};
+      var geom;
       var textSelection = textLayer && !skipTextSelection ? true : false;
       var textRenderingMode = current.textRenderingMode;
+      var canvasWidth = 0.0;
 
       // Type3 fonts - each glyph is a "mini-PDF"
       if (font.coded) {
@@ -2519,7 +2678,7 @@ var CanvasGraphics = (function CanvasGraphicsClosure() {
         if (textSelection) {
           this.save();
           ctx.scale(1, -1);
-          text.geom = this.getTextGeometry();
+          geom = this.createTextGeometry();
           this.restore();
         }
         for (var i = 0; i < glyphsLength; ++i) {
@@ -2528,6 +2687,7 @@ var CanvasGraphics = (function CanvasGraphicsClosure() {
           if (glyph === null) {
             // word break
             this.ctx.translate(wordSpacing, 0);
+            current.x += wordSpacing * textHScale;
             continue;
           }
 
@@ -2544,9 +2704,7 @@ var CanvasGraphics = (function CanvasGraphicsClosure() {
           ctx.translate(width, 0);
           current.x += width * textHScale;
 
-          text.str += glyph.unicode;
-          text.length++;
-          text.canvasWidth += width;
+          canvasWidth += width;
         }
         ctx.restore();
       } else {
@@ -2561,7 +2719,7 @@ var CanvasGraphics = (function CanvasGraphicsClosure() {
           lineWidth /= scale;
 
         if (textSelection)
-          text.geom = this.getTextGeometry();
+          geom = this.createTextGeometry();
 
         if (fontSizeScale != 1.0) {
           ctx.scale(fontSizeScale, fontSizeScale);
@@ -2601,32 +2759,33 @@ var CanvasGraphics = (function CanvasGraphicsClosure() {
                 ctx.strokeText(character, scaledX, 0);
                 break;
               case TextRenderingMode.INVISIBLE:
+              case TextRenderingMode.ADD_TO_PATH:
                 break;
+            }
+            if (textRenderingMode & TextRenderingMode.ADD_TO_PATH_FLAG) {
+              var clipCtx = this.getCurrentTextClipping();
+              clipCtx.fillText(character, scaledX, 0);
             }
           }
 
           x += charWidth;
 
           var glyphUnicode = glyph.unicode === ' ' ? '\u00A0' : glyph.unicode;
-          var glyphUnicodeLength = glyphUnicode.length;
-          //reverse an arabic ligature
-          if (glyphUnicodeLength > 1 &&
-              isRTLRangeFor(glyphUnicode.charCodeAt(0))) {
-            for (var ii = glyphUnicodeLength - 1; ii >= 0; ii--)
-              text.str += glyphUnicode[ii];
-          } else
-            text.str += glyphUnicode;
-          text.length += glyphUnicodeLength;
-          text.canvasWidth += charWidth;
+          if (glyphUnicode in NormalizedUnicodes)
+            glyphUnicode = NormalizedUnicodes[glyphUnicode];
+
+          canvasWidth += charWidth;
         }
         current.x += x * textHScale2;
         ctx.restore();
       }
 
-      if (textSelection)
-        this.textLayer.appendText(text, font.loadedName, fontSize);
+      if (textSelection) {
+        geom.canvasWidth = canvasWidth;
+        this.textLayer.appendText(geom);
+      }
 
-      return text;
+      return canvasWidth;
     },
     showSpacedText: function CanvasGraphics_showSpacedText(arr) {
       var ctx = this.ctx;
@@ -2638,7 +2797,8 @@ var CanvasGraphics = (function CanvasGraphicsClosure() {
         textHScale *= (current.fontMatrix || IDENTITY_MATRIX)[0];
       var arrLength = arr.length;
       var textLayer = this.textLayer;
-      var text = {str: '', length: 0, canvasWidth: 0, geom: {}};
+      var geom;
+      var canvasWidth = 0.0;
       var textSelection = textLayer ? true : false;
 
       if (textSelection) {
@@ -2651,7 +2811,7 @@ var CanvasGraphics = (function CanvasGraphicsClosure() {
           ctx.scale(textHScale, 1);
         } else
           this.applyTextTransforms();
-        text.geom = this.getTextGeometry();
+        geom = this.createTextGeometry();
         ctx.restore();
       }
 
@@ -2661,36 +2821,22 @@ var CanvasGraphics = (function CanvasGraphicsClosure() {
           var spacingLength = -e * 0.001 * fontSize * textHScale;
           current.x += spacingLength;
 
-          if (textSelection) {
-            // Emulate precise spacing via HTML spaces
-            text.canvasWidth += spacingLength;
-            if (e < 0 && text.geom.spaceWidth > 0) { // avoid div by zero
-              var numFakeSpaces = Math.round(-e / text.geom.spaceWidth);
-              if (numFakeSpaces > 0) {
-                text.str += '\u00A0';
-                text.length++;
-              }
-            }
-          }
+          if (textSelection)
+            canvasWidth += spacingLength;
         } else if (isString(e)) {
-          var shownText = this.showText(e, true);
+          var shownCanvasWidth = this.showText(e, true);
 
-          if (textSelection) {
-            if (shownText.str === ' ') {
-              text.str += '\u00A0';
-            } else {
-              text.str += shownText.str;
-            }
-            text.canvasWidth += shownText.canvasWidth;
-            text.length += shownText.length;
-          }
+          if (textSelection)
+            canvasWidth += shownCanvasWidth;
         } else {
           error('TJ array element ' + e + ' is not string or num');
         }
       }
 
-      if (textSelection)
-        this.textLayer.appendText(text, font.loadedName, fontSize);
+      if (textSelection) {
+        geom.canvasWidth = canvasWidth;
+        this.textLayer.appendText(geom);
+      }
     },
     nextLineShowText: function CanvasGraphics_nextLineShowText(text) {
       this.nextLine();
@@ -3030,27 +3176,41 @@ var CanvasGraphics = (function CanvasGraphicsClosure() {
       this.restore();
     },
 
-    putBinaryImageData: function CanvasGraphics_putBinaryImageData() {
-      //
+    putBinaryImageData: function CanvasGraphics_putBinaryImageData(ctx, imgData,
+                                                                   w, h) {
+      var tmpImgData = 'createImageData' in ctx ? ctx.createImageData(w, h) :
+        ctx.getImageData(0, 0, w, h);
+
+      var tmpImgDataPixels = tmpImgData.data;
+      var data = imgData.data;
+      if ('set' in tmpImgDataPixels)
+        tmpImgDataPixels.set(data);
+      else {
+        // Copy over the imageData pixel by pixel.
+        for (var i = 0, ii = tmpImgDataPixels.length; i < ii; i++)
+          tmpImgDataPixels[i] = data[i];
+      }
+
+      ctx.putImageData(tmpImgData, 0, 0);
     },
 
     // Marked content
 
     markPoint: function CanvasGraphics_markPoint(tag) {
-      TODO('Marked content');
+      // TODO Marked content.
     },
     markPointProps: function CanvasGraphics_markPointProps(tag, properties) {
-      TODO('Marked content');
+      // TODO Marked content.
     },
     beginMarkedContent: function CanvasGraphics_beginMarkedContent(tag) {
-      TODO('Marked content');
+      // TODO Marked content.
     },
     beginMarkedContentProps: function CanvasGraphics_beginMarkedContentProps(
                                         tag, properties) {
-      TODO('Marked content');
+      // TODO Marked content.
     },
     endMarkedContent: function CanvasGraphics_endMarkedContent() {
-      TODO('Marked content');
+      // TODO Marked content.
     },
 
     // Compatibility
@@ -3098,46 +3258,7 @@ var CanvasGraphics = (function CanvasGraphicsClosure() {
   return CanvasGraphics;
 })();
 
-if (!isWorker) {
-  // Feature detection if the browser can use an Uint8Array directly as imgData.
-  var canvas = document.createElement('canvas');
-  canvas.width = 1;
-  canvas.height = 1;
-  var ctx = canvas.getContext('2d');
 
-  try {
-    ctx.putImageData({
-      width: 1,
-      height: 1,
-      data: new Uint8Array(4)
-    }, 0, 0);
-
-    CanvasGraphics.prototype.putBinaryImageData =
-      function CanvasGraphicsPutBinaryImageDataNative(ctx, imgData) {
-        ctx.putImageData(imgData, 0, 0);
-      };
-  } catch (e) {
-    CanvasGraphics.prototype.putBinaryImageData =
-      function CanvasGraphicsPutBinaryImageDataShim(ctx, imgData, w, h) {
-        var tmpImgData = ctx.getImageData(0, 0, w, h);
-
-        // Copy over the imageData pixel by pixel.
-        var tmpImgDataPixels = tmpImgData.data;
-        var len = tmpImgDataPixels.length;
-
-        while (len--) {
-          tmpImgDataPixels[len] = imgData.data[len];
-        }
-
-        ctx.putImageData(tmpImgData, 0, 0);
-      };
-  }
-}
-
-/* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
-
-'use strict';
 
 var Name = (function NameClosure() {
   function Name(name) {
@@ -3760,7 +3881,7 @@ var XRef = (function XRefClosure() {
       var e = this.entries[i];
       if (e === null)
         return null;
-      return e.free ? null : e; // returns null is the entry is free
+      return e.free || !e.offset ? null : e; // returns null if entry is free
     },
     fetchIfRef: function XRef_fetchIfRef(obj) {
       if (!isRef(obj))
@@ -3966,10 +4087,6 @@ var PDFObjects = (function PDFObjectsClosure() {
 })();
 
 
-/* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
-
-'use strict';
 
 var PDFFunction = (function PDFFunctionClosure() {
   var CONSTRUCT_SAMPLED = 0;
@@ -4071,11 +4188,12 @@ var PDFFunction = (function PDFFunctionClosure() {
 
       var size = dict.get('Size');
       var bps = dict.get('BitsPerSample');
-      var order = dict.get('Order');
-      if (!order)
-        order = 1;
-      if (order !== 1)
-        error('No support for cubic spline interpolation: ' + order);
+      var order = dict.get('Order') || 1;
+      if (order !== 1) {
+        // No description how cubic spline interpolation works in PDF32000:2008
+        // As in poppler, ignoring order, linear interpolation may work as good
+        TODO('No support for cubic spline interpolation: ' + order);
+      }
 
       var encode = dict.get('Encode');
       if (!encode) {
@@ -4120,7 +4238,7 @@ var PDFFunction = (function PDFFunctionClosure() {
         var range = IR[9];
 
         if (m != args.length)
-          error('Incorrect number of arguments: ' + inputSize + ' != ' +
+          error('Incorrect number of arguments: ' + m + ' != ' +
                 args.length);
 
         var x = args;
@@ -4844,10 +4962,6 @@ var PostScriptLexer = (function PostScriptLexerClosure() {
 })();
 
 
-/* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
-
-'use strict';
 
 var ISOAdobeCharset = [
   '.notdef', 'space', 'exclam', 'quotedbl', 'numbersign', 'dollar',
@@ -4950,10 +5064,6 @@ var ExpertSubsetCharset = [
 ];
 
 
-/* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
-
-'use strict';
 
 var CIDToUnicodeMaps = {
   'Adobe-Japan1': [[32, 160], {f: 12, c: 33}, [45, 8209], {f: 46, c: 46}, 165,
@@ -11884,10 +11994,6 @@ var CIDToUnicodeMaps = {
 };
 
 
-/* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
-
-'use strict';
 
 var ColorSpace = (function ColorSpaceClosure() {
   // Constructor should define this.numComps, this.defaultColor, this.name
@@ -12025,6 +12131,9 @@ var ColorSpace = (function ColorSpaceClosure() {
           var baseIndexedCS = ColorSpace.parseToIR(cs[1], xref, res);
           var hiVal = cs[2] + 1;
           var lookup = xref.fetchIfRef(cs[3]);
+          if (isStream(lookup)) {
+            lookup = lookup.getBytes();
+          }
           return ['IndexedCS', baseIndexedCS, hiVal, lookup];
         case 'Separation':
         case 'DeviceN':
@@ -12062,7 +12171,7 @@ var ColorSpace = (function ColorSpaceClosure() {
       return true;
 
     if (n * 2 !== decode.length) {
-      warning('The decode map is not the correct length');
+      warn('The decode map is not the correct length');
       return true;
     }
     for (var i = 0, ii = decode.length; i < ii; i += 2) {
@@ -12146,14 +12255,18 @@ var IndexedCS = (function IndexedCSClosure() {
 
     var baseNumComps = base.numComps;
     var length = baseNumComps * highVal;
-    var lookupArray = new Uint8Array(length);
+    var lookupArray;
 
     if (isStream(lookup)) {
+      lookupArray = new Uint8Array(length);
       var bytes = lookup.getBytes(length);
       lookupArray.set(bytes);
     } else if (isString(lookup)) {
+      lookupArray = new Uint8Array(length);
       for (var i = 0; i < length; ++i)
         lookupArray[i] = lookup.charCodeAt(i);
+    } else if (lookup instanceof Uint8Array) {
+      lookupArray = lookup;
     } else {
       error('Unrecognized lookup table: ' + lookup);
     }
@@ -12255,6 +12368,675 @@ var DeviceRgbCS = (function DeviceRgbCSClosure() {
 })();
 
 var DeviceCmykCS = (function DeviceCmykCSClosure() {
+  // Sampled RGB colors from CMYK US Web Coated (SWOP) colorspace
+  var lut = new Uint8Array([
+    255, 255, 254, 221, 222, 223, 191, 193, 195, 161, 163, 166, 133, 136, 138,
+    105, 107, 109, 75, 75, 77, 35, 31, 32, 255, 252, 224, 226, 220, 198, 195,
+    191, 173, 164, 162, 147, 136, 134, 122, 107, 106, 96, 75, 74, 66, 33, 29,
+    24, 255, 249, 197, 229, 218, 174, 198, 190, 153, 166, 160, 129, 138, 133,
+    107, 108, 104, 83, 76, 73, 56, 33, 28, 15, 255, 247, 168, 232, 216, 149,
+    200, 188, 130, 168, 158, 110, 139, 131, 90, 110, 103, 70, 77, 72, 45, 32,
+    27, 4, 255, 245, 140, 234, 214, 124, 202, 186, 108, 170, 157, 91, 140, 130,
+    74, 110, 102, 56, 77, 71, 33, 31, 27, 0, 255, 243, 107, 235, 212, 95, 203,
+    184, 83, 171, 155, 69, 141, 129, 55, 111, 101, 40, 77, 70, 19, 29, 26, 0,
+    255, 241, 64, 237, 211, 59, 204, 183, 52, 171, 154, 42, 142, 128, 31, 111,
+    100, 16, 77, 69, 0, 27, 26, 0, 255, 240, 0, 238, 209, 0, 205, 182, 3, 172,
+    153, 0, 142, 127, 0, 112, 100, 0, 77, 69, 0, 26, 25, 0, 251, 225, 236, 218,
+    196, 207, 189, 171, 181, 160, 144, 154, 133, 120, 128, 105, 94, 101, 74, 64,
+    70, 35, 21, 25, 255, 222, 208, 222, 195, 184, 192, 169, 161, 162, 143, 136,
+    135, 118, 113, 106, 92, 88, 75, 63, 60, 34, 20, 17, 255, 220, 184, 225, 193,
+    162, 195, 168, 142, 164, 142, 120, 136, 117, 99, 107, 91, 77, 75, 62, 50,
+    33, 20, 8, 255, 218, 157, 227, 191, 139, 197, 166, 121, 165, 140, 102, 137,
+    116, 84, 108, 90, 64, 76, 61, 40, 32, 19, 0, 255, 216, 132, 229, 189, 116,
+    198, 165, 101, 167, 139, 85, 138, 115, 69, 109, 89, 51, 76, 61, 28, 31, 18,
+    0, 255, 214, 102, 230, 188, 90, 199, 163, 78, 167, 138, 65, 139, 114, 51,
+    109, 89, 35, 76, 60, 14, 29, 18, 0, 255, 213, 65, 232, 186, 58, 200, 162,
+    50, 168, 136, 39, 139, 113, 28, 110, 88, 12, 76, 60, 0, 27, 18, 0, 255, 212,
+    8, 232, 185, 13, 201, 161, 11, 169, 136, 3, 139, 112, 0, 110, 87, 0, 76, 59,
+    0, 26, 18, 0, 248, 197, 219, 216, 172, 192, 187, 150, 168, 158, 126, 143,
+    132, 104, 119, 104, 81, 93, 74, 54, 64, 35, 10, 19, 251, 195, 193, 219, 171,
+    171, 190, 149, 150, 161, 125, 127, 133, 103, 105, 106, 80, 81, 75, 53, 54,
+    34, 10, 10, 254, 193, 171, 221, 169, 151, 192, 148, 132, 162, 124, 112, 134,
+    102, 92, 106, 79, 70, 75, 52, 45, 34, 9, 1, 255, 191, 147, 223, 168, 130,
+    193, 146, 113, 163, 123, 95, 135, 101, 77, 107, 78, 58, 75, 52, 35, 32, 9,
+    0, 255, 190, 124, 225, 166, 109, 195, 145, 95, 164, 122, 79, 136, 100, 63,
+    107, 77, 46, 76, 51, 24, 31, 9, 0, 255, 188, 97, 226, 165, 85, 196, 143, 74,
+    165, 121, 60, 137, 99, 47, 108, 77, 31, 75, 51, 10, 29, 9, 0, 255, 187, 64,
+    227, 164, 56, 196, 142, 48, 165, 120, 37, 137, 98, 25, 108, 76, 9, 75, 50,
+    0, 28, 9, 0, 255, 186, 23, 228, 163, 21, 197, 142, 15, 166, 119, 5, 137, 98,
+    0, 108, 76, 0, 75, 50, 0, 27, 8, 0, 245, 168, 201, 214, 147, 177, 186, 128,
+    155, 157, 107, 131, 131, 88, 109, 104, 67, 85, 74, 42, 57, 35, 0, 12, 248,
+    166, 178, 216, 146, 157, 188, 127, 138, 159, 107, 116, 132, 87, 96, 105, 66,
+    74, 74, 41, 48, 35, 0, 3, 250, 165, 158, 218, 145, 139, 189, 126, 122, 160,
+    106, 103, 133, 86, 84, 105, 66, 64, 75, 41, 39, 33, 0, 0, 252, 164, 136,
+    220, 144, 120, 190, 125, 104, 161, 105, 87, 134, 86, 71, 106, 65, 52, 75,
+    41, 29, 32, 0, 0, 253, 162, 115, 221, 142, 101, 191, 124, 88, 161, 104, 72,
+    134, 85, 58, 106, 64, 41, 75, 40, 19, 31, 0, 0, 254, 161, 91, 222, 141, 80,
+    192, 123, 68, 162, 103, 55, 134, 84, 42, 106, 64, 26, 75, 40, 6, 29, 0, 0,
+    255, 160, 62, 223, 140, 54, 193, 122, 45, 162, 102, 34, 135, 83, 22, 106,
+    63, 5, 74, 40, 0, 28, 0, 0, 255, 159, 29, 223, 140, 25, 193, 121, 18, 163,
+    101, 7, 135, 83, 0, 107, 63, 0, 74, 40, 0, 28, 0, 0, 243, 142, 185, 212,
+    123, 163, 184, 107, 142, 156, 89, 120, 130, 72, 100, 104, 53, 77, 74, 29,
+    51, 35, 0, 4, 245, 140, 164, 214, 123, 145, 186, 106, 127, 157, 89, 107,
+    131, 72, 88, 104, 53, 67, 74, 29, 42, 34, 0, 0, 247, 139, 146, 215, 122,
+    129, 187, 106, 112, 158, 88, 94, 132, 71, 77, 104, 53, 57, 74, 29, 33, 33,
+    0, 0, 248, 138, 126, 217, 121, 111, 188, 105, 96, 159, 87, 80, 132, 70, 64,
+    105, 52, 47, 74, 29, 24, 31, 0, 0, 249, 137, 107, 218, 120, 94, 189, 104,
+    81, 159, 86, 66, 132, 70, 52, 105, 52, 36, 74, 29, 15, 30, 0, 0, 250, 136,
+    85, 218, 119, 74, 189, 103, 63, 160, 86, 51, 133, 69, 38, 105, 51, 22, 74,
+    29, 2, 29, 0, 0, 251, 135, 59, 219, 118, 51, 190, 102, 42, 160, 85, 31, 133,
+    69, 19, 105, 51, 3, 74, 29, 0, 29, 0, 0, 252, 134, 31, 219, 118, 26, 190,
+    102, 19, 160, 85, 7, 133, 69, 0, 105, 51, 0, 73, 29, 0, 28, 0, 0, 240, 113,
+    169, 210, 98, 149, 183, 84, 130, 155, 69, 110, 129, 54, 90, 103, 37, 70, 74,
+    11, 44, 32, 0, 1, 242, 111, 150, 212, 97, 132, 184, 84, 116, 156, 69, 97,
+    130, 54, 79, 103, 37, 60, 74, 12, 36, 31, 0, 0, 244, 111, 134, 213, 97, 118,
+    185, 83, 102, 157, 68, 86, 130, 54, 69, 104, 37, 51, 74, 13, 28, 30, 0, 0,
+    245, 110, 116, 214, 96, 102, 186, 83, 88, 157, 68, 73, 131, 53, 58, 104, 37,
+    41, 74, 14, 19, 29, 0, 0, 246, 110, 98, 215, 96, 86, 186, 82, 74, 157, 67,
+    60, 131, 53, 46, 104, 37, 30, 73, 14, 10, 28, 0, 0, 247, 109, 79, 215, 95,
+    69, 187, 82, 58, 158, 67, 46, 131, 53, 33, 104, 37, 18, 73, 15, 1, 28, 0, 0,
+    247, 108, 56, 216, 95, 48, 187, 82, 40, 158, 67, 29, 131, 53, 16, 104, 37,
+    0, 73, 15, 0, 27, 0, 0, 248, 108, 32, 216, 94, 27, 187, 81, 20, 158, 67, 8,
+    131, 53, 0, 104, 37, 0, 72, 16, 0, 27, 0, 0, 238, 78, 154, 208, 66, 135,
+    181, 55, 118, 154, 43, 99, 129, 30, 81, 103, 12, 62, 74, 0, 38, 27, 0, 0,
+    240, 77, 136, 210, 66, 120, 183, 56, 105, 155, 43, 88, 129, 30, 71, 103, 13,
+    53, 73, 0, 29, 26, 0, 0, 241, 77, 122, 211, 66, 107, 183, 56, 93, 155, 44,
+    77, 129, 31, 62, 103, 14, 44, 73, 0, 23, 26, 0, 0, 242, 77, 106, 211, 66,
+    92, 184, 56, 80, 155, 44, 65, 129, 31, 51, 103, 15, 35, 73, 0, 14, 25, 0, 0,
+    243, 77, 90, 212, 66, 79, 184, 56, 67, 156, 44, 54, 129, 32, 41, 103, 16,
+    25, 73, 0, 6, 25, 0, 0, 243, 77, 73, 213, 66, 63, 184, 56, 53, 156, 44, 41,
+    130, 32, 28, 103, 17, 13, 72, 0, 0, 25, 0, 0, 244, 77, 53, 213, 67, 45, 185,
+    56, 37, 156, 45, 26, 130, 33, 13, 103, 18, 0, 72, 0, 0, 25, 0, 0, 244, 77,
+    33, 213, 67, 28, 185, 57, 21, 156, 45, 9, 130, 33, 0, 103, 19, 0, 72, 0, 0,
+    24, 0, 0, 237, 13, 138, 207, 4, 122, 180, 0, 106, 153, 0, 89, 128, 0, 72,
+    102, 0, 54, 73, 0, 31, 21, 0, 0, 238, 16, 123, 208, 6, 108, 181, 0, 94, 154,
+    0, 78, 128, 0, 63, 102, 0, 46, 72, 0, 24, 21, 0, 0, 239, 20, 110, 209, 11,
+    96, 181, 1, 83, 154, 0, 69, 128, 0, 54, 102, 0, 38, 72, 0, 17, 22, 0, 0,
+    239, 23, 96, 209, 15, 84, 182, 5, 72, 154, 0, 58, 128, 0, 45, 102, 0, 29,
+    72, 0, 9, 22, 0, 0, 240, 26, 82, 210, 19, 71, 182, 10, 60, 154, 0, 48, 128,
+    0, 35, 102, 0, 20, 72, 0, 3, 22, 0, 0, 241, 27, 67, 210, 21, 58, 182, 14,
+    48, 154, 3, 37, 128, 0, 24, 102, 0, 8, 71, 0, 0, 22, 0, 0, 241, 29, 50, 210,
+    23, 42, 183, 17, 34, 154, 6, 23, 129, 0, 10, 102, 0, 0, 71, 0, 0, 22, 0, 0,
+    241, 30, 34, 211, 25, 28, 183, 19, 21, 155, 9, 10, 129, 0, 0, 102, 0, 0, 71,
+    0, 0, 22, 0, 0, 211, 239, 252, 184, 210, 221, 160, 183, 194, 135, 155, 164,
+    111, 128, 137, 87, 101, 109, 59, 70, 76, 22, 28, 32, 218, 237, 223, 190,
+    208, 196, 165, 181, 172, 139, 153, 146, 114, 127, 121, 89, 100, 95, 61, 69,
+    66, 21, 27, 25, 223, 235, 196, 195, 206, 174, 169, 179, 152, 142, 151, 129,
+    117, 126, 107, 91, 99, 83, 62, 68, 56, 20, 26, 17, 227, 232, 168, 198, 204,
+    149, 171, 177, 130, 144, 150, 110, 119, 124, 91, 93, 98, 70, 63, 68, 46, 20,
+    25, 6, 231, 230, 142, 201, 202, 125, 174, 176, 109, 146, 148, 92, 120, 123,
+    75, 94, 97, 57, 63, 67, 35, 19, 25, 0, 234, 229, 112, 203, 200, 98, 176,
+    174, 86, 147, 147, 71, 121, 122, 57, 94, 96, 42, 64, 66, 21, 17, 24, 0, 236,
+    227, 75, 205, 199, 66, 177, 173, 57, 148, 146, 47, 122, 121, 35, 95, 95, 21,
+    64, 65, 2, 14, 24, 0, 238, 226, 32, 207, 198, 30, 178, 172, 25, 149, 145,
+    17, 123, 120, 6, 95, 94, 0, 64, 65, 0, 11, 24, 0, 211, 211, 233, 184, 186,
+    206, 160, 162, 180, 135, 137, 153, 112, 113, 127, 88, 89, 100, 61, 60, 70,
+    23, 18, 26, 217, 209, 207, 190, 184, 183, 165, 161, 160, 139, 136, 136, 115,
+    112, 113, 90, 88, 88, 62, 59, 60, 23, 17, 19, 221, 208, 183, 193, 183, 162,
+    167, 159, 142, 141, 134, 120, 116, 111, 99, 91, 87, 77, 62, 59, 51, 22, 17,
+    10, 224, 206, 158, 196, 181, 139, 170, 157, 122, 143, 133, 103, 118, 110,
+    84, 92, 86, 64, 63, 58, 40, 22, 16, 0, 227, 204, 133, 198, 179, 118, 172,
+    156, 102, 144, 132, 86, 119, 109, 70, 93, 85, 52, 64, 57, 30, 20, 16, 0,
+    230, 203, 106, 200, 178, 93, 173, 155, 81, 145, 130, 67, 120, 108, 53, 94,
+    84, 37, 64, 57, 17, 17, 16, 0, 232, 201, 73, 202, 177, 64, 175, 154, 55,
+    146, 129, 44, 121, 107, 33, 94, 83, 18, 64, 56, 0, 15, 16, 0, 233, 201, 38,
+    203, 176, 32, 175, 153, 27, 147, 129, 18, 121, 106, 6, 94, 83, 0, 64, 56, 0,
+    13, 16, 0, 210, 186, 216, 184, 163, 191, 160, 143, 167, 136, 120, 142, 112,
+    99, 118, 88, 77, 93, 61, 50, 64, 24, 6, 21, 215, 184, 192, 189, 162, 170,
+    164, 141, 149, 138, 119, 126, 115, 98, 104, 90, 76, 81, 62, 50, 54, 24, 6,
+    12, 219, 183, 171, 192, 161, 151, 166, 140, 132, 140, 118, 112, 116, 97, 92,
+    91, 75, 71, 63, 49, 46, 23, 6, 3, 222, 181, 148, 194, 159, 130, 168, 139,
+    114, 142, 117, 95, 117, 96, 78, 92, 74, 59, 63, 49, 36, 22, 6, 0, 224, 180,
+    125, 196, 158, 110, 170, 138, 96, 143, 116, 80, 118, 95, 64, 92, 74, 47, 64,
+    48, 25, 20, 6, 0, 226, 178, 100, 197, 157, 88, 171, 136, 76, 144, 115, 62,
+    119, 94, 49, 93, 73, 33, 64, 48, 13, 18, 6, 0, 228, 177, 71, 199, 156, 62,
+    172, 135, 52, 144, 114, 41, 119, 94, 30, 93, 72, 14, 64, 47, 0, 16, 6, 0,
+    229, 177, 40, 200, 155, 34, 173, 135, 27, 145, 113, 18, 120, 93, 5, 93, 72,
+    0, 63, 47, 0, 15, 6, 0, 210, 159, 199, 184, 140, 176, 160, 122, 154, 136,
+    102, 131, 113, 84, 108, 89, 64, 85, 62, 39, 57, 25, 0, 14, 214, 158, 177,
+    188, 139, 157, 163, 121, 137, 138, 102, 116, 114, 83, 96, 90, 63, 74, 63,
+    38, 48, 25, 0, 5, 217, 157, 158, 190, 138, 139, 165, 120, 122, 139, 101,
+    103, 115, 82, 84, 91, 62, 64, 63, 38, 40, 23, 0, 0, 219, 156, 137, 192, 137,
+    120, 167, 119, 105, 140, 100, 88, 116, 82, 71, 91, 62, 53, 63, 38, 30, 22,
+    0, 0, 221, 155, 116, 193, 136, 102, 168, 118, 89, 141, 99, 73, 117, 81, 59,
+    92, 61, 42, 63, 38, 21, 20, 0, 0, 223, 153, 94, 195, 135, 82, 169, 117, 70,
+    142, 98, 57, 117, 80, 44, 92, 61, 29, 63, 37, 8, 18, 0, 0, 224, 153, 68,
+    196, 134, 58, 170, 116, 49, 143, 97, 38, 118, 80, 26, 92, 60, 11, 63, 37, 0,
+    17, 0, 0, 225, 152, 41, 197, 133, 34, 170, 116, 27, 143, 97, 17, 118, 79, 4,
+    92, 60, 0, 63, 37, 0, 16, 0, 0, 209, 134, 183, 183, 118, 162, 160, 102, 142,
+    136, 85, 120, 113, 69, 100, 89, 50, 77, 62, 26, 51, 23, 0, 6, 213, 133, 163,
+    187, 117, 144, 163, 102, 126, 137, 85, 107, 114, 68, 88, 90, 50, 67, 63, 26,
+    43, 22, 0, 1, 215, 133, 146, 188, 116, 129, 164, 101, 112, 139, 84, 94, 115,
+    68, 77, 91, 50, 58, 63, 27, 34, 20, 0, 0, 217, 132, 127, 190, 116, 111, 165,
+    100, 97, 139, 84, 81, 116, 67, 65, 91, 49, 48, 63, 27, 25, 19, 0, 0, 219,
+    131, 108, 191, 115, 95, 166, 100, 82, 140, 83, 68, 116, 67, 53, 91, 49, 37,
+    63, 27, 17, 17, 0, 0, 220, 130, 88, 192, 114, 76, 167, 99, 65, 141, 82, 53,
+    116, 66, 40, 91, 49, 24, 63, 27, 5, 16, 0, 0, 221, 129, 64, 193, 113, 55,
+    168, 98, 46, 141, 82, 35, 117, 66, 23, 91, 49, 7, 63, 27, 0, 14, 0, 0, 222,
+    129, 41, 194, 113, 34, 168, 98, 26, 141, 81, 16, 117, 66, 3, 92, 48, 0, 62,
+    27, 0, 13, 0, 0, 209, 108, 168, 183, 94, 148, 160, 81, 130, 135, 66, 110,
+    113, 51, 91, 89, 35, 70, 63, 8, 45, 18, 0, 1, 212, 107, 150, 186, 94, 132,
+    162, 81, 116, 137, 66, 97, 114, 52, 80, 90, 35, 60, 63, 9, 37, 16, 0, 0,
+    214, 107, 134, 187, 93, 118, 163, 80, 103, 138, 66, 86, 114, 51, 70, 90, 35,
+    52, 63, 10, 29, 15, 0, 0, 215, 106, 117, 188, 93, 103, 164, 80, 89, 138, 66,
+    74, 115, 51, 59, 90, 35, 42, 63, 11, 21, 13, 0, 0, 216, 106, 100, 189, 92,
+    88, 164, 79, 75, 139, 65, 62, 115, 51, 48, 91, 35, 32, 63, 12, 12, 12, 0, 0,
+    217, 105, 82, 190, 92, 71, 165, 79, 60, 139, 65, 48, 115, 51, 35, 91, 35,
+    20, 62, 13, 3, 11, 0, 0, 218, 105, 61, 191, 92, 52, 166, 79, 43, 140, 65,
+    32, 116, 51, 20, 91, 35, 3, 62, 14, 0, 10, 0, 0, 219, 104, 41, 192, 91, 34,
+    166, 78, 26, 140, 65, 15, 116, 51, 2, 91, 35, 0, 62, 14, 0, 10, 0, 0, 208,
+    76, 153, 183, 65, 135, 159, 54, 118, 135, 42, 99, 113, 29, 82, 89, 10, 62,
+    62, 0, 38, 10, 0, 0, 211, 76, 137, 185, 65, 121, 161, 55, 105, 136, 43, 88,
+    114, 30, 72, 90, 12, 54, 63, 0, 31, 9, 0, 0, 212, 76, 122, 186, 66, 108,
+    162, 55, 94, 137, 43, 78, 114, 30, 63, 90, 13, 45, 62, 0, 24, 9, 0, 0, 213,
+    76, 107, 187, 66, 94, 162, 55, 81, 137, 43, 67, 114, 31, 52, 90, 15, 36, 62,
+    0, 16, 8, 0, 0, 214, 76, 92, 188, 66, 80, 163, 55, 69, 138, 44, 56, 114, 31,
+    42, 90, 16, 27, 62, 0, 8, 8, 0, 0, 215, 76, 76, 188, 66, 65, 164, 55, 55,
+    138, 44, 43, 114, 32, 31, 90, 16, 16, 62, 0, 1, 7, 0, 0, 216, 76, 57, 189,
+    66, 49, 164, 56, 40, 138, 44, 29, 115, 32, 16, 90, 17, 1, 61, 0, 0, 7, 0, 0,
+    217, 76, 40, 190, 66, 33, 164, 56, 25, 138, 44, 14, 114, 33, 1, 90, 18, 0,
+    61, 0, 0, 7, 0, 0, 207, 26, 139, 182, 16, 122, 159, 3, 106, 135, 0, 89, 113,
+    0, 73, 89, 0, 55, 62, 0, 32, 4, 0, 0, 210, 27, 124, 184, 18, 109, 160, 7,
+    95, 136, 0, 79, 113, 0, 64, 90, 0, 47, 62, 0, 25, 4, 0, 0, 211, 30, 111,
+    185, 21, 98, 161, 11, 84, 136, 0, 70, 113, 0, 55, 90, 0, 39, 62, 0, 18, 4,
+    0, 0, 212, 32, 98, 185, 24, 85, 161, 15, 73, 136, 2, 60, 113, 0, 46, 90, 0,
+    30, 61, 0, 11, 4, 0, 0, 213, 34, 85, 186, 26, 73, 162, 17, 62, 137, 5, 50,
+    113, 0, 37, 89, 0, 22, 61, 0, 5, 4, 0, 0, 213, 35, 70, 187, 27, 60, 162, 19,
+    50, 137, 8, 39, 114, 0, 26, 89, 0, 11, 61, 0, 0, 4, 0, 0, 214, 35, 54, 187,
+    29, 45, 163, 21, 37, 137, 11, 26, 114, 0, 13, 89, 0, 0, 60, 0, 0, 4, 0, 0,
+    214, 35, 40, 188, 29, 32, 163, 22, 24, 137, 12, 13, 114, 0, 0, 89, 0, 0, 60,
+    0, 0, 4, 0, 0, 169, 226, 249, 148, 199, 219, 129, 173, 192, 108, 147, 163,
+    88, 122, 136, 68, 96, 108, 43, 66, 76, 4, 25, 33, 178, 224, 221, 156, 197,
+    195, 136, 172, 171, 114, 145, 145, 93, 121, 120, 71, 95, 95, 46, 65, 66, 4,
+    24, 25, 185, 222, 196, 162, 195, 173, 140, 170, 151, 117, 144, 128, 96, 119,
+    106, 74, 94, 83, 47, 65, 57, 4, 24, 18, 190, 220, 169, 166, 193, 149, 144,
+    168, 130, 120, 142, 110, 99, 118, 91, 76, 93, 70, 49, 64, 46, 3, 23, 8, 195,
+    218, 143, 170, 191, 126, 147, 167, 110, 123, 141, 93, 100, 117, 76, 77, 92,
+    58, 50, 63, 36, 3, 23, 0, 199, 216, 115, 173, 190, 101, 149, 165, 88, 125,
+    140, 74, 102, 116, 59, 78, 91, 43, 51, 63, 23, 0, 23, 0, 202, 215, 83, 176,
+    189, 72, 152, 164, 62, 126, 138, 51, 103, 115, 39, 79, 90, 25, 51, 62, 6, 0,
+    22, 0, 204, 214, 50, 178, 188, 43, 153, 163, 37, 127, 138, 28, 104, 114, 18,
+    80, 89, 3, 51, 62, 0, 0, 22, 0, 172, 200, 231, 152, 176, 204, 132, 154, 178,
+    111, 130, 152, 91, 108, 126, 70, 84, 100, 46, 57, 70, 9, 15, 27, 180, 198,
+    205, 158, 175, 182, 138, 153, 159, 116, 129, 135, 95, 107, 112, 73, 83, 88,
+    48, 56, 60, 8, 15, 20, 186, 197, 182, 163, 173, 161, 141, 151, 141, 119,
+    128, 119, 97, 106, 99, 75, 82, 77, 49, 55, 51, 8, 14, 11, 190, 195, 158,
+    166, 172, 139, 144, 150, 122, 121, 127, 103, 99, 105, 84, 77, 81, 65, 50,
+    55, 41, 8, 14, 2, 194, 193, 135, 169, 170, 119, 147, 148, 103, 123, 125, 87,
+    101, 104, 70, 78, 81, 53, 51, 54, 31, 5, 14, 0, 197, 192, 109, 172, 169, 96,
+    149, 147, 83, 124, 124, 69, 102, 103, 55, 79, 80, 39, 51, 54, 19, 2, 14, 0,
+    200, 191, 80, 174, 168, 69, 150, 146, 59, 126, 123, 48, 103, 102, 36, 79,
+    79, 22, 52, 53, 2, 0, 14, 0, 202, 190, 51, 176, 167, 43, 152, 145, 36, 127,
+    123, 27, 103, 101, 16, 80, 79, 1, 52, 53, 0, 0, 14, 0, 175, 176, 215, 154,
+    156, 190, 134, 136, 166, 113, 115, 141, 93, 94, 118, 72, 73, 93, 48, 47, 64,
+    12, 2, 22, 182, 175, 191, 160, 154, 169, 139, 135, 148, 117, 114, 126, 96,
+    94, 104, 75, 72, 81, 50, 47, 55, 12, 3, 14, 186, 174, 170, 163, 153, 151,
+    142, 134, 132, 119, 113, 111, 98, 93, 92, 76, 71, 71, 51, 46, 46, 11, 3, 5,
+    190, 172, 148, 166, 152, 130, 144, 132, 114, 121, 112, 96, 100, 92, 78, 77,
+    71, 59, 51, 46, 36, 9, 4, 0, 192, 171, 127, 169, 151, 111, 146, 131, 97,
+    123, 111, 81, 101, 91, 65, 78, 70, 48, 52, 45, 26, 6, 4, 0, 195, 170, 103,
+    171, 150, 90, 148, 130, 78, 124, 110, 64, 102, 90, 51, 79, 70, 35, 52, 45,
+    15, 3, 5, 0, 198, 169, 76, 173, 149, 66, 149, 129, 56, 125, 109, 45, 103,
+    89, 33, 79, 69, 18, 52, 45, 0, 1, 5, 0, 199, 168, 51, 174, 148, 43, 150,
+    129, 35, 126, 108, 26, 103, 89, 14, 80, 69, 0, 52, 45, 0, 0, 5, 0, 177, 151,
+    198, 156, 134, 175, 136, 117, 153, 115, 98, 130, 95, 80, 108, 74, 60, 85,
+    50, 36, 58, 11, 0, 15, 183, 150, 176, 161, 133, 156, 140, 116, 137, 118, 97,
+    116, 97, 79, 96, 76, 60, 74, 51, 36, 49, 11, 0, 6, 186, 150, 158, 163, 132,
+    139, 142, 115, 122, 120, 97, 103, 99, 79, 84, 77, 59, 64, 52, 36, 41, 9, 0,
+    1, 189, 148, 137, 166, 131, 121, 144, 114, 105, 121, 96, 88, 100, 78, 72,
+    78, 59, 54, 52, 36, 31, 7, 0, 0, 191, 147, 118, 168, 130, 103, 145, 113, 90,
+    122, 95, 75, 101, 77, 60, 78, 59, 43, 52, 35, 22, 5, 0, 0, 193, 147, 97,
+    169, 129, 84, 147, 112, 72, 123, 94, 59, 101, 77, 46, 79, 58, 31, 52, 35,
+    11, 4, 0, 0, 195, 146, 73, 171, 128, 62, 148, 111, 53, 124, 93, 41, 102, 76,
+    30, 79, 58, 15, 52, 35, 0, 3, 0, 0, 197, 145, 50, 172, 128, 42, 149, 111,
+    34, 125, 93, 24, 102, 76, 12, 79, 57, 0, 52, 35, 0, 2, 0, 0, 179, 128, 183,
+    157, 113, 162, 137, 98, 142, 116, 82, 120, 96, 66, 100, 75, 48, 78, 51, 24,
+    52, 5, 0, 8, 183, 128, 163, 161, 113, 144, 140, 98, 126, 119, 81, 107, 98,
+    65, 88, 76, 48, 68, 52, 24, 43, 6, 0, 1, 186, 127, 146, 163, 112, 129, 142,
+    97, 112, 120, 81, 95, 99, 65, 77, 77, 47, 58, 52, 24, 35, 4, 0, 0, 188, 126,
+    128, 165, 111, 112, 144, 96, 97, 121, 80, 81, 100, 65, 66, 78, 47, 48, 53,
+    24, 26, 3, 0, 0, 190, 126, 110, 167, 110, 96, 145, 96, 83, 122, 80, 69, 101,
+    64, 54, 78, 47, 38, 52, 25, 18, 2, 0, 0, 192, 125, 90, 168, 110, 79, 146,
+    95, 67, 123, 79, 54, 101, 64, 42, 79, 47, 26, 52, 25, 7, 2, 0, 0, 194, 124,
+    69, 170, 109, 59, 147, 95, 49, 123, 79, 38, 101, 63, 26, 79, 47, 11, 52, 25,
+    0, 1, 0, 0, 195, 124, 49, 171, 109, 40, 148, 94, 32, 124, 78, 22, 102, 63,
+    9, 79, 46, 0, 52, 25, 0, 1, 0, 0, 180, 104, 168, 158, 91, 148, 138, 78, 130,
+    117, 64, 110, 97, 49, 91, 76, 33, 70, 52, 7, 46, 2, 0, 1, 184, 103, 150,
+    162, 91, 133, 141, 78, 116, 119, 64, 98, 99, 50, 80, 77, 33, 61, 52, 8, 37,
+    2, 0, 0, 186, 103, 135, 163, 90, 119, 142, 78, 103, 120, 64, 87, 99, 50, 70,
+    78, 33, 52, 52, 10, 30, 1, 0, 0, 188, 103, 118, 165, 90, 103, 143, 77, 90,
+    121, 63, 75, 100, 49, 60, 78, 33, 43, 52, 11, 22, 1, 0, 0, 189, 102, 102,
+    166, 89, 89, 144, 77, 76, 121, 63, 63, 100, 49, 49, 78, 34, 33, 52, 12, 14,
+    0, 0, 0, 191, 102, 84, 167, 89, 73, 145, 77, 62, 122, 63, 50, 101, 49, 37,
+    78, 34, 22, 52, 13, 4, 0, 0, 0, 192, 101, 65, 168, 89, 55, 146, 76, 46, 123,
+    63, 35, 101, 49, 23, 78, 34, 7, 51, 13, 0, 0, 0, 0, 193, 101, 48, 169, 88,
+    39, 146, 76, 31, 123, 63, 20, 101, 49, 8, 78, 34, 0, 51, 14, 0, 0, 0, 0,
+    181, 75, 154, 159, 64, 136, 139, 54, 118, 118, 41, 100, 98, 28, 82, 77, 8,
+    63, 51, 0, 39, 0, 0, 0, 184, 75, 137, 162, 65, 121, 141, 54, 106, 119, 42,
+    89, 99, 29, 72, 77, 11, 54, 52, 0, 32, 0, 0, 0, 186, 75, 123, 163, 65, 109,
+    142, 54, 94, 120, 43, 79, 99, 30, 63, 78, 12, 46, 52, 0, 25, 0, 0, 0, 187,
+    76, 108, 164, 65, 95, 143, 55, 82, 121, 43, 68, 100, 31, 54, 78, 14, 37, 52,
+    0, 17, 0, 0, 0, 188, 76, 94, 165, 65, 82, 144, 55, 70, 121, 43, 57, 100, 31,
+    44, 78, 15, 28, 51, 0, 9, 0, 0, 0, 189, 75, 78, 166, 65, 68, 144, 55, 57,
+    121, 43, 45, 100, 31, 33, 78, 16, 18, 51, 0, 2, 0, 0, 0, 190, 75, 61, 167,
+    65, 52, 145, 55, 42, 122, 44, 31, 100, 32, 19, 78, 16, 4, 51, 0, 0, 0, 0, 0,
+    191, 75, 46, 168, 65, 37, 145, 55, 29, 122, 44, 18, 100, 32, 5, 78, 17, 0,
+    50, 0, 0, 0, 0, 0, 181, 35, 140, 160, 24, 123, 140, 12, 107, 118, 0, 90, 98,
+    0, 74, 77, 0, 56, 51, 0, 33, 0, 0, 0, 184, 34, 125, 162, 26, 110, 141, 15,
+    96, 120, 1, 80, 99, 0, 65, 78, 0, 48, 51, 0, 26, 0, 0, 0, 186, 36, 113, 163,
+    27, 99, 142, 18, 86, 120, 5, 71, 99, 0, 57, 78, 0, 40, 51, 0, 20, 0, 0, 0,
+    187, 38, 99, 164, 30, 87, 142, 21, 74, 120, 8, 61, 99, 0, 48, 78, 0, 32, 51,
+    0, 12, 0, 0, 0, 187, 39, 87, 164, 31, 75, 143, 22, 64, 120, 11, 51, 100, 0,
+    39, 78, 0, 24, 51, 0, 6, 0, 0, 0, 188, 40, 73, 165, 32, 62, 143, 24, 52,
+    121, 13, 40, 100, 0, 28, 78, 0, 14, 51, 0, 0, 0, 0, 0, 189, 40, 58, 166, 33,
+    48, 144, 25, 39, 121, 15, 28, 100, 1, 16, 78, 0, 2, 50, 0, 0, 0, 0, 0, 190,
+    40, 45, 166, 34, 36, 144, 26, 27, 121, 16, 17, 100, 3, 3, 77, 0, 0, 49, 0,
+    0, 0, 0, 0, 120, 213, 247, 106, 188, 217, 92, 164, 190, 76, 139, 162, 60,
+    115, 135, 43, 91, 107, 21, 62, 76, 0, 22, 34, 134, 211, 219, 118, 186, 193,
+    102, 162, 169, 84, 138, 144, 67, 114, 120, 49, 90, 95, 26, 62, 66, 0, 22,
+    26, 143, 209, 195, 125, 184, 172, 108, 161, 151, 90, 136, 128, 72, 113, 106,
+    53, 89, 83, 29, 61, 57, 0, 22, 19, 150, 207, 169, 131, 182, 149, 113, 159,
+    130, 94, 135, 110, 76, 112, 91, 56, 88, 71, 31, 60, 47, 0, 21, 9, 156, 205,
+    145, 136, 181, 127, 117, 158, 111, 97, 133, 94, 78, 111, 77, 58, 87, 59, 33,
+    60, 37, 0, 21, 0, 161, 204, 118, 141, 179, 104, 121, 156, 90, 100, 132, 75,
+    81, 110, 61, 60, 86, 45, 35, 59, 25, 0, 21, 0, 165, 203, 89, 144, 178, 77,
+    124, 155, 67, 102, 131, 55, 82, 109, 43, 62, 85, 29, 36, 59, 10, 0, 21, 0,
+    169, 202, 62, 147, 178, 53, 126, 155, 45, 104, 131, 36, 84, 108, 25, 62, 85,
+    11, 36, 58, 0, 0, 21, 0, 129, 189, 229, 114, 167, 202, 99, 146, 177, 83,
+    124, 151, 67, 102, 126, 49, 79, 99, 28, 53, 70, 0, 12, 28, 140, 188, 204,
+    124, 166, 180, 107, 145, 158, 89, 123, 134, 72, 101, 111, 54, 79, 88, 31,
+    53, 60, 0, 12, 21, 148, 186, 182, 130, 164, 161, 112, 144, 141, 93, 121,
+    119, 76, 100, 99, 56, 78, 77, 33, 52, 51, 0, 12, 13, 153, 184, 158, 134,
+    163, 140, 116, 142, 122, 97, 120, 103, 78, 99, 85, 59, 77, 65, 35, 52, 42,
+    0, 12, 3, 158, 183, 136, 138, 161, 120, 119, 141, 104, 99, 119, 87, 80, 98,
+    71, 60, 77, 54, 36, 51, 32, 0, 12, 0, 162, 182, 112, 142, 160, 98, 122, 140,
+    85, 102, 118, 70, 82, 97, 56, 62, 76, 41, 37, 51, 21, 0, 11, 0, 166, 181,
+    85, 145, 159, 74, 125, 139, 63, 103, 117, 51, 84, 97, 39, 63, 75, 25, 37,
+    51, 6, 0, 11, 0, 168, 180, 60, 147, 158, 51, 126, 138, 43, 105, 116, 34, 85,
+    96, 23, 64, 75, 8, 38, 50, 0, 0, 11, 0, 136, 167, 213, 120, 148, 188, 105,
+    129, 165, 88, 109, 140, 71, 90, 117, 54, 69, 92, 32, 44, 64, 0, 2, 23, 145,
+    166, 190, 128, 147, 168, 111, 128, 147, 93, 108, 125, 75, 89, 104, 57, 68,
+    81, 34, 44, 55, 0, 2, 15, 151, 165, 170, 133, 146, 150, 115, 127, 131, 96,
+    107, 111, 78, 88, 92, 59, 68, 71, 36, 43, 46, 0, 2, 6, 155, 163, 148, 136,
+    144, 131, 118, 126, 114, 99, 106, 96, 80, 87, 79, 61, 67, 60, 37, 43, 37, 0,
+    2, 0, 159, 162, 128, 140, 143, 112, 121, 125, 97, 101, 105, 82, 82, 87, 66,
+    62, 67, 49, 38, 43, 27, 0, 2, 0, 163, 161, 105, 142, 142, 92, 123, 124, 80,
+    103, 104, 66, 83, 86, 52, 63, 66, 37, 39, 43, 17, 0, 2, 0, 166, 160, 81,
+    145, 141, 70, 125, 123, 59, 104, 104, 48, 84, 85, 36, 64, 66, 21, 39, 42, 2,
+    0, 1, 0, 168, 160, 59, 147, 141, 50, 126, 122, 41, 105, 103, 32, 85, 85, 20,
+    64, 65, 6, 39, 42, 0, 0, 1, 0, 142, 144, 197, 125, 128, 174, 109, 111, 153,
+    92, 93, 130, 75, 76, 108, 57, 57, 85, 36, 33, 58, 0, 0, 16, 149, 143, 176,
+    131, 127, 156, 114, 110, 136, 96, 93, 116, 78, 75, 96, 60, 57, 74, 37, 33,
+    49, 0, 0, 7, 153, 142, 157, 135, 126, 139, 117, 110, 122, 98, 92, 103, 80,
+    75, 84, 61, 56, 65, 38, 33, 41, 0, 0, 1, 157, 142, 138, 138, 125, 121, 120,
+    109, 106, 100, 91, 89, 82, 74, 72, 62, 56, 54, 39, 33, 32, 0, 0, 0, 160,
+    141, 119, 140, 124, 105, 122, 108, 91, 102, 91, 76, 83, 74, 61, 63, 56, 44,
+    40, 33, 23, 0, 0, 0, 163, 140, 99, 143, 123, 86, 124, 107, 74, 103, 90, 61,
+    84, 73, 48, 64, 55, 32, 40, 33, 13, 0, 0, 0, 165, 139, 77, 145, 122, 66,
+    125, 107, 56, 104, 89, 44, 85, 73, 33, 65, 55, 18, 40, 33, 1, 0, 0, 0, 167,
+    139, 57, 146, 122, 48, 126, 106, 39, 105, 89, 29, 86, 72, 18, 65, 55, 3, 40,
+    33, 0, 0, 0, 0, 146, 123, 182, 129, 108, 161, 113, 94, 141, 95, 78, 120, 78,
+    62, 99, 60, 45, 78, 38, 21, 52, 0, 0, 9, 152, 122, 163, 134, 108, 144, 117,
+    94, 126, 98, 78, 107, 80, 62, 88, 61, 45, 68, 39, 22, 44, 0, 0, 1, 156, 122,
+    146, 137, 107, 129, 119, 93, 113, 100, 77, 95, 82, 62, 78, 63, 45, 59, 40,
+    22, 36, 0, 0, 0, 158, 121, 128, 139, 107, 113, 121, 92, 98, 101, 77, 82, 83,
+    62, 66, 64, 45, 49, 40, 23, 27, 0, 0, 0, 161, 120, 111, 141, 106, 97, 122,
+    92, 84, 103, 77, 70, 84, 62, 56, 64, 45, 40, 40, 23, 19, 0, 0, 0, 163, 120,
+    93, 143, 105, 81, 124, 91, 69, 104, 76, 56, 85, 61, 43, 65, 45, 28, 40, 24,
+    9, 0, 0, 0, 165, 119, 73, 145, 105, 62, 125, 91, 52, 105, 76, 41, 85, 61,
+    29, 65, 44, 15, 40, 24, 0, 0, 0, 0, 166, 119, 55, 146, 104, 46, 126, 90, 37,
+    105, 75, 27, 86, 61, 15, 65, 44, 0, 40, 24, 0, 0, 0, 0, 150, 100, 168, 132,
+    88, 148, 115, 75, 130, 97, 61, 110, 80, 47, 91, 62, 30, 71, 39, 7, 46, 0, 0,
+    2, 154, 100, 150, 136, 88, 133, 119, 75, 116, 100, 61, 98, 82, 47, 81, 63,
+    31, 62, 40, 9, 38, 0, 0, 0, 157, 100, 135, 138, 87, 119, 120, 75, 104, 101,
+    61, 87, 83, 48, 71, 64, 31, 53, 40, 10, 31, 0, 0, 0, 159, 99, 119, 140, 87,
+    104, 122, 75, 91, 102, 61, 75, 84, 48, 61, 64, 32, 44, 40, 11, 23, 0, 0, 0,
+    161, 99, 104, 141, 87, 90, 123, 74, 78, 103, 61, 64, 84, 48, 50, 65, 32, 35,
+    40, 12, 15, 0, 0, 0, 163, 99, 87, 143, 86, 75, 124, 74, 64, 104, 61, 52, 85,
+    47, 39, 65, 32, 24, 40, 13, 6, 0, 0, 0, 164, 98, 69, 144, 86, 58, 125, 74,
+    49, 104, 61, 38, 85, 47, 26, 65, 32, 11, 40, 13, 0, 0, 0, 0, 166, 98, 53,
+    145, 86, 44, 126, 74, 35, 105, 60, 25, 86, 47, 13, 65, 32, 0, 40, 14, 0, 0,
+    0, 0, 152, 75, 154, 134, 64, 136, 117, 53, 119, 99, 41, 101, 82, 27, 83, 63,
+    7, 64, 39, 0, 40, 0, 0, 0, 156, 74, 138, 138, 64, 122, 120, 53, 106, 101,
+    41, 90, 83, 28, 73, 64, 10, 55, 40, 0, 33, 0, 0, 0, 158, 74, 124, 139, 64,
+    110, 121, 54, 95, 102, 42, 80, 84, 29, 64, 65, 12, 47, 41, 0, 26, 0, 0, 0,
+    160, 75, 110, 140, 64, 96, 122, 54, 83, 103, 42, 69, 84, 30, 55, 65, 13, 39,
+    41, 0, 18, 0, 0, 0, 161, 75, 96, 142, 64, 83, 123, 54, 71, 103, 43, 58, 85,
+    30, 45, 65, 14, 30, 41, 0, 11, 0, 0, 0, 163, 75, 81, 143, 64, 70, 124, 54,
+    59, 104, 43, 47, 85, 31, 35, 65, 15, 20, 41, 0, 3, 0, 0, 0, 164, 74, 65,
+    144, 64, 55, 125, 54, 45, 104, 43, 34, 85, 31, 22, 66, 16, 7, 41, 0, 0, 0,
+    0, 0, 165, 74, 51, 145, 64, 42, 125, 54, 33, 105, 43, 22, 86, 32, 10, 65,
+    17, 0, 40, 0, 0, 0, 0, 0, 154, 41, 142, 136, 30, 124, 119, 19, 108, 101, 3,
+    91, 83, 0, 75, 64, 0, 57, 39, 0, 34, 0, 0, 0, 158, 40, 127, 139, 31, 112,
+    121, 21, 97, 102, 7, 81, 84, 0, 66, 65, 0, 49, 40, 0, 27, 0, 0, 0, 159, 41,
+    114, 140, 32, 100, 122, 23, 87, 103, 10, 72, 85, 0, 58, 65, 0, 42, 40, 0,
+    21, 0, 0, 0, 160, 43, 101, 141, 34, 88, 123, 25, 76, 103, 13, 62, 85, 0, 49,
+    65, 0, 33, 41, 0, 14, 0, 0, 0, 161, 44, 89, 142, 35, 77, 123, 26, 65, 103,
+    15, 53, 85, 1, 40, 65, 0, 25, 41, 0, 7, 0, 0, 0, 162, 44, 75, 143, 36, 64,
+    124, 28, 54, 104, 17, 42, 85, 3, 30, 65, 0, 16, 40, 0, 1, 0, 0, 0, 164, 45,
+    61, 144, 37, 51, 124, 29, 42, 104, 18, 31, 85, 4, 19, 65, 0, 4, 40, 0, 0, 0,
+    0, 0, 164, 45, 49, 144, 37, 40, 125, 29, 31, 105, 19, 20, 86, 6, 7, 65, 0,
+    0, 39, 0, 0, 0, 0, 0, 49, 202, 244, 45, 178, 215, 38, 156, 188, 28, 132,
+    160, 14, 110, 134, 0, 86, 107, 0, 59, 76, 0, 20, 34, 80, 200, 217, 70, 176,
+    192, 60, 154, 168, 47, 131, 143, 34, 109, 119, 16, 85, 94, 0, 58, 66, 0, 20,
+    27, 95, 198, 194, 84, 175, 171, 71, 153, 150, 57, 130, 127, 42, 108, 106,
+    25, 84, 83, 0, 58, 57, 0, 20, 19, 107, 196, 169, 93, 173, 149, 79, 151, 130,
+    64, 128, 110, 49, 106, 91, 32, 84, 71, 3, 57, 47, 0, 19, 10, 115, 195, 145,
+    100, 171, 128, 86, 150, 112, 69, 127, 94, 53, 105, 78, 36, 83, 59, 8, 57,
+    37, 0, 19, 1, 122, 193, 120, 107, 170, 106, 91, 149, 92, 74, 126, 77, 57,
+    104, 62, 39, 82, 46, 13, 56, 26, 0, 18, 0, 128, 192, 93, 112, 169, 81, 95,
+    148, 70, 77, 125, 58, 60, 104, 46, 42, 81, 31, 15, 56, 13, 0, 17, 0, 132,
+    191, 69, 115, 168, 60, 98, 147, 51, 79, 124, 41, 62, 103, 30, 43, 81, 17,
+    16, 56, 0, 0, 17, 0, 77, 180, 227, 69, 159, 200, 60, 139, 176, 48, 118, 150,
+    35, 97, 125, 20, 75, 99, 0, 50, 70, 0, 9, 29, 96, 178, 203, 85, 158, 179,
+    73, 138, 157, 59, 117, 133, 45, 96, 111, 29, 75, 87, 3, 50, 60, 0, 9, 21,
+    107, 177, 181, 94, 156, 160, 80, 137, 140, 65, 116, 119, 51, 96, 98, 34, 74,
+    77, 9, 49, 52, 0, 8, 14, 115, 175, 158, 101, 155, 140, 86, 135, 122, 71,
+    114, 103, 55, 95, 85, 38, 73, 65, 14, 49, 42, 0, 7, 4, 121, 174, 137, 106,
+    153, 120, 91, 134, 105, 74, 113, 88, 58, 94, 72, 41, 73, 54, 17, 49, 33, 0,
+    6, 0, 127, 173, 114, 111, 152, 100, 95, 133, 86, 78, 112, 72, 61, 93, 58,
+    43, 72, 42, 19, 48, 22, 0, 6, 0, 132, 172, 88, 115, 151, 77, 98, 132, 66,
+    80, 112, 54, 63, 92, 42, 45, 72, 28, 20, 48, 9, 0, 5, 0, 135, 171, 67, 118,
+    151, 57, 100, 131, 49, 82, 111, 39, 65, 92, 28, 46, 71, 13, 21, 48, 0, 0, 5,
+    0, 93, 159, 211, 83, 141, 187, 72, 123, 164, 59, 104, 140, 46, 85, 116, 31,
+    65, 92, 8, 41, 64, 0, 1, 23, 106, 158, 189, 94, 140, 167, 81, 122, 147, 67,
+    103, 124, 52, 85, 103, 36, 65, 81, 14, 41, 55, 0, 0, 15, 114, 157, 169, 100,
+    139, 150, 87, 121, 131, 71, 102, 111, 56, 84, 92, 40, 64, 71, 17, 41, 47, 0,
+    0, 7, 121, 156, 148, 106, 138, 131, 91, 120, 114, 75, 101, 96, 60, 83, 79,
+    43, 64, 60, 20, 40, 37, 0, 0, 1, 126, 155, 129, 110, 136, 113, 95, 119, 98,
+    78, 101, 82, 62, 83, 67, 45, 63, 50, 22, 40, 28, 0, 0, 0, 130, 154, 107,
+    114, 135, 94, 98, 118, 81, 81, 100, 67, 64, 82, 54, 46, 63, 38, 23, 40, 18,
+    0, 0, 0, 134, 153, 84, 117, 135, 73, 101, 117, 62, 83, 99, 51, 66, 81, 39,
+    48, 62, 24, 24, 40, 5, 0, 0, 0, 137, 152, 65, 119, 134, 55, 102, 117, 46,
+    84, 99, 36, 67, 81, 25, 48, 62, 11, 24, 40, 0, 0, 0, 0, 105, 138, 196, 93,
+    122, 173, 81, 106, 152, 67, 89, 129, 53, 72, 107, 38, 54, 84, 17, 30, 58, 0,
+    0, 17, 115, 137, 175, 101, 121, 155, 88, 106, 136, 73, 89, 115, 58, 72, 95,
+    42, 54, 74, 21, 31, 49, 0, 0, 8, 120, 136, 157, 106, 120, 139, 92, 105, 121,
+    76, 88, 103, 61, 71, 84, 44, 53, 65, 23, 31, 41, 0, 0, 1, 125, 135, 138,
+    110, 119, 122, 95, 104, 106, 79, 87, 89, 63, 71, 73, 46, 53, 55, 25, 31, 33,
+    0, 0, 0, 129, 134, 120, 113, 119, 105, 98, 103, 91, 81, 87, 76, 65, 71, 61,
+    48, 53, 45, 26, 31, 24, 0, 0, 0, 133, 134, 101, 116, 118, 88, 100, 103, 76,
+    83, 86, 62, 67, 70, 49, 49, 53, 34, 27, 31, 14, 0, 0, 0, 136, 133, 80, 119,
+    117, 69, 102, 102, 58, 85, 86, 47, 68, 70, 35, 50, 52, 20, 27, 31, 3, 0, 0,
+    0, 138, 133, 62, 121, 117, 52, 104, 102, 43, 86, 85, 33, 69, 69, 22, 50, 52,
+    7, 27, 31, 0, 0, 0, 0, 114, 118, 182, 100, 104, 161, 87, 90, 141, 73, 75,
+    120, 59, 59, 99, 43, 42, 78, 22, 20, 52, 0, 0, 10, 121, 117, 163, 106, 104,
+    144, 92, 90, 126, 77, 75, 107, 62, 59, 88, 46, 42, 68, 24, 21, 44, 0, 0, 2,
+    125, 117, 146, 110, 103, 129, 95, 89, 113, 79, 74, 95, 64, 59, 78, 47, 42,
+    59, 26, 21, 36, 0, 0, 0, 129, 116, 129, 113, 102, 113, 98, 89, 99, 82, 74,
+    83, 66, 59, 67, 49, 42, 50, 27, 22, 28, 0, 0, 0, 132, 116, 112, 116, 102,
+    98, 100, 88, 85, 83, 73, 71, 67, 59, 57, 50, 43, 41, 28, 22, 20, 0, 0, 0,
+    134, 115, 95, 118, 101, 82, 102, 88, 71, 85, 73, 58, 68, 59, 45, 51, 43, 30,
+    29, 22, 11, 0, 0, 0, 137, 115, 76, 120, 101, 65, 104, 87, 55, 86, 73, 44,
+    69, 58, 32, 51, 42, 18, 29, 22, 1, 0, 0, 0, 139, 114, 60, 122, 100, 50, 105,
+    87, 41, 87, 72, 31, 70, 58, 19, 51, 42, 4, 29, 22, 0, 0, 0, 0, 120, 97, 168,
+    106, 85, 149, 92, 73, 130, 77, 59, 110, 63, 45, 91, 47, 28, 71, 25, 6, 47,
+    0, 0, 3, 126, 97, 151, 111, 85, 133, 96, 73, 117, 80, 59, 98, 65, 46, 81,
+    48, 29, 62, 27, 7, 39, 0, 0, 0, 129, 97, 136, 113, 85, 120, 98, 73, 104, 82,
+    59, 88, 67, 46, 72, 50, 30, 54, 29, 8, 32, 0, 0, 0, 132, 96, 120, 116, 84,
+    105, 100, 72, 91, 84, 59, 76, 68, 46, 61, 51, 30, 45, 29, 9, 24, 0, 0, 0,
+    134, 96, 105, 117, 84, 92, 102, 72, 79, 85, 59, 65, 69, 46, 52, 51, 30, 36,
+    30, 10, 16, 0, 0, 0, 136, 96, 89, 119, 84, 77, 103, 72, 66, 86, 59, 53, 69,
+    46, 41, 52, 31, 26, 30, 11, 7, 0, 0, 0, 138, 95, 71, 121, 83, 61, 105, 72,
+    51, 87, 59, 40, 70, 46, 28, 52, 31, 14, 30, 11, 0, 0, 0, 0, 139, 95, 57,
+    122, 83, 47, 106, 71, 38, 88, 59, 28, 71, 46, 17, 52, 31, 2, 29, 12, 0, 0,
+    0, 0, 125, 74, 155, 110, 63, 137, 96, 52, 120, 81, 40, 101, 66, 27, 83, 49,
+    7, 64, 27, 0, 41, 0, 0, 0, 129, 73, 139, 114, 63, 123, 99, 53, 107, 83, 41,
+    90, 68, 28, 74, 51, 10, 56, 29, 0, 33, 0, 0, 0, 132, 74, 125, 116, 63, 110,
+    101, 53, 96, 84, 41, 80, 69, 29, 65, 51, 12, 48, 30, 0, 27, 0, 0, 0, 134,
+    74, 111, 118, 64, 97, 102, 53, 84, 85, 42, 70, 69, 29, 56, 52, 13, 40, 30,
+    0, 19, 0, 0, 0, 136, 74, 97, 119, 64, 85, 103, 53, 73, 86, 42, 60, 70, 30,
+    47, 52, 14, 31, 30, 0, 12, 0, 0, 0, 137, 74, 83, 121, 64, 71, 104, 54, 61,
+    87, 42, 49, 71, 30, 36, 53, 15, 22, 30, 0, 5, 0, 0, 0, 139, 74, 67, 122, 64,
+    57, 105, 54, 47, 88, 42, 36, 71, 31, 25, 53, 16, 9, 30, 0, 0, 0, 0, 0, 140,
+    73, 54, 123, 64, 45, 106, 54, 36, 88, 43, 26, 71, 31, 14, 53, 17, 1, 29, 0,
+    0, 0, 0, 0, 129, 44, 143, 114, 34, 126, 99, 24, 110, 84, 9, 92, 68, 0, 76,
+    51, 0, 58, 28, 0, 35, 0, 0, 0, 132, 44, 128, 117, 35, 113, 102, 25, 98, 85,
+    12, 82, 69, 0, 67, 52, 0, 50, 29, 0, 28, 0, 0, 0, 134, 45, 116, 118, 36,
+    102, 103, 27, 88, 86, 14, 73, 70, 0, 59, 52, 0, 43, 29, 0, 22, 0, 0, 0, 136,
+    46, 103, 119, 37, 90, 103, 28, 77, 87, 17, 64, 71, 1, 50, 53, 0, 35, 30, 0,
+    15, 0, 0, 0, 137, 47, 90, 120, 38, 78, 104, 29, 67, 87, 18, 54, 71, 3, 42,
+    53, 0, 27, 29, 0, 8, 0, 0, 0, 138, 47, 77, 121, 39, 66, 105, 30, 56, 88, 19,
+    44, 71, 5, 32, 53, 0, 18, 29, 0, 2, 0, 0, 0, 139, 48, 63, 122, 39, 53, 106,
+    31, 44, 88, 20, 33, 71, 7, 21, 53, 0, 6, 28, 0, 0, 0, 0, 0, 140, 48, 52,
+    123, 40, 42, 107, 31, 33, 89, 21, 23, 72, 8, 10, 53, 0, 0, 27, 0, 0, 0, 0,
+    0, 0, 192, 242, 0, 169, 213, 0, 148, 187, 0, 125, 159, 0, 104, 133, 0, 82,
+    106, 0, 56, 76, 0, 18, 34, 0, 189, 216, 0, 167, 190, 0, 147, 167, 0, 124,
+    142, 0, 103, 119, 0, 81, 94, 0, 55, 66, 0, 16, 27, 0, 188, 193, 0, 166, 170,
+    0, 145, 149, 0, 123, 127, 0, 102, 105, 0, 80, 83, 0, 55, 57, 0, 15, 20, 32,
+    186, 168, 27, 164, 149, 17, 144, 130, 0, 122, 110, 0, 101, 91, 0, 79, 71, 0,
+    55, 47, 0, 14, 11, 56, 184, 146, 47, 163, 129, 37, 142, 113, 23, 121, 95, 5,
+    100, 78, 0, 79, 60, 0, 54, 38, 0, 14, 2, 70, 183, 122, 60, 161, 107, 49,
+    141, 94, 35, 120, 79, 20, 100, 64, 0, 78, 48, 0, 54, 27, 0, 13, 0, 80, 182,
+    96, 69, 160, 84, 57, 140, 73, 43, 119, 61, 28, 99, 48, 6, 78, 34, 0, 53, 15,
+    0, 13, 0, 87, 181, 74, 75, 160, 65, 62, 140, 56, 47, 119, 46, 32, 98, 35,
+    12, 77, 21, 0, 53, 2, 0, 13, 0, 0, 171, 225, 0, 151, 199, 0, 132, 174, 0,
+    112, 149, 0, 92, 124, 0, 71, 98, 0, 47, 69, 0, 4, 29, 0, 169, 201, 0, 150,
+    178, 0, 131, 156, 0, 111, 133, 0, 92, 111, 0, 71, 87, 0, 47, 60, 0, 3, 22,
+    41, 168, 180, 36, 148, 159, 28, 130, 140, 15, 110, 118, 0, 91, 98, 0, 70,
+    77, 0, 46, 52, 0, 2, 14, 61, 166, 158, 53, 147, 139, 43, 129, 122, 31, 109,
+    103, 17, 90, 85, 0, 70, 66, 0, 46, 43, 0, 2, 5, 73, 165, 137, 64, 146, 121,
+    53, 128, 106, 40, 108, 89, 26, 89, 73, 6, 69, 55, 0, 46, 33, 0, 1, 0, 83,
+    164, 115, 72, 145, 101, 60, 127, 88, 46, 107, 73, 32, 89, 59, 14, 69, 43, 0,
+    46, 23, 0, 1, 0, 90, 163, 91, 78, 144, 80, 65, 126, 69, 51, 106, 57, 37, 88,
+    44, 19, 68, 30, 0, 45, 11, 0, 1, 0, 95, 163, 72, 82, 143, 62, 69, 125, 53,
+    54, 106, 43, 39, 88, 32, 22, 68, 18, 0, 45, 0, 0, 1, 0, 0, 152, 210, 0, 134,
+    186, 0, 117, 163, 0, 99, 139, 0, 81, 116, 0, 62, 92, 0, 38, 64, 0, 1, 24,
+    47, 151, 188, 42, 133, 167, 35, 117, 146, 24, 98, 124, 10, 81, 103, 0, 61,
+    81, 0, 38, 55, 0, 0, 16, 65, 150, 169, 57, 132, 149, 47, 116, 131, 36, 98,
+    111, 23, 80, 92, 4, 61, 71, 0, 38, 47, 0, 0, 7, 76, 148, 148, 67, 131, 131,
+    56, 115, 114, 44, 97, 96, 31, 79, 79, 14, 61, 61, 0, 38, 38, 0, 0, 1, 84,
+    147, 129, 74, 130, 114, 62, 114, 99, 49, 96, 83, 35, 79, 68, 19, 60, 50, 0,
+    37, 29, 0, 0, 0, 91, 146, 109, 80, 129, 95, 67, 113, 83, 53, 95, 69, 39, 78,
+    55, 23, 60, 39, 1, 37, 20, 0, 0, 0, 97, 146, 87, 84, 128, 76, 71, 112, 65,
+    57, 95, 53, 42, 78, 41, 26, 60, 26, 4, 37, 7, 0, 0, 0, 101, 145, 69, 88,
+    128, 59, 74, 112, 50, 59, 94, 40, 44, 77, 29, 27, 59, 15, 4, 37, 0, 0, 0, 0,
+    52, 132, 195, 47, 117, 172, 40, 102, 151, 30, 85, 129, 19, 69, 107, 2, 51,
+    84, 0, 28, 58, 0, 0, 18, 70, 131, 175, 61, 116, 155, 52, 101, 135, 41, 85,
+    115, 29, 68, 95, 13, 51, 74, 0, 28, 49, 0, 0, 9, 80, 130, 157, 70, 115, 139,
+    59, 100, 121, 47, 84, 103, 35, 68, 85, 19, 51, 65, 0, 28, 42, 0, 0, 1, 87,
+    130, 138, 76, 114, 122, 65, 100, 106, 52, 84, 89, 39, 68, 73, 24, 50, 55, 4,
+    28, 33, 0, 0, 0, 93, 129, 121, 81, 114, 106, 69, 99, 92, 56, 83, 77, 42, 67,
+    62, 27, 50, 46, 7, 29, 25, 0, 0, 0, 98, 128, 102, 86, 113, 89, 73, 98, 77,
+    59, 82, 64, 45, 67, 50, 29, 50, 35, 9, 29, 16, 0, 0, 0, 102, 127, 82, 89,
+    112, 71, 76, 98, 61, 61, 82, 49, 47, 66, 37, 31, 50, 23, 11, 29, 4, 0, 0, 0,
+    105, 127, 66, 92, 112, 56, 78, 97, 47, 63, 82, 37, 48, 66, 25, 32, 50, 11,
+    10, 29, 0, 0, 0, 0, 72, 114, 181, 63, 100, 160, 54, 87, 140, 44, 72, 119,
+    32, 57, 99, 18, 39, 78, 0, 18, 52, 0, 0, 11, 83, 113, 163, 73, 100, 144, 62,
+    86, 126, 50, 71, 107, 38, 57, 88, 24, 40, 68, 3, 19, 44, 0, 0, 3, 89, 113,
+    147, 78, 99, 129, 67, 86, 113, 55, 71, 95, 42, 57, 78, 27, 40, 60, 8, 19,
+    37, 0, 0, 0, 95, 112, 129, 83, 98, 114, 71, 85, 99, 58, 71, 83, 45, 56, 67,
+    30, 40, 50, 11, 20, 29, 0, 0, 0, 99, 111, 113, 86, 98, 99, 74, 85, 86, 60,
+    70, 72, 47, 56, 57, 31, 40, 41, 12, 20, 21, 0, 0, 0, 103, 111, 96, 90, 97,
+    84, 77, 84, 72, 63, 70, 59, 49, 56, 46, 33, 40, 31, 13, 21, 12, 0, 0, 0,
+    106, 110, 78, 93, 97, 67, 79, 84, 57, 64, 70, 46, 50, 56, 34, 34, 40, 19,
+    13, 21, 2, 0, 0, 0, 108, 110, 63, 95, 97, 53, 81, 84, 44, 66, 69, 34, 51,
+    56, 22, 35, 40, 7, 13, 21, 0, 0, 0, 0, 85, 94, 168, 74, 82, 149, 64, 70,
+    130, 53, 57, 110, 41, 43, 91, 27, 26, 71, 5, 5, 47, 0, 0, 4, 92, 94, 151,
+    81, 82, 134, 70, 70, 117, 57, 57, 99, 45, 44, 81, 30, 27, 62, 10, 7, 39, 0,
+    0, 0, 97, 94, 136, 85, 82, 120, 73, 70, 105, 60, 57, 88, 47, 44, 72, 32, 28,
+    54, 13, 8, 32, 0, 0, 0, 101, 94, 121, 88, 82, 106, 76, 70, 92, 62, 57, 77,
+    49, 44, 62, 34, 28, 45, 14, 9, 25, 0, 0, 0, 104, 93, 106, 91, 81, 93, 78,
+    70, 80, 64, 57, 66, 50, 44, 52, 35, 29, 37, 14, 10, 17, 0, 0, 0, 106, 93,
+    90, 93, 81, 78, 80, 69, 67, 66, 57, 55, 52, 44, 42, 36, 29, 27, 15, 11, 8,
+    0, 0, 0, 109, 92, 74, 96, 81, 63, 82, 69, 53, 67, 57, 42, 53, 44, 30, 36,
+    29, 16, 15, 11, 1, 0, 0, 0, 111, 92, 60, 97, 80, 50, 83, 69, 41, 68, 57, 31,
+    53, 44, 20, 37, 30, 5, 15, 11, 0, 0, 0, 0, 94, 73, 155, 82, 63, 137, 72, 52,
+    120, 59, 40, 102, 47, 26, 84, 32, 8, 65, 9, 0, 42, 0, 0, 0, 99, 73, 140, 87,
+    63, 124, 76, 52, 108, 62, 40, 91, 49, 27, 75, 34, 11, 57, 12, 0, 34, 0, 0,
+    0, 103, 73, 126, 90, 63, 111, 78, 53, 97, 64, 41, 81, 51, 28, 66, 35, 13,
+    49, 13, 0, 27, 0, 0, 0, 105, 73, 112, 92, 63, 98, 80, 53, 85, 66, 41, 71,
+    52, 29, 57, 36, 14, 41, 15, 0, 20, 0, 0, 0, 107, 73, 99, 94, 63, 86, 81, 53,
+    74, 67, 41, 61, 53, 29, 48, 37, 15, 32, 16, 0, 13, 0, 0, 0, 110, 73, 85, 96,
+    63, 73, 83, 53, 62, 68, 42, 50, 54, 30, 38, 38, 16, 23, 16, 1, 5, 0, 0, 0,
+    112, 73, 69, 98, 63, 59, 84, 53, 49, 69, 42, 38, 55, 30, 27, 38, 16, 12, 17,
+    1, 0, 0, 0, 0, 113, 73, 57, 99, 63, 47, 85, 53, 38, 70, 42, 28, 55, 30, 17,
+    38, 17, 3, 16, 2, 0, 0, 0, 0, 101, 47, 144, 88, 38, 127, 77, 27, 111, 64,
+    14, 94, 51, 0, 77, 35, 0, 59, 9, 0, 36, 0, 0, 0, 105, 47, 129, 92, 38, 114,
+    80, 28, 99, 66, 16, 83, 53, 0, 68, 37, 0, 51, 13, 0, 29, 0, 0, 0, 107, 48,
+    117, 94, 39, 103, 81, 29, 89, 67, 18, 74, 54, 2, 60, 38, 0, 44, 15, 0, 23,
+    0, 0, 0, 109, 49, 104, 95, 40, 91, 82, 31, 79, 68, 19, 65, 54, 5, 51, 39, 0,
+    36, 17, 0, 16, 0, 0, 0, 110, 50, 92, 97, 40, 80, 84, 31, 68, 69, 20, 56, 55,
+    7, 43, 39, 0, 28, 17, 0, 9, 0, 0, 0, 112, 50, 79, 98, 41, 68, 85, 32, 57,
+    70, 21, 46, 56, 8, 34, 40, 0, 20, 18, 0, 3, 0, 0, 0, 113, 50, 65, 100, 41,
+    55, 86, 33, 46, 71, 22, 35, 56, 10, 23, 40, 0, 8, 17, 0, 0, 0, 0, 0, 115,
+    50, 54, 101, 41, 44, 87, 33, 36, 71, 23, 25, 56, 11, 14, 40, 0, 1, 16, 0, 0,
+    0, 0, 0, 0, 182, 240, 0, 161, 212, 0, 141, 185, 0, 120, 158, 0, 99, 132, 0,
+    78, 106, 0, 53, 75, 0, 12, 35, 0, 180, 214, 0, 159, 189, 0, 140, 166, 0,
+    119, 141, 0, 99, 118, 0, 77, 94, 0, 53, 66, 0, 11, 28, 0, 179, 192, 0, 158,
+    169, 0, 138, 149, 0, 118, 126, 0, 98, 105, 0, 77, 83, 0, 52, 57, 0, 10, 21,
+    0, 177, 168, 0, 156, 149, 0, 137, 130, 0, 116, 110, 0, 97, 91, 0, 76, 71, 0,
+    52, 48, 0, 9, 12, 0, 175, 146, 0, 155, 129, 0, 136, 113, 0, 115, 96, 0, 96,
+    79, 0, 75, 60, 0, 51, 39, 0, 9, 3, 0, 174, 123, 0, 154, 109, 0, 135, 95, 0,
+    115, 80, 0, 95, 65, 0, 75, 49, 0, 51, 28, 0, 8, 0, 0, 173, 98, 0, 153, 87,
+    0, 134, 76, 0, 114, 63, 0, 95, 50, 0, 74, 35, 0, 51, 17, 0, 8, 0, 0, 172,
+    78, 0, 152, 70, 0, 134, 60, 0, 114, 49, 0, 94, 38, 0, 74, 24, 0, 51, 5, 0,
+    8, 0, 0, 163, 224, 0, 144, 198, 0, 126, 173, 0, 107, 148, 0, 88, 123, 0, 68,
+    98, 0, 44, 69, 0, 1, 29, 0, 162, 200, 0, 143, 177, 0, 125, 155, 0, 106, 132,
+    0, 88, 110, 0, 68, 87, 0, 44, 60, 0, 1, 22, 0, 160, 180, 0, 142, 159, 0,
+    124, 139, 0, 105, 118, 0, 87, 98, 0, 67, 77, 0, 44, 52, 0, 0, 15, 0, 159,
+    158, 0, 140, 139, 0, 123, 122, 0, 104, 103, 0, 86, 85, 0, 67, 66, 0, 43, 43,
+    0, 0, 5, 0, 157, 138, 0, 139, 121, 0, 122, 106, 0, 103, 89, 0, 85, 73, 0,
+    66, 56, 0, 43, 34, 0, 0, 0, 0, 156, 116, 0, 138, 102, 0, 121, 89, 0, 103,
+    75, 0, 85, 60, 0, 66, 44, 0, 43, 24, 0, 0, 0, 6, 155, 94, 2, 137, 82, 0,
+    120, 71, 0, 102, 59, 0, 84, 46, 0, 65, 32, 0, 43, 13, 0, 0, 0, 30, 155, 75,
+    23, 137, 66, 11, 120, 57, 0, 102, 46, 0, 84, 35, 0, 65, 20, 0, 43, 2, 0, 0,
+    0, 0, 145, 209, 0, 129, 185, 0, 112, 162, 0, 95, 138, 0, 77, 115, 0, 59, 91,
+    0, 35, 64, 0, 1, 24, 0, 144, 188, 0, 128, 166, 0, 112, 145, 0, 94, 124, 0,
+    77, 103, 0, 58, 81, 0, 35, 55, 0, 0, 16, 0, 143, 168, 0, 127, 149, 0, 111,
+    130, 0, 93, 111, 0, 77, 92, 0, 58, 71, 0, 35, 47, 0, 0, 8, 0, 142, 148, 0,
+    126, 131, 0, 110, 114, 0, 93, 97, 0, 76, 79, 0, 58, 61, 0, 35, 38, 0, 0, 1,
+    0, 141, 130, 0, 125, 114, 0, 109, 100, 0, 92, 84, 0, 75, 68, 0, 58, 51, 0,
+    35, 30, 0, 0, 0, 27, 140, 110, 22, 124, 97, 12, 108, 84, 0, 91, 70, 0, 75,
+    56, 0, 57, 40, 0, 35, 21, 0, 0, 0, 43, 139, 89, 36, 123, 78, 26, 108, 67,
+    12, 91, 55, 0, 74, 43, 0, 57, 28, 0, 35, 9, 0, 0, 0, 51, 139, 72, 43, 123,
+    63, 33, 107, 53, 20, 90, 43, 3, 74, 31, 0, 57, 18, 0, 35, 1, 0, 0, 0, 0,
+    127, 194, 0, 112, 172, 0, 98, 151, 0, 81, 128, 0, 66, 107, 0, 48, 84, 0, 26,
+    58, 0, 0, 18, 0, 126, 174, 0, 111, 154, 0, 97, 135, 0, 81, 115, 0, 65, 95,
+    0, 48, 74, 0, 26, 50, 0, 0, 9, 0, 125, 157, 0, 111, 139, 0, 96, 121, 0, 81,
+    103, 0, 65, 85, 0, 48, 65, 0, 27, 42, 0, 0, 2, 20, 125, 139, 17, 110, 122,
+    9, 96, 107, 0, 80, 90, 0, 65, 73, 0, 48, 56, 0, 27, 34, 0, 0, 0, 39, 124,
+    122, 33, 109, 107, 25, 95, 93, 13, 80, 78, 0, 65, 63, 0, 48, 46, 0, 27, 26,
+    0, 0, 0, 51, 123, 103, 43, 108, 90, 34, 94, 78, 23, 79, 65, 8, 64, 51, 0,
+    48, 36, 0, 27, 17, 0, 0, 0, 59, 122, 84, 51, 108, 73, 41, 94, 63, 29, 79,
+    51, 15, 64, 39, 0, 47, 24, 0, 27, 6, 0, 0, 0, 64, 122, 69, 55, 107, 59, 45,
+    94, 50, 32, 78, 39, 19, 64, 28, 0, 47, 14, 0, 27, 0, 0, 0, 0, 0, 110, 181,
+    0, 97, 160, 0, 83, 140, 0, 69, 119, 0, 54, 99, 0, 37, 78, 0, 16, 53, 0, 0,
+    12, 7, 109, 163, 8, 96, 144, 3, 83, 126, 0, 69, 107, 0, 54, 88, 0, 38, 68,
+    0, 17, 45, 0, 0, 3, 34, 109, 147, 30, 96, 129, 23, 83, 113, 13, 69, 95, 0,
+    54, 78, 0, 38, 60, 0, 18, 37, 0, 0, 0, 48, 108, 130, 41, 95, 114, 33, 82,
+    99, 23, 68, 84, 10, 54, 68, 0, 38, 51, 0, 18, 29, 0, 0, 0, 56, 108, 114, 49,
+    94, 100, 40, 82, 87, 29, 68, 72, 16, 54, 58, 0, 38, 42, 0, 18, 22, 0, 0, 0,
+    63, 107, 97, 55, 94, 85, 45, 81, 73, 34, 68, 60, 21, 54, 47, 5, 38, 32, 0,
+    18, 13, 0, 0, 0, 68, 106, 80, 59, 93, 69, 49, 81, 59, 37, 67, 47, 25, 54,
+    35, 9, 38, 21, 0, 18, 4, 0, 0, 0, 72, 106, 66, 63, 93, 56, 52, 81, 47, 40,
+    67, 36, 27, 53, 25, 11, 38, 11, 0, 18, 0, 0, 0, 0, 28, 92, 168, 24, 80, 149,
+    19, 68, 130, 11, 55, 111, 0, 41, 92, 0, 25, 71, 0, 6, 47, 0, 0, 5, 46, 92,
+    151, 40, 80, 134, 33, 68, 117, 24, 55, 99, 12, 42, 81, 0, 26, 63, 0, 7, 40,
+    0, 0, 0, 55, 91, 137, 48, 80, 121, 40, 68, 105, 30, 55, 89, 18, 42, 72, 2,
+    27, 55, 0, 8, 32, 0, 0, 0, 62, 91, 121, 54, 79, 107, 45, 68, 93, 34, 55, 77,
+    23, 42, 62, 7, 27, 46, 0, 8, 25, 0, 0, 0, 67, 91, 107, 58, 79, 93, 49, 68,
+    81, 38, 55, 67, 26, 42, 53, 12, 27, 37, 0, 8, 18, 0, 0, 0, 72, 90, 91, 62,
+    79, 79, 52, 67, 68, 41, 55, 56, 29, 42, 43, 15, 28, 28, 1, 9, 9, 0, 0, 0,
+    76, 90, 75, 66, 78, 65, 56, 67, 55, 43, 55, 44, 31, 42, 32, 17, 28, 18, 2,
+    9, 2, 0, 0, 0, 78, 90, 62, 68, 78, 52, 58, 67, 43, 45, 55, 33, 32, 42, 22,
+    19, 28, 7, 2, 9, 0, 0, 0, 0, 53, 72, 156, 46, 62, 138, 39, 51, 121, 30, 39,
+    102, 20, 25, 84, 2, 9, 65, 0, 0, 42, 0, 0, 0, 62, 72, 140, 55, 62, 124, 46,
+    52, 108, 36, 40, 91, 25, 27, 75, 9, 11, 57, 0, 0, 34, 0, 0, 0, 68, 72, 127,
+    59, 62, 112, 50, 52, 97, 39, 40, 82, 28, 27, 66, 13, 12, 49, 0, 0, 28, 0, 0,
+    0, 72, 73, 113, 63, 62, 99, 53, 52, 86, 42, 40, 71, 30, 28, 57, 17, 13, 41,
+    0, 0, 21, 0, 0, 0, 76, 72, 100, 66, 62, 87, 56, 52, 75, 44, 41, 62, 32, 29,
+    48, 19, 14, 33, 3, 0, 13, 0, 0, 0, 79, 72, 86, 69, 62, 74, 58, 52, 63, 46,
+    41, 51, 34, 29, 39, 21, 15, 24, 4, 1, 6, 0, 0, 0, 81, 72, 71, 71, 62, 61,
+    60, 52, 51, 48, 41, 40, 35, 29, 28, 22, 15, 13, 5, 1, 0, 0, 0, 0, 83, 72,
+    59, 73, 62, 49, 62, 52, 41, 49, 41, 31, 36, 30, 20, 22, 16, 5, 4, 2, 0, 0,
+    0, 0, 67, 49, 144, 59, 40, 128, 50, 30, 112, 40, 18, 95, 29, 2, 78, 13, 0,
+    60, 0, 0, 37, 0, 0, 0, 73, 50, 130, 64, 40, 115, 55, 31, 100, 44, 19, 84,
+    32, 4, 69, 18, 0, 52, 0, 0, 30, 0, 0, 0, 76, 50, 118, 67, 41, 104, 57, 32,
+    90, 46, 20, 75, 34, 7, 61, 20, 0, 45, 0, 0, 24, 0, 0, 0, 79, 51, 105, 69,
+    42, 92, 59, 33, 80, 47, 21, 66, 35, 9, 52, 22, 0, 37, 1, 0, 16, 0, 0, 0, 81,
+    52, 93, 71, 42, 81, 61, 33, 70, 49, 22, 57, 36, 11, 44, 23, 0, 29, 2, 0, 9,
+    0, 0, 0, 83, 52, 80, 73, 43, 69, 62, 34, 59, 50, 23, 47, 37, 12, 35, 23, 0,
+    21, 3, 0, 3, 0, 0, 0, 85, 52, 67, 75, 43, 57, 64, 34, 47, 51, 24, 36, 38,
+    13, 25, 24, 0, 10, 3, 0, 0, 0, 0, 0, 87, 52, 56, 76, 43, 46, 65, 34, 37, 52,
+    24, 27, 39, 14, 16, 24, 0, 2, 2, 0, 0, 0, 0, 0, 0, 174, 238, 0, 154, 210, 0,
+    135, 184, 0, 115, 157, 0, 95, 132, 0, 75, 105, 0, 50, 75, 0, 6, 35, 0, 172,
+    213, 0, 153, 188, 0, 134, 165, 0, 114, 141, 0, 94, 118, 0, 74, 93, 0, 50,
+    66, 0, 5, 28, 0, 171, 191, 0, 151, 169, 0, 133, 148, 0, 113, 126, 0, 94,
+    105, 0, 73, 83, 0, 50, 57, 0, 5, 21, 0, 169, 168, 0, 150, 148, 0, 131, 130,
+    0, 112, 110, 0, 93, 92, 0, 73, 71, 0, 49, 48, 0, 5, 13, 0, 167, 146, 0, 148,
+    130, 0, 130, 113, 0, 111, 96, 0, 92, 79, 0, 72, 61, 0, 49, 39, 0, 4, 3, 0,
+    166, 124, 0, 147, 110, 0, 129, 96, 0, 110, 81, 0, 92, 66, 0, 72, 49, 0, 49,
+    29, 0, 4, 0, 0, 165, 100, 0, 146, 89, 0, 129, 78, 0, 110, 65, 0, 91, 52, 0,
+    72, 37, 0, 49, 18, 0, 4, 0, 0, 164, 82, 0, 146, 73, 0, 128, 64, 0, 109, 52,
+    0, 91, 41, 0, 72, 26, 0, 49, 8, 0, 4, 0, 0, 157, 223, 0, 138, 197, 0, 121,
+    172, 0, 102, 147, 0, 84, 123, 0, 65, 98, 0, 41, 69, 0, 1, 30, 0, 155, 199,
+    0, 137, 176, 0, 120, 155, 0, 102, 132, 0, 84, 110, 0, 65, 87, 0, 41, 60, 0,
+    1, 22, 0, 154, 179, 0, 136, 158, 0, 119, 139, 0, 101, 118, 0, 83, 98, 0, 64,
+    77, 0, 41, 52, 0, 0, 15, 0, 152, 158, 0, 135, 139, 0, 118, 122, 0, 100, 103,
+    0, 83, 85, 0, 64, 66, 0, 41, 43, 0, 0, 6, 0, 151, 138, 0, 133, 122, 0, 117,
+    106, 0, 99, 90, 0, 82, 74, 0, 64, 56, 0, 41, 35, 0, 0, 0, 0, 150, 117, 0,
+    133, 103, 0, 116, 90, 0, 99, 76, 0, 82, 61, 0, 63, 45, 0, 41, 25, 0, 0, 0,
+    0, 149, 95, 0, 132, 84, 0, 116, 73, 0, 98, 61, 0, 81, 48, 0, 63, 33, 0, 41,
+    15, 0, 0, 0, 0, 148, 78, 0, 131, 69, 0, 115, 59, 0, 98, 49, 0, 81, 37, 0,
+    63, 23, 0, 40, 4, 0, 0, 0, 0, 140, 208, 0, 124, 184, 0, 108, 161, 0, 91,
+    137, 0, 74, 115, 0, 56, 91, 0, 33, 64, 0, 1, 24, 0, 139, 187, 0, 123, 165,
+    0, 107, 145, 0, 90, 123, 0, 74, 102, 0, 56, 80, 0, 33, 55, 0, 0, 17, 0, 138,
+    168, 0, 122, 149, 0, 106, 130, 0, 90, 110, 0, 73, 91, 0, 56, 71, 0, 33, 47,
+    0, 0, 8, 0, 136, 148, 0, 121, 131, 0, 105, 115, 0, 89, 97, 0, 73, 80, 0, 55,
+    61, 0, 33, 39, 0, 0, 1, 0, 135, 130, 0, 120, 115, 0, 105, 100, 0, 88, 84, 0,
+    72, 69, 0, 55, 52, 0, 33, 30, 0, 0, 0, 0, 135, 111, 0, 119, 98, 0, 104, 85,
+    0, 88, 71, 0, 72, 57, 0, 55, 41, 0, 33, 22, 0, 0, 0, 0, 134, 91, 0, 118, 80,
+    0, 103, 69, 0, 87, 57, 0, 72, 44, 0, 54, 30, 0, 33, 11, 0, 0, 0, 0, 133, 75,
+    0, 118, 65, 0, 103, 56, 0, 87, 45, 0, 71, 34, 0, 54, 20, 0, 33, 2, 0, 0, 0,
+    0, 123, 194, 0, 108, 171, 0, 94, 150, 0, 78, 128, 0, 63, 106, 0, 46, 84, 0,
+    24, 58, 0, 0, 19, 0, 122, 174, 0, 107, 154, 0, 93, 135, 0, 78, 114, 0, 63,
+    95, 0, 46, 74, 0, 25, 50, 0, 0, 10, 0, 121, 157, 0, 107, 139, 0, 93, 121, 0,
+    78, 103, 0, 63, 85, 0, 46, 65, 0, 25, 42, 0, 0, 2, 0, 120, 139, 0, 106, 122,
+    0, 92, 107, 0, 77, 90, 0, 62, 74, 0, 46, 56, 0, 25, 34, 0, 0, 0, 0, 119,
+    122, 0, 105, 107, 0, 91, 93, 0, 77, 78, 0, 62, 63, 0, 45, 47, 0, 25, 26, 0,
+    0, 0, 0, 119, 104, 0, 104, 91, 0, 91, 79, 0, 76, 66, 0, 62, 52, 0, 45, 37,
+    0, 25, 18, 0, 0, 0, 0, 118, 86, 0, 104, 75, 0, 90, 64, 0, 76, 52, 0, 61, 40,
+    0, 45, 26, 0, 25, 7, 0, 0, 0, 0, 118, 71, 0, 104, 61, 0, 90, 52, 0, 75, 42,
+    0, 61, 30, 0, 45, 17, 0, 24, 1, 0, 0, 0, 0, 107, 181, 0, 94, 160, 0, 81,
+    140, 0, 66, 119, 0, 52, 99, 0, 35, 78, 0, 15, 53, 0, 0, 13, 0, 106, 163, 0,
+    93, 144, 0, 80, 126, 0, 66, 107, 0, 52, 88, 0, 36, 68, 0, 15, 45, 0, 0, 4,
+    0, 106, 147, 0, 93, 130, 0, 80, 113, 0, 66, 96, 0, 52, 79, 0, 36, 60, 0, 16,
+    37, 0, 0, 0, 0, 105, 130, 0, 92, 115, 0, 79, 100, 0, 66, 84, 0, 52, 68, 0,
+    36, 51, 0, 16, 30, 0, 0, 0, 0, 104, 115, 0, 91, 101, 0, 79, 87, 0, 65, 73,
+    0, 52, 59, 0, 36, 43, 0, 16, 22, 0, 0, 0, 0, 104, 98, 0, 91, 86, 0, 79, 74,
+    0, 65, 61, 0, 52, 48, 0, 36, 33, 0, 16, 14, 0, 0, 0, 0, 103, 81, 0, 90, 70,
+    0, 78, 60, 0, 65, 49, 0, 52, 37, 0, 36, 22, 0, 16, 5, 0, 0, 0, 0, 103, 68,
+    0, 90, 58, 0, 78, 49, 0, 65, 38, 0, 51, 27, 0, 36, 13, 0, 16, 0, 0, 0, 0, 0,
+    90, 168, 0, 78, 149, 0, 67, 130, 0, 54, 111, 0, 40, 92, 0, 24, 72, 0, 6, 47,
+    0, 0, 6, 0, 90, 152, 0, 78, 134, 0, 67, 117, 0, 54, 99, 0, 40, 82, 0, 25,
+    63, 0, 6, 40, 0, 0, 0, 0, 89, 137, 0, 78, 121, 0, 66, 106, 0, 54, 89, 0, 41,
+    73, 0, 26, 55, 0, 7, 33, 0, 0, 0, 0, 89, 122, 0, 77, 107, 0, 66, 93, 0, 54,
+    78, 0, 41, 63, 0, 26, 46, 0, 7, 25, 0, 0, 0, 0, 89, 108, 0, 77, 94, 0, 66,
+    81, 0, 53, 68, 0, 41, 54, 0, 26, 38, 0, 8, 18, 0, 0, 0, 7, 88, 92, 4, 77,
+    80, 0, 66, 69, 0, 53, 57, 0, 41, 44, 0, 27, 29, 0, 8, 10, 0, 0, 0, 23, 88,
+    77, 19, 76, 66, 11, 65, 56, 0, 53, 45, 0, 41, 33, 0, 27, 19, 0, 8, 3, 0, 0,
+    0, 30, 88, 64, 26, 76, 54, 18, 65, 45, 4, 53, 35, 0, 41, 24, 0, 27, 9, 0, 8,
+    0, 0, 0, 0, 0, 72, 156, 0, 62, 138, 0, 51, 121, 0, 39, 103, 0, 26, 85, 0, 9,
+    66, 0, 0, 42, 0, 0, 0, 0, 72, 141, 0, 62, 125, 0, 51, 109, 0, 39, 92, 0, 27,
+    75, 0, 11, 57, 0, 0, 35, 0, 0, 0, 0, 72, 128, 0, 62, 113, 0, 51, 98, 0, 40,
+    82, 0, 27, 67, 0, 12, 50, 0, 1, 28, 0, 0, 0, 17, 72, 114, 13, 62, 100, 6,
+    51, 87, 0, 40, 72, 0, 28, 58, 0, 13, 42, 0, 1, 21, 0, 0, 0, 28, 72, 101, 23,
+    61, 88, 16, 51, 76, 4, 40, 62, 0, 28, 49, 0, 14, 34, 0, 1, 14, 0, 0, 0, 36,
+    72, 87, 30, 61, 75, 23, 51, 64, 12, 40, 52, 1, 28, 40, 0, 14, 25, 0, 1, 7,
+    0, 0, 0, 41, 71, 72, 35, 61, 62, 28, 51, 52, 17, 40, 41, 5, 28, 29, 0, 14,
+    15, 0, 0, 0, 0, 0, 0, 45, 71, 60, 39, 61, 51, 31, 51, 42, 20, 40, 32, 8, 29,
+    21, 0, 15, 6, 0, 0, 0, 0, 0, 0, 0, 51, 145, 0, 42, 129, 0, 33, 113, 0, 20,
+    96, 0, 5, 79, 0, 0, 60, 0, 0, 37, 0, 0, 0, 24, 52, 131, 21, 42, 116, 15, 33,
+    101, 5, 21, 85, 0, 7, 69, 0, 0, 52, 0, 1, 30, 0, 0, 0, 34, 52, 119, 29, 43,
+    105, 22, 33, 91, 12, 22, 76, 0, 8, 61, 0, 0, 45, 0, 1, 24, 0, 0, 0, 40, 53,
+    106, 34, 43, 93, 27, 34, 80, 17, 23, 67, 5, 9, 53, 0, 0, 37, 0, 0, 16, 0, 0,
+    0, 45, 53, 94, 38, 44, 82, 31, 34, 70, 20, 24, 58, 10, 11, 45, 0, 0, 29, 0,
+    0, 9, 0, 0, 0, 48, 53, 81, 42, 44, 70, 34, 35, 60, 24, 24, 48, 13, 12, 36,
+    0, 0, 21, 0, 0, 3, 0, 0, 0, 51, 53, 68, 45, 44, 58, 37, 35, 48, 26, 25, 37,
+    15, 13, 26, 2, 1, 11, 0, 0, 0, 0, 0, 0, 54, 54, 57, 47, 44, 47, 39, 35, 39,
+    28, 25, 29, 17, 13, 17, 4, 1, 3, 0, 0, 0, 0, 0, 0]);
+
   function DeviceCmykCS() {
     this.name = 'DeviceCMYK';
     this.numComps = 4;
@@ -12262,19 +13044,45 @@ var DeviceCmykCS = (function DeviceCmykCSClosure() {
   }
   DeviceCmykCS.prototype = {
     getRgb: function DeviceCmykCS_getRgb(color) {
-      var c = color[0], m = color[1], y = color[2], k = color[3];
+      // using lut as in spline interpolation (see function.js)
+      var cubeVertices = 16; // 1 << number of colors
+      var cubeN = new Float32Array(cubeVertices);
+      var cubeVertex = new Uint32Array(cubeVertices);
+      for (var j = 0; j < cubeVertices; j++)
+        cubeN[j] = 1;
 
-      // CMYK -> CMY: http://www.easyrgb.com/index.php?X=MATH&H=14#text14
-      c = (c * (1 - k) + k);
-      m = (m * (1 - k) + k);
-      y = (y * (1 - k) + k);
+      var k = 3, pos = 1;
+      var lutDomain = 7, lutStep = 8;
+      for (var i = 3; i >= 0; i--) {
+        var e = color[i] * lutDomain;
 
-      // CMY -> RGB: http://www.easyrgb.com/index.php?X=MATH&H=12#text12
-      var r = (1 - c);
-      var g = (1 - m);
-      var b = (1 - y);
+        var e0 = e < lutDomain ? Math.floor(e) : e - 1; // e1 = e0 + 1;
+        var n0 = e0 + 1 - e; // (e1 - e) / (e1 - e0);
+        var n1 = e - e0; // (e - e0) / (e1 - e0);
+        var offset0 = e0 * k;
+        var offset1 = offset0 + k; // e1 * k
+        for (var j = 0; j < cubeVertices; j++) {
+          if (j & pos) {
+            cubeN[j] *= n1;
+            cubeVertex[j] += offset1;
+          } else {
+            cubeN[j] *= n0;
+            cubeVertex[j] += offset0;
+          }
+        }
 
-      return [r, g, b];
+        k *= lutStep;
+        pos <<= 1;
+      }
+      var y = new Float32Array(3);
+      for (var j = 0; j < 3; ++j) {
+        var rj = 0;
+        for (var i = 0; i < cubeVertices; i++)
+          rj += lut[cubeVertex[i] + j] * cubeN[i];
+        y[j] = rj;
+      }
+
+      return [y[0] / 255, y[1] / 255, y[2] / 255];
     },
     getRgbBuffer: function DeviceCmykCS_getRgbBuffer(colorBuf, bits) {
       var scale = 1 / ((1 << bits) - 1);
@@ -12417,10 +13225,6 @@ var LabCS = (function LabCSClosure() {
   return LabCS;
 })();
 
-/* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
-
-'use strict';
 
 var ARCFourCipher = (function ARCFourCipherClosure() {
   function ARCFourCipher(key) {
@@ -13068,10 +13872,6 @@ var CipherTransformFactory = (function CipherTransformFactoryClosure() {
 })();
 
 
-/* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
-
-'use strict';
 
 var PartialEvaluator = (function PartialEvaluatorClosure() {
   function PartialEvaluator(xref, handler, uniquePrefix) {
@@ -13082,6 +13882,7 @@ var PartialEvaluator = (function PartialEvaluatorClosure() {
     this.handler = handler;
     this.uniquePrefix = uniquePrefix;
     this.objIdCounter = 0;
+    this.fontIdCounter = 0;
   }
 
   var OP_MAP = {
@@ -13194,6 +13995,56 @@ var PartialEvaluator = (function PartialEvaluatorClosure() {
   };
 
   PartialEvaluator.prototype = {
+    loadFont: function PartialEvaluator_loadFont(fontName, font, xref,
+                                                 resources, dependency) {
+      var fontRes = resources.get('Font');
+
+      assert(fontRes, 'fontRes not available');
+
+      ++this.fontIdCounter;
+
+      font = xref.fetchIfRef(font) || fontRes.get(fontName);
+      if (!isDict(font)) {
+        return {
+          translated: new ErrorFont('Font ' + fontName + ' is not available'),
+          loadedName: 'font_' + this.uniquePrefix + this.fontIdCounter
+        };
+      }
+
+      var loadedName = font.loadedName;
+      if (!loadedName) {
+        // keep track of each font we translated so the caller can
+        // load them asynchronously before calling display on a page
+        loadedName = 'font_' + this.uniquePrefix + this.fontIdCounter;
+        font.loadedName = loadedName;
+
+        var translated;
+        try {
+          translated = this.translateFont(font, xref, resources,
+                                          dependency);
+        } catch (e) {
+          translated = new ErrorFont(e instanceof Error ? e.message : e);
+        }
+        font.translated = translated;
+
+        var data = translated;
+        if (data.loadCharProcs) {
+          delete data.loadCharProcs;
+
+          var charProcs = font.get('CharProcs').getAll();
+          var fontResources = font.get('Resources') || resources;
+          var charProcOperatorList = {};
+          for (var key in charProcs) {
+            var glyphStream = charProcs[key];
+            charProcOperatorList[key] =
+              this.getOperatorList(glyphStream, fontResources, dependency);
+          }
+          data.charProcOperatorList = charProcOperatorList;
+        }
+      }
+      return font;
+    },
+
     getOperatorList: function PartialEvaluator_getOperatorList(stream,
                                                                resources,
                                                                dependency,
@@ -13216,46 +14067,19 @@ var PartialEvaluator = (function PartialEvaluatorClosure() {
       }
 
       function handleSetFont(fontName, font) {
-        var loadedName = null;
+        font = self.loadFont(fontName, font, xref, resources, dependency);
 
-        var fontRes = resources.get('Font');
+        var loadedName = font.loadedName;
+        if (!font.sent) {
+          var data = font.translated.exportData();
 
-        assert(fontRes, 'fontRes not available');
-
-        font = xref.fetchIfRef(font) || fontRes.get(fontName);
-        assertWellFormed(isDict(font));
-
-        ++self.objIdCounter;
-        if (!font.loadedName) {
-          font.translated = self.translateFont(font, xref, resources,
-                                               dependency);
-          if (font.translated) {
-            // keep track of each font we translated so the caller can
-            // load them asynchronously before calling display on a page
-            loadedName = 'font_' + uniquePrefix + self.objIdCounter;
-            font.translated.properties.loadedName = loadedName;
-            font.loadedName = loadedName;
-
-            var translated = font.translated;
-            // Convert the file to an ArrayBuffer which will be turned back into
-            // a Stream in the main thread.
-            if (translated.file)
-              translated.file = translated.file.getBytes();
-            if (translated.properties.file) {
-              translated.properties.file =
-                  translated.properties.file.getBytes();
-            }
-
-            handler.send('obj', [
-                loadedName,
-                'Font',
-                translated.name,
-                translated.file,
-                translated.properties
-            ]);
-          }
+          handler.send('obj', [
+              loadedName,
+              'Font',
+              data
+          ]);
+          font.sent = true;
         }
-        loadedName = loadedName || font.loadedName;
 
         // Ensure the font is ready before the font is set
         // and later on used for drawing.
@@ -13542,68 +14366,131 @@ var PartialEvaluator = (function PartialEvaluatorClosure() {
       return queue;
     },
 
-    getTextContent: function partialEvaluatorGetIRQueue(stream, resources) {
+    getTextContent: function partialEvaluatorGetIRQueue(
+                                                    stream, resources, state) {
+      var bidiTexts;
+      var kSpaceFactor = 0.35;
+      var kMultipleSpaceFactor = 1.5;
+
+      if (!state) {
+        bidiTexts = [];
+        state = {
+          bidiTexts: bidiTexts
+        };
+      } else {
+        bidiTexts = state.bidiTexts;
+      }
 
       var self = this;
       var xref = this.xref;
 
       function handleSetFont(fontName, fontRef) {
-        var fontRes = resources.get('Font');
-
-        // TODO: TOASK: Is it possible to get here? If so, what does
-        // args[0].name should be like???
-        assert(fontRes, 'fontRes not available');
-
-        fontRes = xref.fetchIfRef(fontRes);
-        fontRef = fontRef || fontRes.get(fontName);
-        var font = xref.fetchIfRef(fontRef), tra;
-        assertWellFormed(isDict(font));
-        if (!font.translated) {
-          font.translated = self.translateFont(font, xref, resources);
-        }
-        return font;
+        return self.loadFont(fontName, fontRef, xref, resources, null);
       }
 
       resources = xref.fetchIfRef(resources) || new Dict();
+      // The xobj is parsed iff it's needed, e.g. if there is a `DO` cmd.
+      var xobjs = null;
 
       var parser = new Parser(new Lexer(stream), false);
       var res = resources;
       var args = [], obj;
 
-      var text = '';
       var chunk = '';
       var font = null;
       while (!isEOF(obj = parser.getObj())) {
         if (isCmd(obj)) {
           var cmd = obj.cmd;
           switch (cmd) {
+            // TODO: Add support for SAVE/RESTORE and XFORM here.
             case 'Tf':
-              font = handleSetFont(args[0].name);
+              font = handleSetFont(args[0].name).translated;
               break;
             case 'TJ':
               var items = args[0];
               for (var j = 0, jj = items.length; j < jj; j++) {
                 if (typeof items[j] === 'string') {
-                  chunk += items[j];
-                } else if (items[j] < 0) {
-                  // making all negative offsets a space - better to have
-                  // a space in incorrect place than not have them at all
-                  chunk += ' ';
+                  chunk += fontCharsToUnicode(items[j], font);
+                } else if (items[j] < 0 && font.spaceWidth > 0) {
+                  var fakeSpaces = -items[j] / font.spaceWidth;
+                  if (fakeSpaces > kMultipleSpaceFactor) {
+                    fakeSpaces = Math.round(fakeSpaces);
+                    while (fakeSpaces--) {
+                      chunk += ' ';
+                    }
+                  } else if (fakeSpaces > kSpaceFactor) {
+                    chunk += ' ';
+                  }
                 }
               }
               break;
             case 'Tj':
-              chunk += args[0];
+              chunk += fontCharsToUnicode(args[0], font);
               break;
             case "'":
-              chunk += args[0] + ' ';
+              // For search, adding a extra white space for line breaks would be
+              // better here, but that causes too much spaces in the
+              // text-selection divs.
+              chunk += fontCharsToUnicode(args[0], font);
               break;
             case '"':
-              chunk += args[2] + ' ';
+              // Note comment in "'"
+              chunk += fontCharsToUnicode(args[2], font);
+              break;
+            case 'Do':
+              // Set the chunk such that the following if won't add something
+              // to the state.
+              chunk = '';
+
+              if (args[0].code) {
+                break;
+              }
+
+              if (!xobjs) {
+                xobjs = resources.get('XObject') || new Dict();
+              }
+
+              var name = args[0].name;
+              var xobj = xobjs.get(name);
+              if (!xobj)
+                break;
+              assertWellFormed(isStream(xobj), 'XObject should be a stream');
+
+              var type = xobj.dict.get('Subtype');
+              assertWellFormed(
+                isName(type),
+                'XObject should have a Name subtype'
+              );
+
+              if ('Form' !== type.name)
+                break;
+
+              state = this.getTextContent(
+                xobj,
+                xobj.dict.get('Resources') || resources,
+                state
+              );
+              break;
+            case 'gs':
+              var dictName = args[0];
+              var extGState = resources.get('ExtGState');
+
+              if (!isDict(extGState) || !extGState.has(dictName.name))
+                break;
+
+              var gsState = extGState.get(dictName.name);
+
+              for (var i = 0; i < gsState.length; i++) {
+                if (gsState[i] === 'Font') {
+                  font = handleSetFont(args[0].name).translated;
+                }
+              }
               break;
           } // switch
+
           if (chunk !== '') {
-            text += fontCharsToUnicode(chunk, font.translated.properties);
+            bidiTexts.push(PDFJS.bidi(chunk, -1));
+
             chunk = '';
           }
 
@@ -13612,9 +14499,9 @@ var PartialEvaluator = (function PartialEvaluatorClosure() {
           assertWellFormed(args.length <= 33, 'Too many arguments');
           args.push(obj);
         }
-      }
+      } // while
 
-      return text;
+      return state;
     },
 
     extractDataStructures: function
@@ -13644,8 +14531,13 @@ var PartialEvaluator = (function PartialEvaluatorClosure() {
 
       var flags = properties.flags;
       var differences = [];
-      var baseEncoding = !!(flags & FontFlags.Symbolic) ?
-                         Encodings.symbolsEncoding : Encodings.StandardEncoding;
+      var baseEncoding = Encodings.StandardEncoding;
+      // The Symbolic attribute can be misused for regular fonts
+      // Heuristic: we have to check if the font is a standard one also
+      if (!!(flags & FontFlags.Symbolic)) {
+        baseEncoding = !properties.file ? Encodings.symbolsEncoding :
+                                          Encodings.MacRomanEncoding;
+      }
       var hasEncoding = dict.has('Encoding');
       if (hasEncoding) {
         var encoding = dict.get('Encoding');
@@ -13835,7 +14727,7 @@ var PartialEvaluator = (function PartialEvaluatorClosure() {
         if (widths) {
           var start = 0, end = 0;
           for (var i = 0, ii = widths.length; i < ii; i++) {
-            var code = widths[i];
+            var code = xref.fetchIfRef(widths[i]);
             if (isArray(code)) {
               for (var j = 0, jj = code.length; j < jj; j++)
                 glyphsWidths[start++] = code[j];
@@ -13870,21 +14762,41 @@ var PartialEvaluator = (function PartialEvaluatorClosure() {
         }
       }
 
+      // Heuristic: detection of monospace font by checking all non-zero widths
+      var isMonospace = true, firstWidth = defaultWidth;
+      for (var glyph in glyphsWidths) {
+        var glyphWidth = glyphsWidths[glyph];
+        if (!glyphWidth)
+          continue;
+        if (!firstWidth) {
+          firstWidth = glyphWidth;
+          continue;
+        }
+        if (firstWidth != glyphWidth) {
+          isMonospace = false;
+          break;
+        }
+      }
+      if (isMonospace)
+        properties.flags |= FontFlags.FixedPitch;
+
       properties.defaultWidth = defaultWidth;
       properties.widths = glyphsWidths;
     },
 
     getBaseFontMetrics: function PartialEvaluator_getBaseFontMetrics(name) {
-      var defaultWidth = 0, widths = [];
+      var defaultWidth = 0, widths = [], monospace = false;
       var glyphWidths = Metrics[stdFontMap[name] || name];
       if (isNum(glyphWidths)) {
         defaultWidth = glyphWidths;
+        monospace = true;
       } else {
         widths = glyphWidths;
       }
 
       return {
         defaultWidth: defaultWidth,
+        monospace: monospace,
         widths: widths
       };
     },
@@ -13905,7 +14817,7 @@ var PartialEvaluator = (function PartialEvaluatorClosure() {
         //  - get the FontDescriptor from the descendant font
         var df = dict.get('DescendantFonts');
         if (!df)
-          return null;
+          error('Descendant fonts are not specified');
 
         dict = isArray(df) ? xref.fetchIfRef(df[0]) : df;
 
@@ -13928,7 +14840,7 @@ var PartialEvaluator = (function PartialEvaluatorClosure() {
           // This case is here for compatibility.
           var baseFontName = dict.get('BaseFont');
           if (!isName(baseFontName))
-            return null;
+            error('Base font is not specified');
 
           // Using base font name as a font name.
           baseFontName = baseFontName.name.replace(/[,_]/g, '-');
@@ -13938,6 +14850,7 @@ var PartialEvaluator = (function PartialEvaluatorClosure() {
           var fontNameWoStyle = baseFontName.split('-')[0];
           var flags = (serifFonts[fontNameWoStyle] ||
             (fontNameWoStyle.search(/serif/gi) != -1) ? FontFlags.Serif : 0) |
+            (metrics.monospace ? FontFlags.FixedPitch : 0) |
             (symbolsFonts[fontNameWoStyle] ? FontFlags.Symbolic :
             FontFlags.Nonsymbolic);
 
@@ -13951,11 +14864,7 @@ var PartialEvaluator = (function PartialEvaluatorClosure() {
           };
           this.extractDataStructures(dict, dict, xref, properties);
 
-          return {
-            name: baseFontName,
-            dict: baseDict,
-            properties: properties
-          };
+          return new Font(baseFontName, null, properties);
         }
       }
 
@@ -13991,6 +14900,7 @@ var PartialEvaluator = (function PartialEvaluatorClosure() {
         file: fontFile,
         length1: length1,
         length2: length2,
+        loadedName: baseDict.loadedName,
         composite: composite,
         wideChars: composite,
         fixedPitch: false,
@@ -14011,22 +14921,9 @@ var PartialEvaluator = (function PartialEvaluatorClosure() {
 
       if (type.name === 'Type3') {
         properties.coded = true;
-        var charProcs = dict.get('CharProcs').getAll();
-        var fontResources = dict.get('Resources') || resources;
-        properties.charProcOperatorList = {};
-        for (var key in charProcs) {
-          var glyphStream = charProcs[key];
-          properties.charProcOperatorList[key] =
-            this.getOperatorList(glyphStream, fontResources, dependency);
-        }
       }
 
-      return {
-        name: fontName.name,
-        dict: baseDict,
-        file: fontFile,
-        properties: properties
-      };
+      return new Font(fontName.name, fontFile, properties);
     }
   };
 
@@ -14057,10 +14954,6 @@ var EvalState = (function EvalStateClosure() {
 })();
 
 
-/* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
-
-'use strict';
 
 /**
  * Maximum time to wait for a font to be loaded by font-face rules.
@@ -14439,7 +15332,7 @@ var serifFonts = {
   'Seagull': true, 'Sistina': true, 'Souvenir': true,
   'STIX': true, 'Stone Informal': true, 'Stone Serif': true,
   'Sylfaen': true, 'Times': true, 'Trajan': true,
-  'TrinitŽ': true, 'Trump Mediaeval': true, 'Utopia': true,
+  'TrinitÃ©': true, 'Trump Mediaeval': true, 'Utopia': true,
   'Vale Type': true, 'Bitstream Vera': true, 'Vera Serif': true,
   'Versailles': true, 'Wanted': true, 'Weiss': true,
   'Wide Latin': true, 'Windsor': true, 'XITS': true
@@ -14463,27 +15356,30 @@ function mapPrivateUseChars(code) {
 }
 
 var FontLoader = {
-  listeningForFontLoad: false,
+//#if !(MOZCENTRAL)
+  loadingContext: {
+    requests: [],
+    nextRequestId: 0
+  },
+
+  isSyncFontLoadingSupported: (function detectSyncFontLoadingSupport() {
+    if (isWorker)
+      return false;
+
+    // User agent string sniffing is bad, but there is no reliable way to tell
+    // if font is fully loaded and ready to be used with canvas.
+    var userAgent = window.navigator.userAgent;
+    var m = /Mozilla\/5.0.*?rv:(\d+).*? Gecko/.exec(userAgent);
+    if (m && m[1] >= 14)
+      return true;
+    // TODO other browsers
+    return false;
+  })(),
 
   bind: function fontLoaderBind(fonts, callback) {
-    function checkFontsLoaded() {
-      for (var i = 0, ii = fonts.length; i < ii; i++) {
-        var fontObj = fonts[i];
-        if (fontObj.loading) {
-          return false;
-        }
-      }
+    assert(!isWorker, 'bind() shall be called from main thread');
 
-      document.documentElement.removeEventListener(
-        'pdfjsFontLoad', checkFontsLoaded, false);
-
-      callback();
-      return true;
-    }
-
-    var rules = [], names = [], fontsToLoad = [];
-    var fontCreateTimer = 0;
-
+    var rules = [], fontsToLoad = [];
     for (var i = 0, ii = fonts.length; i < ii; i++) {
       var font = fonts[i];
 
@@ -14494,40 +15390,53 @@ var FontLoader = {
       }
       font.attached = true;
 
-      fontsToLoad.push(font);
-
-      var str = '';
-      var data = font.data;
-      if (data) {
-        var length = data.length;
-        for (var j = 0; j < length; j++)
-          str += String.fromCharCode(data[j]);
-
-        var rule = font.bindDOM(str);
-        if (rule) {
-          rules.push(rule);
-          names.push(font.loadedName);
-        }
+      var rule = font.bindDOM();
+      if (rule) {
+        rules.push(rule);
+        fontsToLoad.push(font);
       }
     }
 
-    this.listeningForFontLoad = false;
-    if (!isWorker && rules.length) {
-      FontLoader.prepareFontLoadEvent(rules, names, fontsToLoad);
-    }
-
-    if (!checkFontsLoaded()) {
-      document.documentElement.addEventListener(
-        'pdfjsFontLoad', checkFontsLoaded, false);
+    var request = FontLoader.queueLoadingCallback(callback);
+    if (rules.length > 0 && !this.isSyncFontLoadingSupported) {
+      FontLoader.prepareFontLoadEvent(rules, fontsToLoad, request);
+    } else {
+      request.complete();
     }
   },
+
+  queueLoadingCallback: function FontLoader_queueLoadingCallback(callback) {
+    function LoadLoader_completeRequest() {
+      assert(!request.end, 'completeRequest() cannot be called twice');
+      request.end = Date.now();
+
+      // sending all completed requests in order how they were queued
+      while (context.requests.length > 0 && context.requests[0].end) {
+        var otherRequest = context.requests.shift();
+        setTimeout(otherRequest.callback, 0);
+      }
+    }
+
+    var context = FontLoader.loadingContext;
+    var requestId = 'pdfjs-font-loading-' + (context.nextRequestId++);
+    var request = {
+      id: requestId,
+      complete: LoadLoader_completeRequest,
+      callback: callback,
+      started: Date.now()
+    };
+    context.requests.push(request);
+    return request;
+  },
+
   // Set things up so that at least one pdfjsFontLoad event is
-  // dispatched when all the @font-face |rules| for |names| have been
+  // dispatched when all the @font-face |rules| for |fonts| have been
   // loaded in a subdocument.  It's expected that the load of |rules|
   // has already started in this (outer) document, so that they should
   // be ordered before the load in the subdocument.
-  prepareFontLoadEvent: function fontLoaderPrepareFontLoadEvent(rules, names,
-                                                                fonts) {
+  prepareFontLoadEvent: function fontLoaderPrepareFontLoadEvent(rules,
+                                                                fonts,
+                                                                request) {
       /** Hack begin */
       // There's no event when a font has finished downloading so the
       // following code is a dirty hack to 'guess' when a font is
@@ -14551,6 +15460,20 @@ var FontLoader = {
       // The postMessage() hackery was added to work around chrome bug
       // 82402.
 
+      var requestId = request.id;
+      // Validate the requestId parameter -- the value used to construct HTML.
+      if (!/^[\w\-]+$/.test(requestId)) {
+        error('Invalid request id: ' + requestId);
+
+        // Normally the error-function throws. But if a malicious code
+        // intercepts the function call then the return is needed.
+        return;
+      }
+
+      var names = [];
+      for (var i = 0, ii = fonts.length; i < ii; i++)
+        names.push(fonts[i].loadedName);
+
       // Validate the names parameter -- the values can used to construct HTML.
       if (!/^\w+$/.test(names.join(''))) {
         error('Invalid font name(s): ' + names.join());
@@ -14572,22 +15495,21 @@ var FontLoader = {
       div.innerHTML = html;
       document.body.appendChild(div);
 
-      if (!this.listeningForFontLoad) {
-        window.addEventListener(
-          'message',
-          function fontLoaderMessage(e) {
-            var fontNames = JSON.parse(e.data);
-            for (var i = 0, ii = fonts.length; i < ii; ++i) {
-              var font = fonts[i];
-              font.loading = false;
-            }
-            var evt = document.createEvent('Events');
-            evt.initEvent('pdfjsFontLoad', true, false);
-            document.documentElement.dispatchEvent(evt);
-          },
-          false);
-        this.listeningForFontLoad = true;
-      }
+      window.addEventListener(
+        'message',
+        function fontLoaderMessage(e) {
+          if (e.data !== requestId)
+            return;
+          for (var i = 0, ii = fonts.length; i < ii; ++i) {
+            var font = fonts[i];
+            font.loading = false;
+          }
+          request.complete();
+          // cleanup
+          document.body.removeChild(frame);
+          window.removeEventListener('message', fontLoaderMessage, false);
+        },
+        false);
 
       // XXX we should have a time-out here too, and maybe fire
       // pdfjsFontLoadFailed?
@@ -14598,13 +15520,10 @@ var FontLoader = {
       }
       src += '</style>';
       src += '<script type="application/javascript">';
-      var fontNamesArray = '';
-      for (var i = 0, ii = names.length; i < ii; ++i) {
-        fontNamesArray += '"' + names[i] + '", ';
-      }
-      src += '  var fontNames=[' + fontNamesArray + '];\n';
       src += '  window.onload = function fontLoaderOnload() {\n';
-      src += '    parent.postMessage(JSON.stringify(fontNames), "*");\n';
+      src += '    parent.postMessage("' + requestId + '", "*");\n';
+      // Chrome stuck on loading (see chrome issue 145227) - resetting url
+      src += '    window.location = "about:blank";\n';
       src += '  }';
       // Hack so the end script tag isn't counted if this is inline JS.
       src += '</scr' + 'ipt></head><body>';
@@ -14621,6 +15540,22 @@ var FontLoader = {
       document.body.appendChild(frame);
       /** Hack end */
   }
+//#else
+//bind: function fontLoaderBind(fonts, callback) {
+//  assert(!isWorker, 'bind() shall be called from main thread');
+//
+//  for (var i = 0, ii = fonts.length; i < ii; i++) {
+//    var font = fonts[i];
+//    if (font.attached)
+//      continue;
+//
+//    font.attached = true;
+//    font.bindDOM()
+//  }
+//
+//  setTimeout(callback);
+//}
+//#endif
 };
 
 var UnicodeRanges = [
@@ -15481,63 +16416,743 @@ var NormalizedUnicodes = {
   '\uFB16': '\u057E\u0576',
   '\uFB17': '\u0574\u056D',
   '\uFB4F': '\u05D0\u05DC',
+  '\uFB50': '\u0671',
+  '\uFB51': '\u0671',
+  '\uFB52': '\u067B',
+  '\uFB53': '\u067B',
+  '\uFB54': '\u067B',
+  '\uFB55': '\u067B',
+  '\uFB56': '\u067E',
+  '\uFB57': '\u067E',
+  '\uFB58': '\u067E',
+  '\uFB59': '\u067E',
+  '\uFB5A': '\u0680',
+  '\uFB5B': '\u0680',
+  '\uFB5C': '\u0680',
+  '\uFB5D': '\u0680',
+  '\uFB5E': '\u067A',
+  '\uFB5F': '\u067A',
+  '\uFB60': '\u067A',
+  '\uFB61': '\u067A',
+  '\uFB62': '\u067F',
+  '\uFB63': '\u067F',
+  '\uFB64': '\u067F',
+  '\uFB65': '\u067F',
+  '\uFB66': '\u0679',
+  '\uFB67': '\u0679',
+  '\uFB68': '\u0679',
+  '\uFB69': '\u0679',
+  '\uFB6A': '\u06A4',
+  '\uFB6B': '\u06A4',
+  '\uFB6C': '\u06A4',
+  '\uFB6D': '\u06A4',
+  '\uFB6E': '\u06A6',
+  '\uFB6F': '\u06A6',
+  '\uFB70': '\u06A6',
+  '\uFB71': '\u06A6',
+  '\uFB72': '\u0684',
+  '\uFB73': '\u0684',
+  '\uFB74': '\u0684',
+  '\uFB75': '\u0684',
+  '\uFB76': '\u0683',
+  '\uFB77': '\u0683',
+  '\uFB78': '\u0683',
+  '\uFB79': '\u0683',
+  '\uFB7A': '\u0686',
+  '\uFB7B': '\u0686',
+  '\uFB7C': '\u0686',
+  '\uFB7D': '\u0686',
+  '\uFB7E': '\u0687',
+  '\uFB7F': '\u0687',
+  '\uFB80': '\u0687',
+  '\uFB81': '\u0687',
+  '\uFB82': '\u068D',
+  '\uFB83': '\u068D',
+  '\uFB84': '\u068C',
+  '\uFB85': '\u068C',
+  '\uFB86': '\u068E',
+  '\uFB87': '\u068E',
+  '\uFB88': '\u0688',
+  '\uFB89': '\u0688',
+  '\uFB8A': '\u0698',
+  '\uFB8B': '\u0698',
+  '\uFB8C': '\u0691',
+  '\uFB8D': '\u0691',
+  '\uFB8E': '\u06A9',
+  '\uFB8F': '\u06A9',
+  '\uFB90': '\u06A9',
+  '\uFB91': '\u06A9',
+  '\uFB92': '\u06AF',
+  '\uFB93': '\u06AF',
+  '\uFB94': '\u06AF',
+  '\uFB95': '\u06AF',
+  '\uFB96': '\u06B3',
+  '\uFB97': '\u06B3',
+  '\uFB98': '\u06B3',
+  '\uFB99': '\u06B3',
+  '\uFB9A': '\u06B1',
+  '\uFB9B': '\u06B1',
+  '\uFB9C': '\u06B1',
+  '\uFB9D': '\u06B1',
+  '\uFB9E': '\u06BA',
+  '\uFB9F': '\u06BA',
+  '\uFBA0': '\u06BB',
+  '\uFBA1': '\u06BB',
+  '\uFBA2': '\u06BB',
+  '\uFBA3': '\u06BB',
+  '\uFBA4': '\u06C0',
+  '\uFBA5': '\u06C0',
+  '\uFBA6': '\u06C1',
+  '\uFBA7': '\u06C1',
+  '\uFBA8': '\u06C1',
+  '\uFBA9': '\u06C1',
+  '\uFBAA': '\u06BE',
+  '\uFBAB': '\u06BE',
+  '\uFBAC': '\u06BE',
+  '\uFBAD': '\u06BE',
+  '\uFBAE': '\u06D2',
+  '\uFBAF': '\u06D2',
+  '\uFBB0': '\u06D3',
+  '\uFBB1': '\u06D3',
+  '\uFBD3': '\u06AD',
+  '\uFBD4': '\u06AD',
+  '\uFBD5': '\u06AD',
+  '\uFBD6': '\u06AD',
+  '\uFBD7': '\u06C7',
+  '\uFBD8': '\u06C7',
+  '\uFBD9': '\u06C6',
+  '\uFBDA': '\u06C6',
+  '\uFBDB': '\u06C8',
+  '\uFBDC': '\u06C8',
+  '\uFBDD': '\u0677',
+  '\uFBDE': '\u06CB',
+  '\uFBDF': '\u06CB',
+  '\uFBE0': '\u06C5',
+  '\uFBE1': '\u06C5',
+  '\uFBE2': '\u06C9',
+  '\uFBE3': '\u06C9',
+  '\uFBE4': '\u06D0',
+  '\uFBE5': '\u06D0',
+  '\uFBE6': '\u06D0',
+  '\uFBE7': '\u06D0',
+  '\uFBE8': '\u0649',
+  '\uFBE9': '\u0649',
+  '\uFBEA': '\u0626\u0627',
+  '\uFBEB': '\u0626\u0627',
+  '\uFBEC': '\u0626\u06D5',
+  '\uFBED': '\u0626\u06D5',
+  '\uFBEE': '\u0626\u0648',
+  '\uFBEF': '\u0626\u0648',
+  '\uFBF0': '\u0626\u06C7',
+  '\uFBF1': '\u0626\u06C7',
+  '\uFBF2': '\u0626\u06C6',
+  '\uFBF3': '\u0626\u06C6',
+  '\uFBF4': '\u0626\u06C8',
+  '\uFBF5': '\u0626\u06C8',
+  '\uFBF6': '\u0626\u06D0',
+  '\uFBF7': '\u0626\u06D0',
+  '\uFBF8': '\u0626\u06D0',
+  '\uFBF9': '\u0626\u0649',
+  '\uFBFA': '\u0626\u0649',
+  '\uFBFB': '\u0626\u0649',
+  '\uFBFC': '\u06CC',
+  '\uFBFD': '\u06CC',
+  '\uFBFE': '\u06CC',
+  '\uFBFF': '\u06CC',
+  '\uFC00': '\u0626\u062C',
+  '\uFC01': '\u0626\u062D',
+  '\uFC02': '\u0626\u0645',
+  '\uFC03': '\u0626\u0649',
+  '\uFC04': '\u0626\u064A',
+  '\uFC05': '\u0628\u062C',
+  '\uFC06': '\u0628\u062D',
+  '\uFC07': '\u0628\u062E',
+  '\uFC08': '\u0628\u0645',
+  '\uFC09': '\u0628\u0649',
+  '\uFC0A': '\u0628\u064A',
+  '\uFC0B': '\u062A\u062C',
+  '\uFC0C': '\u062A\u062D',
+  '\uFC0D': '\u062A\u062E',
+  '\uFC0E': '\u062A\u0645',
+  '\uFC0F': '\u062A\u0649',
+  '\uFC10': '\u062A\u064A',
+  '\uFC11': '\u062B\u062C',
+  '\uFC12': '\u062B\u0645',
+  '\uFC13': '\u062B\u0649',
+  '\uFC14': '\u062B\u064A',
+  '\uFC15': '\u062C\u062D',
+  '\uFC16': '\u062C\u0645',
+  '\uFC17': '\u062D\u062C',
+  '\uFC18': '\u062D\u0645',
+  '\uFC19': '\u062E\u062C',
+  '\uFC1A': '\u062E\u062D',
+  '\uFC1B': '\u062E\u0645',
+  '\uFC1C': '\u0633\u062C',
+  '\uFC1D': '\u0633\u062D',
+  '\uFC1E': '\u0633\u062E',
+  '\uFC1F': '\u0633\u0645',
+  '\uFC20': '\u0635\u062D',
+  '\uFC21': '\u0635\u0645',
+  '\uFC22': '\u0636\u062C',
+  '\uFC23': '\u0636\u062D',
+  '\uFC24': '\u0636\u062E',
+  '\uFC25': '\u0636\u0645',
+  '\uFC26': '\u0637\u062D',
+  '\uFC27': '\u0637\u0645',
+  '\uFC28': '\u0638\u0645',
+  '\uFC29': '\u0639\u062C',
+  '\uFC2A': '\u0639\u0645',
+  '\uFC2B': '\u063A\u062C',
+  '\uFC2C': '\u063A\u0645',
+  '\uFC2D': '\u0641\u062C',
+  '\uFC2E': '\u0641\u062D',
+  '\uFC2F': '\u0641\u062E',
+  '\uFC30': '\u0641\u0645',
+  '\uFC31': '\u0641\u0649',
+  '\uFC32': '\u0641\u064A',
+  '\uFC33': '\u0642\u062D',
+  '\uFC34': '\u0642\u0645',
+  '\uFC35': '\u0642\u0649',
+  '\uFC36': '\u0642\u064A',
+  '\uFC37': '\u0643\u0627',
+  '\uFC38': '\u0643\u062C',
+  '\uFC39': '\u0643\u062D',
+  '\uFC3A': '\u0643\u062E',
+  '\uFC3B': '\u0643\u0644',
+  '\uFC3C': '\u0643\u0645',
+  '\uFC3D': '\u0643\u0649',
+  '\uFC3E': '\u0643\u064A',
+  '\uFC3F': '\u0644\u062C',
+  '\uFC40': '\u0644\u062D',
+  '\uFC41': '\u0644\u062E',
+  '\uFC42': '\u0644\u0645',
+  '\uFC43': '\u0644\u0649',
+  '\uFC44': '\u0644\u064A',
+  '\uFC45': '\u0645\u062C',
+  '\uFC46': '\u0645\u062D',
+  '\uFC47': '\u0645\u062E',
+  '\uFC48': '\u0645\u0645',
+  '\uFC49': '\u0645\u0649',
+  '\uFC4A': '\u0645\u064A',
+  '\uFC4B': '\u0646\u062C',
+  '\uFC4C': '\u0646\u062D',
+  '\uFC4D': '\u0646\u062E',
+  '\uFC4E': '\u0646\u0645',
+  '\uFC4F': '\u0646\u0649',
+  '\uFC50': '\u0646\u064A',
+  '\uFC51': '\u0647\u062C',
+  '\uFC52': '\u0647\u0645',
+  '\uFC53': '\u0647\u0649',
+  '\uFC54': '\u0647\u064A',
+  '\uFC55': '\u064A\u062C',
+  '\uFC56': '\u064A\u062D',
+  '\uFC57': '\u064A\u062E',
+  '\uFC58': '\u064A\u0645',
+  '\uFC59': '\u064A\u0649',
+  '\uFC5A': '\u064A\u064A',
+  '\uFC5B': '\u0630\u0670',
+  '\uFC5C': '\u0631\u0670',
+  '\uFC5D': '\u0649\u0670',
+  '\uFC5E': '\u0020\u064C\u0651',
+  '\uFC5F': '\u0020\u064D\u0651',
+  '\uFC60': '\u0020\u064E\u0651',
+  '\uFC61': '\u0020\u064F\u0651',
+  '\uFC62': '\u0020\u0650\u0651',
+  '\uFC63': '\u0020\u0651\u0670',
+  '\uFC64': '\u0626\u0631',
+  '\uFC65': '\u0626\u0632',
+  '\uFC66': '\u0626\u0645',
+  '\uFC67': '\u0626\u0646',
+  '\uFC68': '\u0626\u0649',
+  '\uFC69': '\u0626\u064A',
+  '\uFC6A': '\u0628\u0631',
+  '\uFC6B': '\u0628\u0632',
+  '\uFC6C': '\u0628\u0645',
+  '\uFC6D': '\u0628\u0646',
+  '\uFC6E': '\u0628\u0649',
+  '\uFC6F': '\u0628\u064A',
+  '\uFC70': '\u062A\u0631',
+  '\uFC71': '\u062A\u0632',
+  '\uFC72': '\u062A\u0645',
+  '\uFC73': '\u062A\u0646',
+  '\uFC74': '\u062A\u0649',
+  '\uFC75': '\u062A\u064A',
+  '\uFC76': '\u062B\u0631',
+  '\uFC77': '\u062B\u0632',
+  '\uFC78': '\u062B\u0645',
+  '\uFC79': '\u062B\u0646',
+  '\uFC7A': '\u062B\u0649',
+  '\uFC7B': '\u062B\u064A',
+  '\uFC7C': '\u0641\u0649',
+  '\uFC7D': '\u0641\u064A',
+  '\uFC7E': '\u0642\u0649',
+  '\uFC7F': '\u0642\u064A',
+  '\uFC80': '\u0643\u0627',
+  '\uFC81': '\u0643\u0644',
+  '\uFC82': '\u0643\u0645',
+  '\uFC83': '\u0643\u0649',
+  '\uFC84': '\u0643\u064A',
+  '\uFC85': '\u0644\u0645',
+  '\uFC86': '\u0644\u0649',
+  '\uFC87': '\u0644\u064A',
+  '\uFC88': '\u0645\u0627',
+  '\uFC89': '\u0645\u0645',
+  '\uFC8A': '\u0646\u0631',
+  '\uFC8B': '\u0646\u0632',
+  '\uFC8C': '\u0646\u0645',
+  '\uFC8D': '\u0646\u0646',
+  '\uFC8E': '\u0646\u0649',
+  '\uFC8F': '\u0646\u064A',
+  '\uFC90': '\u0649\u0670',
+  '\uFC91': '\u064A\u0631',
+  '\uFC92': '\u064A\u0632',
+  '\uFC93': '\u064A\u0645',
+  '\uFC94': '\u064A\u0646',
+  '\uFC95': '\u064A\u0649',
+  '\uFC96': '\u064A\u064A',
+  '\uFC97': '\u0626\u062C',
+  '\uFC98': '\u0626\u062D',
+  '\uFC99': '\u0626\u062E',
+  '\uFC9A': '\u0626\u0645',
+  '\uFC9B': '\u0626\u0647',
+  '\uFC9C': '\u0628\u062C',
+  '\uFC9D': '\u0628\u062D',
+  '\uFC9E': '\u0628\u062E',
+  '\uFC9F': '\u0628\u0645',
+  '\uFCA0': '\u0628\u0647',
+  '\uFCA1': '\u062A\u062C',
+  '\uFCA2': '\u062A\u062D',
+  '\uFCA3': '\u062A\u062E',
+  '\uFCA4': '\u062A\u0645',
+  '\uFCA5': '\u062A\u0647',
+  '\uFCA6': '\u062B\u0645',
+  '\uFCA7': '\u062C\u062D',
+  '\uFCA8': '\u062C\u0645',
+  '\uFCA9': '\u062D\u062C',
+  '\uFCAA': '\u062D\u0645',
+  '\uFCAB': '\u062E\u062C',
+  '\uFCAC': '\u062E\u0645',
+  '\uFCAD': '\u0633\u062C',
+  '\uFCAE': '\u0633\u062D',
+  '\uFCAF': '\u0633\u062E',
+  '\uFCB0': '\u0633\u0645',
+  '\uFCB1': '\u0635\u062D',
+  '\uFCB2': '\u0635\u062E',
+  '\uFCB3': '\u0635\u0645',
+  '\uFCB4': '\u0636\u062C',
+  '\uFCB5': '\u0636\u062D',
+  '\uFCB6': '\u0636\u062E',
+  '\uFCB7': '\u0636\u0645',
+  '\uFCB8': '\u0637\u062D',
+  '\uFCB9': '\u0638\u0645',
+  '\uFCBA': '\u0639\u062C',
+  '\uFCBB': '\u0639\u0645',
+  '\uFCBC': '\u063A\u062C',
+  '\uFCBD': '\u063A\u0645',
+  '\uFCBE': '\u0641\u062C',
+  '\uFCBF': '\u0641\u062D',
+  '\uFCC0': '\u0641\u062E',
+  '\uFCC1': '\u0641\u0645',
+  '\uFCC2': '\u0642\u062D',
+  '\uFCC3': '\u0642\u0645',
+  '\uFCC4': '\u0643\u062C',
+  '\uFCC5': '\u0643\u062D',
+  '\uFCC6': '\u0643\u062E',
+  '\uFCC7': '\u0643\u0644',
+  '\uFCC8': '\u0643\u0645',
+  '\uFCC9': '\u0644\u062C',
+  '\uFCCA': '\u0644\u062D',
+  '\uFCCB': '\u0644\u062E',
+  '\uFCCC': '\u0644\u0645',
+  '\uFCCD': '\u0644\u0647',
+  '\uFCCE': '\u0645\u062C',
+  '\uFCCF': '\u0645\u062D',
+  '\uFCD0': '\u0645\u062E',
+  '\uFCD1': '\u0645\u0645',
+  '\uFCD2': '\u0646\u062C',
+  '\uFCD3': '\u0646\u062D',
+  '\uFCD4': '\u0646\u062E',
+  '\uFCD5': '\u0646\u0645',
+  '\uFCD6': '\u0646\u0647',
+  '\uFCD7': '\u0647\u062C',
+  '\uFCD8': '\u0647\u0645',
+  '\uFCD9': '\u0647\u0670',
+  '\uFCDA': '\u064A\u062C',
+  '\uFCDB': '\u064A\u062D',
+  '\uFCDC': '\u064A\u062E',
+  '\uFCDD': '\u064A\u0645',
+  '\uFCDE': '\u064A\u0647',
+  '\uFCDF': '\u0626\u0645',
+  '\uFCE0': '\u0626\u0647',
+  '\uFCE1': '\u0628\u0645',
+  '\uFCE2': '\u0628\u0647',
+  '\uFCE3': '\u062A\u0645',
+  '\uFCE4': '\u062A\u0647',
+  '\uFCE5': '\u062B\u0645',
+  '\uFCE6': '\u062B\u0647',
+  '\uFCE7': '\u0633\u0645',
+  '\uFCE8': '\u0633\u0647',
+  '\uFCE9': '\u0634\u0645',
+  '\uFCEA': '\u0634\u0647',
+  '\uFCEB': '\u0643\u0644',
+  '\uFCEC': '\u0643\u0645',
+  '\uFCED': '\u0644\u0645',
+  '\uFCEE': '\u0646\u0645',
+  '\uFCEF': '\u0646\u0647',
+  '\uFCF0': '\u064A\u0645',
+  '\uFCF1': '\u064A\u0647',
+  '\uFCF2': '\u0640\u064E\u0651',
+  '\uFCF3': '\u0640\u064F\u0651',
+  '\uFCF4': '\u0640\u0650\u0651',
+  '\uFCF5': '\u0637\u0649',
+  '\uFCF6': '\u0637\u064A',
+  '\uFCF7': '\u0639\u0649',
+  '\uFCF8': '\u0639\u064A',
+  '\uFCF9': '\u063A\u0649',
+  '\uFCFA': '\u063A\u064A',
+  '\uFCFB': '\u0633\u0649',
+  '\uFCFC': '\u0633\u064A',
+  '\uFCFD': '\u0634\u0649',
+  '\uFCFE': '\u0634\u064A',
+  '\uFCFF': '\u062D\u0649',
+  '\uFD00': '\u062D\u064A',
+  '\uFD01': '\u062C\u0649',
+  '\uFD02': '\u062C\u064A',
+  '\uFD03': '\u062E\u0649',
+  '\uFD04': '\u062E\u064A',
+  '\uFD05': '\u0635\u0649',
+  '\uFD06': '\u0635\u064A',
+  '\uFD07': '\u0636\u0649',
+  '\uFD08': '\u0636\u064A',
+  '\uFD09': '\u0634\u062C',
+  '\uFD0A': '\u0634\u062D',
+  '\uFD0B': '\u0634\u062E',
+  '\uFD0C': '\u0634\u0645',
+  '\uFD0D': '\u0634\u0631',
+  '\uFD0E': '\u0633\u0631',
+  '\uFD0F': '\u0635\u0631',
+  '\uFD10': '\u0636\u0631',
+  '\uFD11': '\u0637\u0649',
+  '\uFD12': '\u0637\u064A',
+  '\uFD13': '\u0639\u0649',
+  '\uFD14': '\u0639\u064A',
+  '\uFD15': '\u063A\u0649',
+  '\uFD16': '\u063A\u064A',
+  '\uFD17': '\u0633\u0649',
+  '\uFD18': '\u0633\u064A',
+  '\uFD19': '\u0634\u0649',
+  '\uFD1A': '\u0634\u064A',
+  '\uFD1B': '\u062D\u0649',
+  '\uFD1C': '\u062D\u064A',
+  '\uFD1D': '\u062C\u0649',
+  '\uFD1E': '\u062C\u064A',
+  '\uFD1F': '\u062E\u0649',
+  '\uFD20': '\u062E\u064A',
+  '\uFD21': '\u0635\u0649',
+  '\uFD22': '\u0635\u064A',
+  '\uFD23': '\u0636\u0649',
+  '\uFD24': '\u0636\u064A',
+  '\uFD25': '\u0634\u062C',
+  '\uFD26': '\u0634\u062D',
+  '\uFD27': '\u0634\u062E',
+  '\uFD28': '\u0634\u0645',
+  '\uFD29': '\u0634\u0631',
+  '\uFD2A': '\u0633\u0631',
+  '\uFD2B': '\u0635\u0631',
+  '\uFD2C': '\u0636\u0631',
+  '\uFD2D': '\u0634\u062C',
+  '\uFD2E': '\u0634\u062D',
+  '\uFD2F': '\u0634\u062E',
+  '\uFD30': '\u0634\u0645',
+  '\uFD31': '\u0633\u0647',
+  '\uFD32': '\u0634\u0647',
+  '\uFD33': '\u0637\u0645',
+  '\uFD34': '\u0633\u062C',
+  '\uFD35': '\u0633\u062D',
+  '\uFD36': '\u0633\u062E',
+  '\uFD37': '\u0634\u062C',
+  '\uFD38': '\u0634\u062D',
+  '\uFD39': '\u0634\u062E',
+  '\uFD3A': '\u0637\u0645',
+  '\uFD3B': '\u0638\u0645',
+  '\uFD3C': '\u0627\u064B',
+  '\uFD3D': '\u0627\u064B',
+  '\uFD50': '\u062A\u062C\u0645',
+  '\uFD51': '\u062A\u062D\u062C',
+  '\uFD52': '\u062A\u062D\u062C',
+  '\uFD53': '\u062A\u062D\u0645',
+  '\uFD54': '\u062A\u062E\u0645',
+  '\uFD55': '\u062A\u0645\u062C',
+  '\uFD56': '\u062A\u0645\u062D',
+  '\uFD57': '\u062A\u0645\u062E',
+  '\uFD58': '\u062C\u0645\u062D',
+  '\uFD59': '\u062C\u0645\u062D',
+  '\uFD5A': '\u062D\u0645\u064A',
+  '\uFD5B': '\u062D\u0645\u0649',
+  '\uFD5C': '\u0633\u062D\u062C',
+  '\uFD5D': '\u0633\u062C\u062D',
+  '\uFD5E': '\u0633\u062C\u0649',
+  '\uFD5F': '\u0633\u0645\u062D',
+  '\uFD60': '\u0633\u0645\u062D',
+  '\uFD61': '\u0633\u0645\u062C',
+  '\uFD62': '\u0633\u0645\u0645',
+  '\uFD63': '\u0633\u0645\u0645',
+  '\uFD64': '\u0635\u062D\u062D',
+  '\uFD65': '\u0635\u062D\u062D',
+  '\uFD66': '\u0635\u0645\u0645',
+  '\uFD67': '\u0634\u062D\u0645',
+  '\uFD68': '\u0634\u062D\u0645',
+  '\uFD69': '\u0634\u062C\u064A',
+  '\uFD6A': '\u0634\u0645\u062E',
+  '\uFD6B': '\u0634\u0645\u062E',
+  '\uFD6C': '\u0634\u0645\u0645',
+  '\uFD6D': '\u0634\u0645\u0645',
+  '\uFD6E': '\u0636\u062D\u0649',
+  '\uFD6F': '\u0636\u062E\u0645',
+  '\uFD70': '\u0636\u062E\u0645',
+  '\uFD71': '\u0637\u0645\u062D',
+  '\uFD72': '\u0637\u0645\u062D',
+  '\uFD73': '\u0637\u0645\u0645',
+  '\uFD74': '\u0637\u0645\u064A',
+  '\uFD75': '\u0639\u062C\u0645',
+  '\uFD76': '\u0639\u0645\u0645',
+  '\uFD77': '\u0639\u0645\u0645',
+  '\uFD78': '\u0639\u0645\u0649',
+  '\uFD79': '\u063A\u0645\u0645',
+  '\uFD7A': '\u063A\u0645\u064A',
+  '\uFD7B': '\u063A\u0645\u0649',
+  '\uFD7C': '\u0641\u062E\u0645',
+  '\uFD7D': '\u0641\u062E\u0645',
+  '\uFD7E': '\u0642\u0645\u062D',
+  '\uFD7F': '\u0642\u0645\u0645',
+  '\uFD80': '\u0644\u062D\u0645',
+  '\uFD81': '\u0644\u062D\u064A',
+  '\uFD82': '\u0644\u062D\u0649',
+  '\uFD83': '\u0644\u062C\u062C',
+  '\uFD84': '\u0644\u062C\u062C',
+  '\uFD85': '\u0644\u062E\u0645',
+  '\uFD86': '\u0644\u062E\u0645',
+  '\uFD87': '\u0644\u0645\u062D',
+  '\uFD88': '\u0644\u0645\u062D',
+  '\uFD89': '\u0645\u062D\u062C',
+  '\uFD8A': '\u0645\u062D\u0645',
+  '\uFD8B': '\u0645\u062D\u064A',
+  '\uFD8C': '\u0645\u062C\u062D',
+  '\uFD8D': '\u0645\u062C\u0645',
+  '\uFD8E': '\u0645\u062E\u062C',
+  '\uFD8F': '\u0645\u062E\u0645',
+  '\uFD92': '\u0645\u062C\u062E',
+  '\uFD93': '\u0647\u0645\u062C',
+  '\uFD94': '\u0647\u0645\u0645',
+  '\uFD95': '\u0646\u062D\u0645',
+  '\uFD96': '\u0646\u062D\u0649',
+  '\uFD97': '\u0646\u062C\u0645',
+  '\uFD98': '\u0646\u062C\u0645',
+  '\uFD99': '\u0646\u062C\u0649',
+  '\uFD9A': '\u0646\u0645\u064A',
+  '\uFD9B': '\u0646\u0645\u0649',
+  '\uFD9C': '\u064A\u0645\u0645',
+  '\uFD9D': '\u064A\u0645\u0645',
+  '\uFD9E': '\u0628\u062E\u064A',
+  '\uFD9F': '\u062A\u062C\u064A',
+  '\uFDA0': '\u062A\u062C\u0649',
+  '\uFDA1': '\u062A\u062E\u064A',
+  '\uFDA2': '\u062A\u062E\u0649',
+  '\uFDA3': '\u062A\u0645\u064A',
+  '\uFDA4': '\u062A\u0645\u0649',
+  '\uFDA5': '\u062C\u0645\u064A',
+  '\uFDA6': '\u062C\u062D\u0649',
+  '\uFDA7': '\u062C\u0645\u0649',
+  '\uFDA8': '\u0633\u062E\u0649',
+  '\uFDA9': '\u0635\u062D\u064A',
+  '\uFDAA': '\u0634\u062D\u064A',
+  '\uFDAB': '\u0636\u062D\u064A',
+  '\uFDAC': '\u0644\u062C\u064A',
+  '\uFDAD': '\u0644\u0645\u064A',
+  '\uFDAE': '\u064A\u062D\u064A',
+  '\uFDAF': '\u064A\u062C\u064A',
+  '\uFDB0': '\u064A\u0645\u064A',
+  '\uFDB1': '\u0645\u0645\u064A',
+  '\uFDB2': '\u0642\u0645\u064A',
+  '\uFDB3': '\u0646\u062D\u064A',
+  '\uFDB4': '\u0642\u0645\u062D',
+  '\uFDB5': '\u0644\u062D\u0645',
+  '\uFDB6': '\u0639\u0645\u064A',
+  '\uFDB7': '\u0643\u0645\u064A',
+  '\uFDB8': '\u0646\u062C\u062D',
+  '\uFDB9': '\u0645\u062E\u064A',
+  '\uFDBA': '\u0644\u062C\u0645',
+  '\uFDBB': '\u0643\u0645\u0645',
+  '\uFDBC': '\u0644\u062C\u0645',
+  '\uFDBD': '\u0646\u062C\u062D',
+  '\uFDBE': '\u062C\u062D\u064A',
+  '\uFDBF': '\u062D\u062C\u064A',
+  '\uFDC0': '\u0645\u062C\u064A',
+  '\uFDC1': '\u0641\u0645\u064A',
+  '\uFDC2': '\u0628\u062D\u064A',
+  '\uFDC3': '\u0643\u0645\u0645',
+  '\uFDC4': '\u0639\u062C\u0645',
+  '\uFDC5': '\u0635\u0645\u0645',
+  '\uFDC6': '\u0633\u062E\u064A',
+  '\uFDC7': '\u0646\u062C\u064A',
   '\uFE49': '\u203E',
   '\uFE4A': '\u203E',
   '\uFE4B': '\u203E',
   '\uFE4C': '\u203E',
   '\uFE4D': '\u005F',
   '\uFE4E': '\u005F',
-  '\uFE4F': '\u005F'
+  '\uFE4F': '\u005F',
+  '\uFE80': '\u0621',
+  '\uFE81': '\u0622',
+  '\uFE82': '\u0622',
+  '\uFE83': '\u0623',
+  '\uFE84': '\u0623',
+  '\uFE85': '\u0624',
+  '\uFE86': '\u0624',
+  '\uFE87': '\u0625',
+  '\uFE88': '\u0625',
+  '\uFE89': '\u0626',
+  '\uFE8A': '\u0626',
+  '\uFE8B': '\u0626',
+  '\uFE8C': '\u0626',
+  '\uFE8D': '\u0627',
+  '\uFE8E': '\u0627',
+  '\uFE8F': '\u0628',
+  '\uFE90': '\u0628',
+  '\uFE91': '\u0628',
+  '\uFE92': '\u0628',
+  '\uFE93': '\u0629',
+  '\uFE94': '\u0629',
+  '\uFE95': '\u062A',
+  '\uFE96': '\u062A',
+  '\uFE97': '\u062A',
+  '\uFE98': '\u062A',
+  '\uFE99': '\u062B',
+  '\uFE9A': '\u062B',
+  '\uFE9B': '\u062B',
+  '\uFE9C': '\u062B',
+  '\uFE9D': '\u062C',
+  '\uFE9E': '\u062C',
+  '\uFE9F': '\u062C',
+  '\uFEA0': '\u062C',
+  '\uFEA1': '\u062D',
+  '\uFEA2': '\u062D',
+  '\uFEA3': '\u062D',
+  '\uFEA4': '\u062D',
+  '\uFEA5': '\u062E',
+  '\uFEA6': '\u062E',
+  '\uFEA7': '\u062E',
+  '\uFEA8': '\u062E',
+  '\uFEA9': '\u062F',
+  '\uFEAA': '\u062F',
+  '\uFEAB': '\u0630',
+  '\uFEAC': '\u0630',
+  '\uFEAD': '\u0631',
+  '\uFEAE': '\u0631',
+  '\uFEAF': '\u0632',
+  '\uFEB0': '\u0632',
+  '\uFEB1': '\u0633',
+  '\uFEB2': '\u0633',
+  '\uFEB3': '\u0633',
+  '\uFEB4': '\u0633',
+  '\uFEB5': '\u0634',
+  '\uFEB6': '\u0634',
+  '\uFEB7': '\u0634',
+  '\uFEB8': '\u0634',
+  '\uFEB9': '\u0635',
+  '\uFEBA': '\u0635',
+  '\uFEBB': '\u0635',
+  '\uFEBC': '\u0635',
+  '\uFEBD': '\u0636',
+  '\uFEBE': '\u0636',
+  '\uFEBF': '\u0636',
+  '\uFEC0': '\u0636',
+  '\uFEC1': '\u0637',
+  '\uFEC2': '\u0637',
+  '\uFEC3': '\u0637',
+  '\uFEC4': '\u0637',
+  '\uFEC5': '\u0638',
+  '\uFEC6': '\u0638',
+  '\uFEC7': '\u0638',
+  '\uFEC8': '\u0638',
+  '\uFEC9': '\u0639',
+  '\uFECA': '\u0639',
+  '\uFECB': '\u0639',
+  '\uFECC': '\u0639',
+  '\uFECD': '\u063A',
+  '\uFECE': '\u063A',
+  '\uFECF': '\u063A',
+  '\uFED0': '\u063A',
+  '\uFED1': '\u0641',
+  '\uFED2': '\u0641',
+  '\uFED3': '\u0641',
+  '\uFED4': '\u0641',
+  '\uFED5': '\u0642',
+  '\uFED6': '\u0642',
+  '\uFED7': '\u0642',
+  '\uFED8': '\u0642',
+  '\uFED9': '\u0643',
+  '\uFEDA': '\u0643',
+  '\uFEDB': '\u0643',
+  '\uFEDC': '\u0643',
+  '\uFEDD': '\u0644',
+  '\uFEDE': '\u0644',
+  '\uFEDF': '\u0644',
+  '\uFEE0': '\u0644',
+  '\uFEE1': '\u0645',
+  '\uFEE2': '\u0645',
+  '\uFEE3': '\u0645',
+  '\uFEE4': '\u0645',
+  '\uFEE5': '\u0646',
+  '\uFEE6': '\u0646',
+  '\uFEE7': '\u0646',
+  '\uFEE8': '\u0646',
+  '\uFEE9': '\u0647',
+  '\uFEEA': '\u0647',
+  '\uFEEB': '\u0647',
+  '\uFEEC': '\u0647',
+  '\uFEED': '\u0648',
+  '\uFEEE': '\u0648',
+  '\uFEEF': '\u0649',
+  '\uFEF0': '\u0649',
+  '\uFEF1': '\u064A',
+  '\uFEF2': '\u064A',
+  '\uFEF3': '\u064A',
+  '\uFEF4': '\u064A',
+  '\uFEF5': '\u0644\u0622',
+  '\uFEF6': '\u0644\u0622',
+  '\uFEF7': '\u0644\u0623',
+  '\uFEF8': '\u0644\u0623',
+  '\uFEF9': '\u0644\u0625',
+  '\uFEFA': '\u0644\u0625',
+  '\uFEFB': '\u0644\u0627',
+  '\uFEFC': '\u0644\u0627'
 };
 
-function fontCharsToUnicode(charCodes, fontProperties) {
-  var toUnicode = fontProperties.toUnicode;
-  var composite = fontProperties.composite;
-  var encoding, differences, cidToUnicode;
-  var result = '';
-  if (composite) {
-    cidToUnicode = fontProperties.cidToUnicode;
-    for (var i = 0, ii = charCodes.length; i < ii; i += 2) {
-      var charCode = (charCodes.charCodeAt(i) << 8) |
-        charCodes.charCodeAt(i + 1);
-      if (toUnicode && charCode in toUnicode) {
-        var unicode = toUnicode[charCode];
-        result += typeof unicode !== 'number' ? unicode :
-          String.fromCharCode(unicode);
-        continue;
-      }
-      result += String.fromCharCode(!cidToUnicode ? charCode :
-        cidToUnicode[charCode] || charCode);
-    }
-  } else {
-    differences = fontProperties.differences;
-    encoding = fontProperties.baseEncoding;
-    for (var i = 0, ii = charCodes.length; i < ii; i++) {
-      var charCode = charCodes.charCodeAt(i);
-      var unicode;
-      if (toUnicode && charCode in toUnicode) {
-        var unicode = toUnicode[charCode];
-        result += typeof unicode !== 'number' ? unicode :
-          String.fromCharCode(unicode);
-        continue;
-      }
+function reverseIfRtl(chars) {
+  var charsLength = chars.length;
+  //reverse an arabic ligature
+  if (charsLength <= 1 || !isRTLRangeFor(chars.charCodeAt(0)))
+    return chars;
 
-      var glyphName = charCode in differences ? differences[charCode] :
-        encoding[charCode];
-      if (glyphName in GlyphsUnicode) {
-        result += String.fromCharCode(GlyphsUnicode[glyphName]);
-        continue;
-      }
-      result += String.fromCharCode(charCode);
-    }
-  }
-  // normalizing the unicode characters
-  for (var i = 0, ii = result.length; i < ii; i++) {
-    if (!(result[i] in NormalizedUnicodes))
+  var s = '';
+  for (var ii = charsLength - 1; ii >= 0; ii--)
+    s += chars[ii];
+  return s;
+}
+
+function fontCharsToUnicode(charCodes, font) {
+  var glyphs = font.charsToGlyphs(charCodes);
+  var result = '';
+  for (var i = 0, ii = glyphs.length; i < ii; i++) {
+    var glyph = glyphs[i];
+    if (!glyph)
       continue;
-    result = result.substring(0, i) + NormalizedUnicodes[result[i]] +
-      result.substring(i + 1);
-    ii = result.length;
+
+    var glyphUnicode = glyph.unicode;
+    if (glyphUnicode in NormalizedUnicodes)
+      glyphUnicode = NormalizedUnicodes[glyphUnicode];
+    result += reverseIfRtl(glyphUnicode);
   }
   return result;
 }
@@ -15552,9 +17167,19 @@ function fontCharsToUnicode(charCodes, fontProperties) {
  */
 var Font = (function FontClosure() {
   function Font(name, file, properties) {
+    if (arguments.length === 1) {
+      // importing translated data
+      var data = arguments[0];
+      for (var i in data) {
+        this[i] = data[i];
+      }
+      return;
+    }
+
     this.name = name;
+    this.loadedName = properties.loadedName;
     this.coded = properties.coded;
-    this.charProcOperatorList = properties.charProcOperatorList;
+    this.loadCharProcs = properties.coded;
     this.sizes = [];
 
     var names = name.split('+');
@@ -15562,17 +17187,13 @@ var Font = (function FontClosure() {
     names = names.split(/[-,_]/g)[0];
     this.isSerifFont = !!(properties.flags & FontFlags.Serif);
     this.isSymbolicFont = !!(properties.flags & FontFlags.Symbolic);
+    this.isMonospace = !!(properties.flags & FontFlags.FixedPitch);
 
     var type = properties.type;
     this.type = type;
 
-    // If the font is to be ignored, register it like an already loaded font
-    // to avoid the cost of waiting for it be be loaded by the platform.
-    if (properties.ignore) {
-      this.loadedName = this.isSerifFont ? 'serif' : 'sans-serif';
-      this.loading = false;
-      return;
-    }
+    this.fallbackName = this.isMonospace ? 'monospace' :
+                        this.isSerifFont ? 'serif' : 'sans-serif';
 
     this.differences = properties.differences;
     this.widths = properties.widths;
@@ -15619,13 +17240,19 @@ var Font = (function FontClosure() {
       return;
     }
 
+    // Some fonts might use wrong font types for Type1C or CIDFontType0C
+    var subtype = properties.subtype;
+    if (subtype == 'Type1C' && (type != 'Type1' && type != 'MMType1'))
+      type = 'Type1';
+    if (subtype == 'CIDFontType0C' && type != 'CIDFontType0')
+      type = 'CIDFontType0';
+
     var data;
     switch (type) {
       case 'Type1':
       case 'CIDFontType0':
         this.mimetype = 'font/opentype';
 
-        var subtype = properties.subtype;
         var cff = (subtype == 'Type1C' || subtype == 'CIDFontType0C') ?
           new CFFFont(file, properties) : new Type1Font(name, file, properties);
 
@@ -15652,7 +17279,6 @@ var Font = (function FontClosure() {
     this.widthMultiplier = !properties.fontMatrix ? 1.0 :
       1.0 / properties.fontMatrix[0];
     this.encoding = properties.baseEncoding;
-    this.loadedName = properties.loadedName;
     this.loading = true;
   };
 
@@ -15810,7 +17436,8 @@ var Font = (function FontClosure() {
                '\x00\x01' + // encodingID
                string32(4 + numTables * 8); // start of the table record
 
-    var segCount = ranges.length + 1;
+    var trailingRangesCount = ranges[ranges.length - 1][1] < 0xFFFF ? 1 : 0;
+    var segCount = ranges.length + trailingRangesCount;
     var segCount2 = segCount * 2;
     var searchRange = getMaxPower2(segCount) * 2;
     var searchEntry = Math.log(segCount) / Math.log(2);
@@ -15825,7 +17452,7 @@ var Font = (function FontClosure() {
     var bias = 0;
 
     if (deltas) {
-      for (var i = 0; i < segCount - 1; i++) {
+      for (var i = 0, ii = ranges.length; i < ii; i++) {
         var range = ranges[i];
         var start = range[0];
         var end = range[1];
@@ -15842,7 +17469,7 @@ var Font = (function FontClosure() {
           glyphsIds += string16(deltas[codes[j]]);
       }
     } else {
-      for (var i = 0; i < segCount - 1; i++) {
+      for (var i = 0, ii = ranges.length; i < ii; i++) {
         var range = ranges[i];
         var start = range[0];
         var end = range[1];
@@ -15855,10 +17482,12 @@ var Font = (function FontClosure() {
       }
     }
 
-    endCount += '\xFF\xFF';
-    startCount += '\xFF\xFF';
-    idDeltas += '\x00\x01';
-    idRangeOffsets += '\x00\x00';
+    if (trailingRangesCount > 0) {
+      endCount += '\xFF\xFF';
+      startCount += '\xFF\xFF';
+      idDeltas += '\x00\x01';
+      idRangeOffsets += '\x00\x00';
+    }
 
     var format314 = '\x00\x00' + // language
                     string16(segCount2) +
@@ -16055,6 +17684,15 @@ var Font = (function FontClosure() {
     font: null,
     mimetype: null,
     encoding: null,
+
+    exportData: function Font_exportData() {
+      var data = {};
+      for (var i in this) {
+        if (this.hasOwnProperty(i))
+          data[i] = this[i];
+      }
+      return data;
+    },
 
     checkAndRepair: function Font_checkAndRepair(name, font, properties) {
       function readTableEntry(file) {
@@ -16530,6 +18168,9 @@ var Font = (function FontClosure() {
       var requiredTables = ['OS/2', 'cmap', 'head', 'hhea',
                              'hmtx', 'maxp', 'name', 'post'];
 
+      var optionalTables = ['cvt ', 'fpgm', 'glyf', 'loca', 'prep',
+                            'CFF ', 'VORG', 'vhea', 'vmtx'];
+
       var header = readOpenTypeHeader(font);
       var numTables = header.numTables;
 
@@ -16555,6 +18196,9 @@ var Font = (function FontClosure() {
             os2 = table;
 
           requiredTables.splice(index, 1);
+        } else if (optionalTables.indexOf(table.tag) < 0) {
+          // skipping table if it's not a required or optional table
+          continue;
         } else {
           if (table.tag == 'vmtx')
             vmtx = table;
@@ -16765,9 +18409,9 @@ var Font = (function FontClosure() {
             this.isSymbolicFont = false;
         }
 
-        // heuristics: if removed more than 10 glyphs encoding WinAnsiEncoding
+        // heuristics: if removed more than 5 glyphs encoding WinAnsiEncoding
         // does not set properly (broken PDFs have about 100 removed glyphs)
-        if (glyphsRemoved > 10) {
+        if (glyphsRemoved > 5) {
           warn('Switching TrueType encoding to MacRomanEncoding for ' +
                this.name + ' font');
           encoding = Encodings.MacRomanEncoding;
@@ -16858,6 +18502,12 @@ var Font = (function FontClosure() {
 
         createGlyphNameMap(glyphs, ids, properties);
         this.glyphNameMap = properties.glyphNameMap;
+      }
+
+      if (glyphs.length === 0) {
+        // defines at least one glyph
+        glyphs.push({ unicode: 0xF000, code: 0xF000, glyph: '.notdef' });
+        ids.push(0);
       }
 
       // Converting glyphs and ids into font's cmap table
@@ -16980,6 +18630,7 @@ var Font = (function FontClosure() {
         }
         this.toFontChar = toFontChar;
       }
+      var unitsPerEm = properties.unitsPerEm || 1000; // defaulting to 1000
 
       var fields = {
         // PostScript Font Program
@@ -17000,7 +18651,7 @@ var Font = (function FontClosure() {
               '\x00\x00\x00\x00' + // checksumAdjustement
               '\x5F\x0F\x3C\xF5' + // magicNumber
               '\x00\x00' + // Flags
-              '\x03\xE8' + // unitsPerEM (defaulting to 1000)
+              safeString16(unitsPerEm) + // unitsPerEM
               '\x00\x00\x00\x00\x9e\x0b\x7e\x27' + // creation date
               '\x00\x00\x00\x00\x9e\x0b\x7e\x27' + // modifification date
               '\x00\x00' + // xMin
@@ -17157,7 +18808,11 @@ var Font = (function FontClosure() {
       }
     },
 
-    bindDOM: function Font_bindDOM(data) {
+    bindDOM: function Font_bindDOM() {
+      if (!this.data)
+        return null;
+
+      var data = bytesToString(this.data);
       var fontName = this.loadedName;
 
       // Add the font-face rule to the document
@@ -17176,13 +18831,18 @@ var Font = (function FontClosure() {
       var styleSheet = styleElement.sheet;
       styleSheet.insertRule(rule, styleSheet.cssRules.length);
 
-      if (PDFJS.pdfBug && FontInspector.enabled)
-        FontInspector.fontAdded(this, url);
+      if (PDFJS.pdfBug && 'FontInspector' in globalScope &&
+          globalScope['FontInspector'].enabled)
+        globalScope['FontInspector'].fontAdded(this, url);
 
       return rule;
     },
 
     get spaceWidth() {
+      if ('_shadowWidth' in this) {
+        return this._shadowWidth;
+      }
+
       // trying to estimate space character width
       var possibleSpaceReplacements = ['space', 'minus', 'one', 'i'];
       var width;
@@ -17210,7 +18870,10 @@ var Font = (function FontClosure() {
           break; // the non-zero width found
       }
       width = (width || this.defaultWidth) * this.widthMultiplier;
-      return shadow(this, 'spaceWidth', width);
+      // Do not shadow the property here. See discussion:
+      // https://github.com/mozilla/pdf.js/pull/2127#discussion_r1662280
+      this._shadowWidth = width;
+      return width;
     },
 
     charToGlyph: function Font_charToGlyph(charcode) {
@@ -17351,6 +19014,31 @@ var Font = (function FontClosure() {
   return Font;
 })();
 
+var ErrorFont = (function ErrorFontClosure() {
+  function ErrorFont(error) {
+    this.error = error;
+  }
+
+  ErrorFont.prototype = {
+    charsToGlyphs: function ErrorFont_charsToGlyphs() {
+      return [];
+    },
+    exportData: function ErrorFont_exportData() {
+      return {error: this.error};
+    }
+  };
+
+  return ErrorFont;
+})();
+
+var CallothersubrCmd = (function CallothersubrCmdClosure() {
+  function CallothersubrCmd(index) {
+    this.index = index;
+  }
+
+  return CallothersubrCmd;
+})();
+
 /*
  * Type1Parser encapsulate the needed code for parsing a Type1 font
  * program. Some of its logic depends on the Type2 charstrings
@@ -17450,8 +19138,8 @@ var Type1Parser = function type1Parser() {
       '1': 'vstem',
       '2': 'hstem',
 
+      '6': 'endchar', // seac
       // Type1 only command with command not (yet) built-in ,throw an error
-      '6': -1, // seac
       '7': -1, // sbw
 
       '11': 'sub',
@@ -17480,6 +19168,43 @@ var Type1Parser = function type1Parser() {
   };
 
   var kEscapeCommand = 12;
+
+  // Breaks up the stack by arguments and also calculates the value.
+  function breakUpArgs(stack, numArgs) {
+    var args = [];
+    var index = stack.length - 1;
+    for (var i = 0; i < numArgs; i++) {
+      if (index < 0) {
+        args.unshift({ arg: [0],
+                       value: 0,
+                       offset: 0 });
+        warn('Malformed charstring stack: not enough values on stack.');
+        continue;
+      }
+      var token = stack[index];
+      if (token === 'div') {
+        var a = stack[index - 2];
+        var b = stack[index - 1];
+        if (!isInt(a) || !isInt(b)) {
+          warn('Malformed charsting stack: expected ints on stack for div.');
+          a = 0;
+          b = 1;
+        }
+        args.unshift({ arg: [a, b, 'div'],
+                       value: a / b,
+                       offset: index - 2 });
+        index -= 3;
+      } else if (isInt(token)) {
+        args.unshift({ arg: stack.slice(index, index + 1),
+                       value: token,
+                       offset: index });
+        index--;
+      } else {
+        warn('Malformed charsting stack: found bad token ' + token + '.');
+      }
+    }
+    return args;
+  }
 
   function decodeCharString(array) {
     var charstring = [];
@@ -17519,10 +19244,35 @@ var Type1Parser = function type1Parser() {
               i++;
               continue;
             }
+
+            assert(argc == 0, 'callothersubr with arguments is not supported');
+            charstring.push(new CallothersubrCmd(index));
+            continue;
+          } else if (escape == 7) { // sbw
+            var args = breakUpArgs(charstring, 4);
+            var arg0 = args[0];
+            var arg1 = args[1];
+            var arg2 = args[2];
+            lsb = arg0.value;
+            width = arg2.value;
+            // To convert to type2 we have to move the width value to the first
+            // part of the charstring and then use rmoveto with (dx, dy).
+            // The height argument will not be used for vmtx and vhea tables
+            // reconstruction -- ignoring it.
+            charstring = arg2.arg;
+            charstring = charstring.concat(arg0.arg, arg1.arg);
+            charstring.push('rmoveto');
+            continue;
           } else if (escape == 17 || escape == 33) {
             // pop or setcurrentpoint commands can be ignored
             // since we are not doing callothersubr
             continue;
+          } else if (escape == 6) {
+            // seac is like type 2's special endchar but it doesn't use the
+            // first argument asb, so remove it.
+            var args = breakUpArgs(charstring, 5);
+            var arg0 = args[0];
+            charstring.splice(arg0.offset, arg0.arg.length);
           } else if (!kHintingEnabled && (escape == 1 || escape == 2)) {
             charstring.push('drop', 'drop', 'drop', 'drop', 'drop', 'drop');
             continue;
@@ -17530,25 +19280,17 @@ var Type1Parser = function type1Parser() {
 
           command = charStringDictionary['12'][escape];
         } else {
-          // TODO Clean this code
           if (value == 13) { // hsbw
-            if (charstring.length == 2) {
-              lsb = charstring[0];
-              width = charstring[1];
-              charstring.splice(0, 1);
-            } else if (charstring.length == 4 && charstring[3] == 'div') {
-              lsb = charstring[0];
-              width = charstring[1] / charstring[2];
-              charstring.splice(0, 1);
-            } else if (charstring.length == 4 && charstring[2] == 'div') {
-              lsb = charstring[0] / charstring[1];
-              width = charstring[3];
-              charstring.splice(0, 3);
-            } else {
-              error('Unsupported hsbw format: ' + charstring);
-            }
-
-            charstring.push(lsb, 'hmoveto');
+            var args = breakUpArgs(charstring, 2);
+            var arg0 = args[0];
+            var arg1 = args[1];
+            lsb = arg0.value;
+            width = arg1.value;
+            // To convert to type2 we have to move the width value to the first
+            // part of the charstring and then use hmoveto with lsb.
+            charstring = arg1.arg;
+            charstring = charstring.concat(arg0.arg);
+            charstring.push('hmoveto');
             continue;
           } else if (value == 10) { // callsubr
             if (charstring[charstring.length - 1] < 3) { // subr #0..2
@@ -17758,6 +19500,10 @@ var Type1Parser = function type1Parser() {
             case '/OtherBlues':
             case '/FamilyBlues':
             case '/FamilyOtherBlues':
+              var blueArray = readNumberArray(eexecStr, i + 1);
+              if (blueArray.length > 0 && (blueArray.length % 2) == 0)
+                program.properties.privateData[token.substring(1)] = blueArray;
+              break;
             case '/StemSnapH':
             case '/StemSnapV':
               program.properties.privateData[token.substring(1)] =
@@ -18040,23 +19786,23 @@ Type1Font.prototype = {
   },
 
   getType2Charstrings: function Type1Font_getType2Charstrings(
-                                  type1Charstrings) {
+                                  type1Subrs) {
     var type2Charstrings = [];
-    var count = type1Charstrings.length;
-    for (var i = 0; i < count; i++) {
-      var charstring = type1Charstrings[i].charstring;
-      type2Charstrings.push(this.flattenCharstring(charstring.slice(),
-                                                   this.commandsMap));
-    }
+    var count = type1Subrs.length;
+    var type1Charstrings = [];
+    for (var i = 0; i < count; i++)
+      type1Charstrings.push(type1Subrs[i].charstring.slice());
+    for (var i = 0; i < count; i++)
+      type2Charstrings.push(this.flattenCharstring(type1Charstrings, i));
     return type2Charstrings;
   },
 
   getType2Subrs: function Type1Font_getType2Subrs(type1Subrs) {
     var bias = 0;
     var count = type1Subrs.length;
-    if (count < 1240)
+    if (count < 1133)
       bias = 107;
-    else if (count < 33900)
+    else if (count < 33769)
       bias = 1131;
     else
       bias = 32768;
@@ -18067,11 +19813,7 @@ Type1Font.prototype = {
       type2Subrs.push([0x0B]);
 
     for (var i = 0; i < count; i++) {
-      var subr = type1Subrs[i];
-      if (!subr)
-        subr = [0x0B];
-
-      type2Subrs.push(this.flattenCharstring(subr, this.commandsMap));
+      type2Subrs.push(this.flattenCharstring(type1Subrs, i));
     }
 
     return type2Subrs;
@@ -18103,11 +19845,15 @@ Type1Font.prototype = {
     'hvcurveto': 31
   },
 
-  flattenCharstring: function Type1Font_flattenCharstring(charstring, map) {
+  flattenCharstring: function Type1Font_flattenCharstring(charstrings, index) {
+    var charstring = charstrings[index];
+    if (!charstring)
+      return [0x0B];
+    var map = this.commandsMap;
     // charstring changes size - can't cache .length in loop
     for (var i = 0; i < charstring.length; i++) {
       var command = charstring[i];
-      if (command.charAt) {
+      if (typeof command === 'string') {
         var cmd = map[command];
         assert(cmd, 'Unknow command: ' + command);
 
@@ -18115,6 +19861,17 @@ Type1Font.prototype = {
           charstring.splice(i++, 1, cmd[0], cmd[1]);
         else
           charstring[i] = cmd;
+      } else if (command instanceof CallothersubrCmd) {
+        var otherSubrCharstring = charstrings[command.index];
+        if (otherSubrCharstring) {
+          var lastCommand = otherSubrCharstring.indexOf('return');
+          if (lastCommand >= 0)
+            otherSubrCharstring = otherSubrCharstring.slice(0, lastCommand);
+          charstring.splice.apply(charstring,
+                                  [i, 1].concat(otherSubrCharstring));
+        } else
+          charstring.splice(i, 1); // ignoring empty subr call
+        i--;
       } else {
         // Type1 charstring use a division for number above 32000
         if (command > 32000) {
@@ -18313,10 +20070,9 @@ var CFFFont = (function CFFFontClosure() {
           inverseEncoding[encoding[charcode]] = charcode | 0;
       else
         inverseEncoding = charsets;
-      for (var i = 0, ii = charsets.length; i < ii; i++) {
+      var i = charsets[0] == '.notdef' ? 1 : 0;
+      for (var ii = charsets.length; i < ii; i++) {
         var glyph = charsets[i];
-        if (glyph == '.notdef')
-          continue;
 
         var code = inverseEncoding[i];
         if (!code || isSpecialUnicode(code)) {
@@ -18393,6 +20149,19 @@ var CFFParser = (function CFFParserClosure() {
       var charStringOffset = topDict.getByName('CharStrings');
       cff.charStrings = this.parseCharStrings(charStringOffset);
 
+      var fontMatrix = topDict.getByName('FontMatrix');
+      if (fontMatrix) {
+        // estimating unitsPerEM for the font
+        properties.unitsPerEm = 1 / fontMatrix[0];
+      }
+
+      var fontBBox = topDict.getByName('FontBBox');
+      if (fontBBox) {
+        // adjusting ascent/descent
+        properties.ascent = fontBBox[3];
+        properties.descent = fontBBox[1];
+      }
+
       var charset, encoding;
       if (cff.isCIDFont) {
         var fdArrayIndex = this.parseIndex(topDict.getByName('FDArray')).obj;
@@ -18466,7 +20235,7 @@ var CFFParser = (function CFFParserClosure() {
           return parseFloatOperand(pos);
         } else if (value === 28) {
           value = dict[pos++];
-          value = (value << 8) | dict[pos++];
+          value = ((value << 24) | (dict[pos++] << 16)) >> 16;
           return value;
         } else if (value === 29) {
           value = dict[pos++];
@@ -18617,7 +20386,7 @@ var CFFParser = (function CFFParserClosure() {
 
         var data = charstring;
         var length = data.length;
-        for (var j = 0; j <= length; j) {
+        for (var j = 0; j <= length;) {
           var value = data[j++];
           if (value == 12 && data[j++] == 0) {
               data[j - 2] = 139;
@@ -19495,10 +21264,6 @@ var CFFCompiler = (function CFFCompilerClosure() {
 })();
 
 
-/* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
-
-'use strict';
 
 var GlyphsUnicode = {
   A: 0x0041,
@@ -23708,10 +25473,6 @@ var GlyphsUnicode = {
 };
 
 
-/* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
-
-'use strict';
 
 var PDFImage = (function PDFImageClosure() {
   /**
@@ -23807,7 +25568,12 @@ var PDFImage = (function PDFImageClosure() {
     if (smask) {
       this.smask = new PDFImage(xref, res, smask, false);
     } else if (mask) {
-      this.mask = new PDFImage(xref, res, mask, false);
+      if (isStream(mask)) {
+        this.mask = new PDFImage(xref, res, mask, false);
+      } else {
+        // Color key mask (just an array).
+        this.mask = mask;
+      }
     }
   }
   /**
@@ -23839,11 +25605,15 @@ var PDFImage = (function PDFImageClosure() {
       maskPromise.resolve(null);
     } else {
       smaskPromise.resolve(null);
-      if (mask && isStream(mask)) {
-        handleImageData(handler, xref, res, mask, maskPromise);
-      } else if (mask) {
-        TODO('handle color key masking');
-        maskPromise.resolve(null);
+      if (mask) {
+        if (isStream(mask)) {
+          handleImageData(handler, xref, res, mask, maskPromise);
+        } else if (isArray(mask)) {
+          maskPromise.resolve(mask);
+        } else {
+          warn('Unsupported mask format.');
+          maskPromise.resolve(null);
+        }
       } else {
         maskPromise.resolve(null);
       }
@@ -23989,7 +25759,7 @@ var PDFImage = (function PDFImageClosure() {
       }
       return output;
     },
-    getOpacity: function PDFImage_getOpacity(width, height) {
+    getOpacity: function PDFImage_getOpacity(width, height, image) {
       var smask = this.smask;
       var mask = this.mask;
       var originalWidth = this.width;
@@ -24004,18 +25774,40 @@ var PDFImage = (function PDFImageClosure() {
         if (sw != width || sh != height)
           buf = PDFImage.resize(buf, smask.bpc, 1, sw, sh, width, height);
       } else if (mask) {
-        var sw = mask.width;
-        var sh = mask.height;
-        buf = new Uint8Array(sw * sh);
-        mask.numComps = 1;
-        mask.fillGrayBuffer(buf);
+        if (mask instanceof PDFImage) {
+          var sw = mask.width;
+          var sh = mask.height;
+          buf = new Uint8Array(sw * sh);
+          mask.numComps = 1;
+          mask.fillGrayBuffer(buf);
 
-        // Need to invert values in buffer
-        for (var i = 0, ii = sw * sh; i < ii; ++i)
-          buf[i] = 255 - buf[i];
+          // Need to invert values in buffer
+          for (var i = 0, ii = sw * sh; i < ii; ++i)
+            buf[i] = 255 - buf[i];
 
-        if (sw != width || sh != height)
-          buf = PDFImage.resize(buf, mask.bpc, 1, sw, sh, width, height);
+          if (sw != width || sh != height)
+            buf = PDFImage.resize(buf, mask.bpc, 1, sw, sh, width, height);
+        } else if (isArray(mask)) {
+          // Color key mask: if any of the compontents are outside the range
+          // then they should be painted.
+          buf = new Uint8Array(width * height);
+          var numComps = this.numComps;
+          for (var i = 0, ii = width * height; i < ii; ++i) {
+            var opacity = 0;
+            var imageOffset = i * numComps;
+            for (var j = 0; j < numComps; ++j) {
+              var color = image[imageOffset + j];
+              var maskOffset = j * 2;
+              if (color < mask[maskOffset] || color > mask[maskOffset + 1]) {
+                opacity = 255;
+                break;
+              }
+            }
+            buf[i] = opacity;
+          }
+        } else {
+          error('Unknown mask format.');
+        }
       } else {
         buf = new Uint8Array(width * height);
         for (var i = 0, ii = width * height; i < ii; ++i)
@@ -24057,15 +25849,19 @@ var PDFImage = (function PDFImageClosure() {
       var rowBytes = (originalWidth * numComps * bpc + 7) >> 3;
       var imgArray = this.getImageBytes(originalHeight * rowBytes);
 
+      // imgArray can be incomplete (e.g. after CCITT fax encoding)
+      var actualHeight = 0 | (imgArray.length / rowBytes *
+                         height / originalHeight);
+
       var comps = this.colorSpace.getRgbBuffer(
         this.getComponents(imgArray), bpc);
       if (originalWidth != width || originalHeight != height)
         comps = PDFImage.resize(comps, this.bpc, 3, originalWidth,
                                 originalHeight, width, height);
       var compsPos = 0;
-      var opacity = this.getOpacity(width, height);
+      var opacity = this.getOpacity(width, height, imgArray);
       var opacityPos = 0;
-      var length = width * height * 4;
+      var length = width * actualHeight * 4;
 
       for (var i = 0; i < length; i += 4) {
         buffer[i] = comps[compsPos++];
@@ -24111,10 +25907,6 @@ function loadJpegStream(id, imageData, objs) {
 }
 
 
-/* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
-
-'use strict';
 
 // The Metrics object contains glyph widths (in glyph space units).
 // As per PDF spec, for most fonts (Type 3 being an exception) a glyph
@@ -27059,10 +28851,6 @@ var Metrics = {
 };
 
 
-/* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
-
-'use strict';
 
 var EOF = {};
 
@@ -27277,6 +29065,9 @@ var Parser = (function ParserClosure() {
       return stream;
     },
     makeFilter: function Parser_makeFilter(stream, name, length, params) {
+      if (stream.dict.get('Length') === 0) {
+        return new NullStream(stream);
+      }
       if (name == 'FlateDecode' || name == 'Fl') {
         if (params) {
           return new PredictorStream(new FlateStream(stream), params);
@@ -27717,10 +29508,6 @@ var Linearization = (function LinearizationClosure() {
 })();
 
 
-/* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
-
-'use strict';
 
 var PatternType = {
   AXIAL: 2,
@@ -27757,6 +29544,7 @@ var Pattern = (function PatternClosure() {
         // Both radial and axial shadings are handled by RadialAxial shading.
         return new Shadings.RadialAxial(dict, matrix, xref, res);
       default:
+        TODO('Unsupported shading type: ' + type);
         return new Shadings.Dummy();
     }
   };
@@ -27764,6 +29552,12 @@ var Pattern = (function PatternClosure() {
 })();
 
 var Shadings = {};
+
+// A small number to offset the first/last color stops so we can insert ones to
+// support extend.  Number.MIN_VALUE appears to be too small and breaks the
+// extend. 1e-7 works in FF but chrome seems to use an even smaller sized number
+// internally so we have to go bigger.
+Shadings.SMALL_NUMBER = 1e-2;
 
 // Radial and axial shading have very similar implementations
 // If needed, the implementations can be broken into two classes
@@ -27773,7 +29567,6 @@ Shadings.RadialAxial = (function RadialAxialClosure() {
     this.coordsArr = dict.get('Coords');
     this.shadingType = dict.get('ShadingType');
     this.type = 'Pattern';
-
     this.ctx = ctx;
     var cs = dict.get('ColorSpace', 'CS');
     cs = ColorSpace.parse(cs, xref, res);
@@ -27791,7 +29584,23 @@ Shadings.RadialAxial = (function RadialAxialClosure() {
       var extendArr = dict.get('Extend');
       extendStart = extendArr[0];
       extendEnd = extendArr[1];
-      TODO('Support extend');
+    }
+
+    if (this.shadingType === PatternType.RADIAL &&
+       (!extendStart || !extendEnd)) {
+      // Radial gradient only currently works if either circle is fully within
+      // the other circle.
+      var x1 = this.coordsArr[0];
+      var y1 = this.coordsArr[1];
+      var r1 = this.coordsArr[2];
+      var x2 = this.coordsArr[3];
+      var y2 = this.coordsArr[4];
+      var r2 = this.coordsArr[5];
+      var distance = Math.sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2));
+      if (r1 <= r2 + distance &&
+          r2 <= r1 + distance) {
+        warn('Unsupported radial gradient.');
+      }
     }
 
     this.extendStart = extendStart;
@@ -27807,14 +29616,41 @@ Shadings.RadialAxial = (function RadialAxialClosure() {
     // 10 samples seems good enough for now, but probably won't work
     // if there are sharp color changes. Ideally, we would implement
     // the spec faithfully and add lossless optimizations.
-    var step = (t1 - t0) / 10;
     var diff = t1 - t0;
+    var step = diff / 10;
 
-    var colorStops = [];
+    var colorStops = this.colorStops = [];
+
+    // Protect against bad domains so we don't end up in an infinte loop below.
+    if (t0 >= t1 || step <= 0) {
+      // Acrobat doesn't seem to handle these cases so we'll ignore for
+      // now.
+      info('Bad shading domain.');
+      return;
+    }
+
     for (var i = t0; i <= t1; i += step) {
       var rgbColor = cs.getRgb(fn([i]));
       var cssColor = Util.makeCssRgb(rgbColor[0], rgbColor[1], rgbColor[2]);
       colorStops.push([(i - t0) / diff, cssColor]);
+    }
+
+    var background = 'transparent';
+    if (dict.has('Background')) {
+      var rgbColor = cs.getRgb(dict.get('Background'));
+      background = Util.makeCssRgb(rgbColor[0], rgbColor[1], rgbColor[2]);
+    }
+
+    if (!extendStart) {
+      // Insert a color stop at the front and offset the first real color stop
+      // so it doesn't conflict with the one we insert.
+      colorStops.unshift([0, background]);
+      colorStops[1][0] += Shadings.SMALL_NUMBER;
+    }
+    if (!extendEnd) {
+      // Same idea as above in extendStart but for the end.
+      colorStops[colorStops.length - 1][0] -= Shadings.SMALL_NUMBER;
+      colorStops.push([1, background]);
     }
 
     this.colorStops = colorStops;
@@ -27830,17 +29666,6 @@ Shadings.RadialAxial = (function RadialAxialClosure() {
     return {
       type: 'Pattern',
       getPattern: function RadialAxial_getPattern(ctx) {
-        var curMatrix = ctx.mozCurrentTransform;
-        if (curMatrix) {
-          var userMatrix = ctx.mozCurrentTransformInverse;
-
-          p0 = Util.applyTransform(p0, curMatrix);
-          p0 = Util.applyTransform(p0, userMatrix);
-
-          p1 = Util.applyTransform(p1, curMatrix);
-          p1 = Util.applyTransform(p1, userMatrix);
-        }
-
         var grad;
         if (type == PatternType.AXIAL)
           grad = ctx.createLinearGradient(p0[0], p0[1], p1[0], p1[1]);
@@ -27893,7 +29718,12 @@ Shadings.Dummy = (function DummyClosure() {
   }
 
   Dummy.fromIR = function Dummy_fromIR() {
-    return 'hotpink';
+    return {
+      type: 'Pattern',
+      getPattern: function Dummy_fromIR_getPattern() {
+        return 'hotpink';
+      }
+    };
   };
 
   Dummy.prototype = {
@@ -27918,11 +29748,11 @@ var TilingPattern = (function TilingPatternClosure() {
     var xstep = IR[5];
     var ystep = IR[6];
     var paintType = IR[7];
+    var tilingType = IR[8];
 
-    TODO('TilingType');
+    TODO('TilingType: ' + tilingType);
 
     this.curMatrix = ctx.mozCurrentTransform;
-    this.invMatrix = ctx.mozCurrentTransformInverse;
     this.ctx = ctx;
     this.type = 'Pattern';
 
@@ -27992,9 +29822,11 @@ var TilingPattern = (function TilingPatternClosure() {
     var xstep = dict.get('XStep');
     var ystep = dict.get('YStep');
     var paintType = dict.get('PaintType');
+    var tilingType = dict.get('TilingType');
 
     return [
-      'TilingPattern', args, operatorList, matrix, bbox, xstep, ystep, paintType
+      'TilingPattern', args, operatorList, matrix, bbox, xstep, ystep,
+      paintType, tilingType
     ];
   };
 
@@ -28021,10 +29853,6 @@ var TilingPattern = (function TilingPatternClosure() {
 })();
 
 
-/* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
-
-'use strict';
 
 var Stream = (function StreamClosure() {
   function Stream(arrayBuffer, start, length, dict) {
@@ -28875,7 +30703,7 @@ var JpegStream = (function JpegStreamClosure() {
    */
   JpegStream.prototype.isNativelySupported =
     function JpegStream_isNativelySupported(xref, res) {
-    var cs = ColorSpace.parse(this.dict.get('ColorSpace'), xref, res);
+    var cs = ColorSpace.parse(this.dict.get('ColorSpace', 'CS'), xref, res);
     // when bug 674619 lands, let's check if browser can do
     // normal cmyk and then we won't need to decode in JS
     if (cs.name === 'DeviceGray' || cs.name === 'DeviceRGB')
@@ -28890,7 +30718,7 @@ var JpegStream = (function JpegStreamClosure() {
    */
   JpegStream.prototype.isNativelyDecodable =
     function JpegStream_isNativelyDecodable(xref, res) {
-    var cs = ColorSpace.parse(this.dict.get('ColorSpace'), xref, res);
+    var cs = ColorSpace.parse(this.dict.get('ColorSpace', 'CS'), xref, res);
     var numComps = cs.numComps;
     if (numComps == 1 || numComps == 3)
       return true;
@@ -30359,11 +32187,16 @@ var LZWStream = (function LZWStreamClosure() {
   return LZWStream;
 })();
 
+var NullStream = (function NullStreamClosure() {
+  function NullStream() {
+    Stream.call(this, new Uint8Array(0));
+  }
 
-/* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
+  NullStream.prototype = Stream.prototype;
 
-'use strict';
+  return NullStream;
+})();
+
 
 function MessageHandler(name, comObj) {
   this.name = name;
@@ -30373,11 +32206,19 @@ function MessageHandler(name, comObj) {
   var ah = this.actionHandler = {};
 
   ah['console_log'] = [function ahConsoleLog(data) {
-    console.log.apply(console, data);
+    log.apply(null, data);
   }];
-  ah['console_error'] = [function ahConsoleError(data) {
-    console.error.apply(console, data);
-  }];
+  // If there's no console available, console_error in the
+  // action handler will do nothing.
+  if ('console' in globalScope) {
+    ah['console_error'] = [function ahConsoleError(data) {
+      globalScope['console'].error.apply(null, data);
+    }];
+  } else {
+    ah['console_error'] = [function ahConsoleError(data) {
+      log.apply(null, data);
+    }];
+  }
   ah['_warn'] = [function ah_Warn(data) {
     warn(data);
   }];
@@ -30446,15 +32287,10 @@ var WorkerMessageHandler = {
   setup: function wphSetup(handler) {
     var pdfModel = null;
 
-    handler.on('test', function wphSetupTest(data) {
-      handler.send('test', data instanceof Uint8Array);
-    });
-
-    handler.on('GetDocRequest', function wphSetupDoc(data) {
+    function loadDocument(pdfData, pdfModelSource) {
       // Create only the model of the PDFDoc, which is enough for
       // processing the content of the pdf.
-      var pdfData = data.data;
-      var pdfPassword = data.params.password;
+      var pdfPassword = pdfModelSource.password;
       try {
         pdfModel = new PDFDocument(new Stream(pdfData), pdfPassword);
       } catch (e) {
@@ -30484,6 +32320,38 @@ var WorkerMessageHandler = {
         encrypted: !!pdfModel.xref.encrypt
       };
       handler.send('GetDoc', {pdfInfo: doc});
+    }
+
+    handler.on('test', function wphSetupTest(data) {
+      handler.send('test', data instanceof Uint8Array);
+    });
+
+    handler.on('GetDocRequest', function wphSetupDoc(data) {
+      var source = data.source;
+      if (source.data) {
+        // the data is array, instantiating directly from it
+        loadDocument(source.data, source);
+        return;
+      }
+
+      PDFJS.getPdf(
+        {
+          url: source.url,
+          progress: function getPDFProgress(evt) {
+            handler.send('DocProgress', {
+              loaded: evt.loaded,
+              total: evt.lengthComputable ? evt.total : void(0)
+            });
+          },
+          error: function getPDFError(e) {
+            handler.send('DocError', 'Unexpected server response of ' +
+                         e.target.status + '.');
+          },
+          headers: source.httpHeaders
+        },
+        function getPDFLoad(data) {
+          loadDocument(data, source);
+        });
     });
 
     handler.on('GetPageRequest', function wphSetupGetPage(data) {
@@ -30555,7 +32423,7 @@ var WorkerMessageHandler = {
         return;
       }
 
-      console.log('page=%d - getOperatorList: time=%dms, len=%d', pageNum,
+      log('page=%d - getOperatorList: time=%dms, len=%d', pageNum,
                               Date.now() - start, operatorList.fnArray.length);
 
       // Filter the dependecies for fonts.
@@ -30587,7 +32455,7 @@ var WorkerMessageHandler = {
         promise.reject(e);
       }
 
-      console.log('text indexing: page=%d - time=%dms',
+      log('text indexing: page=%d - time=%dms',
                       pageNum, Date.now() - start);
     });
   }
@@ -30598,7 +32466,7 @@ var consoleTimer = {};
 var workerConsole = {
   log: function log() {
     var args = Array.prototype.slice.call(arguments);
-    postMessage({
+    globalScope.postMessage({
       action: 'console_log',
       data: args
     });
@@ -30606,7 +32474,7 @@ var workerConsole = {
 
   error: function error() {
     var args = Array.prototype.slice.call(arguments);
-    postMessage({
+    globalScope.postMessage({
       action: 'console_error',
       data: args
     });
@@ -30634,7 +32502,7 @@ if (typeof window === 'undefined') {
   // throw an exception which will be forwarded on automatically.
   PDFJS.LogManager.addLogger({
     warn: function(msg) {
-      postMessage({
+      globalScope.postMessage({
         action: '_warn',
         data: msg
       });
@@ -30646,925 +32514,6 @@ if (typeof window === 'undefined') {
 }
 
 
-/* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- /
-/* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
-
-// - The JPEG specification can be found in the ITU CCITT Recommendation T.81
-//   (www.w3.org/Graphics/JPEG/itu-t81.pdf)
-// - The JFIF specification can be found in the JPEG File Interchange Format
-//   (www.w3.org/Graphics/JPEG/jfif3.pdf)
-// - The Adobe Application-Specific JPEG markers in the Supporting the DCT Filters
-//   in PostScript Level 2, Technical Note #5116
-//   (partners.adobe.com/public/developer/en/ps/sdk/5116.DCT_Filter.pdf)
-
-var JpegImage = (function jpegImage() {
-  "use strict";
-  var dctZigZag = new Int32Array([
-     0,
-     1,  8,
-    16,  9,  2,
-     3, 10, 17, 24,
-    32, 25, 18, 11, 4,
-     5, 12, 19, 26, 33, 40,
-    48, 41, 34, 27, 20, 13,  6,
-     7, 14, 21, 28, 35, 42, 49, 56,
-    57, 50, 43, 36, 29, 22, 15,
-    23, 30, 37, 44, 51, 58,
-    59, 52, 45, 38, 31,
-    39, 46, 53, 60,
-    61, 54, 47,
-    55, 62,
-    63
-  ]);
-
-  var dctCos1  =  4017   // cos(pi/16)
-  var dctSin1  =   799   // sin(pi/16)
-  var dctCos3  =  3406   // cos(3*pi/16)
-  var dctSin3  =  2276   // sin(3*pi/16)
-  var dctCos6  =  1567   // cos(6*pi/16)
-  var dctSin6  =  3784   // sin(6*pi/16)
-  var dctSqrt2 =  5793   // sqrt(2)
-  var dctSqrt1d2 = 2896  // sqrt(2) / 2
-
-  function constructor() {
-  }
-
-  function buildHuffmanTable(codeLengths, values) {
-    var k = 0, code = [], i, j, length = 16;
-    while (length > 0 && !codeLengths[length - 1])
-      length--;
-    code.push({children: [], index: 0});
-    var p = code[0], q;
-    for (i = 0; i < length; i++) {
-      for (j = 0; j < codeLengths[i]; j++) {
-        p = code.pop();
-        p.children[p.index] = values[k];
-        while (p.index > 0) {
-          p = code.pop();
-        }
-        p.index++;
-        code.push(p);
-        while (code.length <= i) {
-          code.push(q = {children: [], index: 0});
-          p.children[p.index] = q.children;
-          p = q;
-        }
-        k++;
-      }
-      if (i + 1 < length) {
-        // p here points to last code
-        code.push(q = {children: [], index: 0});
-        p.children[p.index] = q.children;
-        p = q;
-      }
-    }
-    return code[0].children;
-  }
-
-  function decodeScan(data, offset,
-                      frame, components, resetInterval,
-                      spectralStart, spectralEnd,
-                      successivePrev, successive) {
-    var precision = frame.precision;
-    var samplesPerLine = frame.samplesPerLine;
-    var scanLines = frame.scanLines;
-    var mcusPerLine = frame.mcusPerLine;
-    var progressive = frame.progressive;
-    var maxH = frame.maxH, maxV = frame.maxV;
-
-    var startOffset = offset, bitsData = 0, bitsCount = 0;
-    function readBit() {
-      if (bitsCount > 0) {
-        bitsCount--;
-        return (bitsData >> bitsCount) & 1;
-      }
-      bitsData = data[offset++];
-      if (bitsData == 0xFF) {
-        var nextByte = data[offset++];
-        if (nextByte) {
-          throw "unexpected marker: " + ((bitsData << 8) | nextByte).toString(16);
-        }
-        // unstuff 0
-      }
-      bitsCount = 7;
-      return bitsData >>> 7;
-    }
-    function decodeHuffman(tree) {
-      var node = tree, bit;
-      while ((bit = readBit()) !== null) {
-        node = node[bit];
-        if (typeof node === 'number')
-          return node;
-        if (typeof node !== 'object')
-          throw "invalid huffman sequence";
-      }
-      return null;
-    }
-    function receive(length) {
-      var n = 0;
-      while (length > 0) {
-        var bit = readBit();
-        if (bit === null) return;
-        n = (n << 1) | bit;
-        length--;
-      }
-      return n;
-    }
-    function receiveAndExtend(length) {
-      var n = receive(length);
-      if (n >= 1 << (length - 1))
-        return n;
-      return n + (-1 << length) + 1;
-    }
-    function decodeBaseline(component, zz) {
-      var t = decodeHuffman(component.huffmanTableDC);
-      var diff = t === 0 ? 0 : receiveAndExtend(t);
-      zz[0]= (component.pred += diff);
-      var k = 1;
-      while (k < 64) {
-        var rs = decodeHuffman(component.huffmanTableAC);
-        var s = rs & 15, r = rs >> 4;
-        if (s === 0) {
-          if (r < 15)
-            break;
-          k += 16;
-          continue;
-        }
-        k += r;
-        var z = dctZigZag[k];
-        zz[z] = receiveAndExtend(s);
-        k++;
-      }
-    }
-    function decodeDCFirst(component, zz) {
-      var t = decodeHuffman(component.huffmanTableDC);
-      var diff = t === 0 ? 0 : (receiveAndExtend(t) << successive);
-      zz[0] = (component.pred += diff);
-    }
-    function decodeDCSuccessive(component, zz) {
-      zz[0] |= readBit() << successive;
-    }
-    var eobrun = 0;
-    function decodeACFirst(component, zz) {
-      if (eobrun > 0) {
-        eobrun--;
-        return;
-      }
-      var k = spectralStart, e = spectralEnd;
-      while (k <= e) {
-        var rs = decodeHuffman(component.huffmanTableAC);
-        var s = rs & 15, r = rs >> 4;
-        if (s === 0) {
-          if (r < 15) {
-            eobrun = receive(r) + (1 << r) - 1;
-            break;
-          }
-          k += 16;
-          continue;
-        }
-        k += r;
-        var z = dctZigZag[k];
-        zz[z] = receiveAndExtend(s) * (1 << successive);
-        k++;
-      }
-    }
-    var successiveACState = 0, successiveACNextValue;
-    function decodeACSuccessive(component, zz) {
-      var k = spectralStart, e = spectralEnd, r = 0;
-      while (k <= e) {
-        var z = dctZigZag[k];
-        switch (successiveACState) {
-        case 0: // initial state
-          var rs = decodeHuffman(component.huffmanTableAC);
-          var s = rs & 15, r = rs >> 4;
-          if (s === 0) {
-            if (r < 15) {
-              eobrun = receive(r) + (1 << r);
-              successiveACState = 4;
-            } else {
-              r = 16;
-              successiveACState = 1;
-            }
-          } else {
-            if (s !== 1)
-              throw "invalid ACn encoding";
-            successiveACNextValue = receiveAndExtend(s);
-            successiveACState = r ? 2 : 3;
-          }
-          continue;
-        case 1: // skipping r zero items
-        case 2:
-          if (zz[z])
-            zz[z] += (readBit() << successive);
-          else {
-            r--;
-            if (r === 0)
-              successiveACState = successiveACState == 2 ? 3 : 0;
-          }
-          break;
-        case 3: // set value for a zero item
-          if (zz[z])
-            zz[z] += (readBit() << successive);
-          else {
-            zz[z] = successiveACNextValue << successive;
-            successiveACState = 0;
-          }
-          break;
-        case 4: // eob
-          if (zz[z])
-            zz[z] += (readBit() << successive);
-          break;
-        }
-        k++;
-      }
-      if (successiveACState === 4) {
-        eobrun--;
-        if (eobrun === 0)
-          successiveACState = 0;
-      }
-    }
-    function decodeMcu(component, decode, mcu, row, col) {
-      var mcuRow = (mcu / mcusPerLine) | 0;
-      var mcuCol = mcu % mcusPerLine;
-      var blockRow = mcuRow * component.v + row;
-      var blockCol = mcuCol * component.h + col;
-      decode(component, component.blocks[blockRow][blockCol]);
-    }
-    function decodeBlock(component, decode, mcu) {
-      var blockRow = (mcu / component.blocksPerLine) | 0;
-      var blockCol = mcu % component.blocksPerLine;
-      decode(component, component.blocks[blockRow][blockCol]);
-    }
-
-    var componentsLength = components.length;
-    var component, i, j, k, n;
-    var decodeFn;
-    if (progressive) {
-      if (spectralStart === 0)
-        decodeFn = successivePrev === 0 ? decodeDCFirst : decodeDCSuccessive;
-      else
-        decodeFn = successivePrev === 0 ? decodeACFirst : decodeACSuccessive;
-    } else {
-      decodeFn = decodeBaseline;
-    }
-
-    var mcu = 0, marker;
-    var mcuExpected;
-    if (componentsLength == 1) {
-      mcuExpected = components[0].blocksPerLine * components[0].blocksPerColumn;
-    } else {
-      mcuExpected = mcusPerLine * frame.mcusPerColumn;
-    }
-    if (!resetInterval) resetInterval = mcuExpected;
-
-    var h, v;
-    while (mcu < mcuExpected) {
-      // reset interval stuff
-      for (i = 0; i < componentsLength; i++)
-        components[i].pred = 0;
-      eobrun = 0;
-
-      if (componentsLength == 1) {
-        component = components[0];
-        for (n = 0; n < resetInterval; n++) {
-          decodeBlock(component, decodeFn, mcu);
-          mcu++;
-        }
-      } else {
-        for (n = 0; n < resetInterval; n++) {
-          for (i = 0; i < componentsLength; i++) {
-            component = components[i];
-            h = component.h;
-            v = component.v;
-            for (j = 0; j < v; j++) {
-              for (k = 0; k < h; k++) {
-                decodeMcu(component, decodeFn, mcu, j, k);
-              }
-            }
-          }
-          mcu++;
-        }
-      }
-
-      // find marker
-      bitsCount = 0;
-      marker = (data[offset] << 8) | data[offset + 1];
-      if (marker <= 0xFF00) {
-        throw "marker was not found";
-      }
-
-      if (marker >= 0xFFD0 && marker <= 0xFFD7) { // RSTx
-        offset += 2;
-      }
-      else
-        break;
-    }
-
-    return offset - startOffset;
-  }
-
-  function buildComponentData(frame, component) {
-    var lines = [];
-    var blocksPerLine = component.blocksPerLine;
-    var blocksPerColumn = component.blocksPerColumn;
-    var samplesPerLine = blocksPerLine << 3;
-    var R = new Int32Array(64), r = new Uint8Array(64);
-
-    // A port of poppler's IDCT method which in turn is taken from:
-    //   Christoph Loeffler, Adriaan Ligtenberg, George S. Moschytz,
-    //   "Practical Fast 1-D DCT Algorithms with 11 Multiplications",
-    //   IEEE Intl. Conf. on Acoustics, Speech & Signal Processing, 1989,
-    //   988-991.
-    function quantizeAndInverse(zz, dataOut, dataIn) {
-      var qt = component.quantizationTable;
-      var v0, v1, v2, v3, v4, v5, v6, v7, t;
-      var p = dataIn;
-      var i;
-
-      // dequant
-      for (i = 0; i < 64; i++)
-        p[i] = zz[i] * qt[i];
-
-      // inverse DCT on rows
-      for (i = 0; i < 8; ++i) {
-        var row = 8 * i;
-
-        // check for all-zero AC coefficients
-        if (p[1 + row] == 0 && p[2 + row] == 0 && p[3 + row] == 0 &&
-            p[4 + row] == 0 && p[5 + row] == 0 && p[6 + row] == 0 &&
-            p[7 + row] == 0) {
-          t = (dctSqrt2 * p[0 + row] + 512) >> 10;
-          p[0 + row] = t;
-          p[1 + row] = t;
-          p[2 + row] = t;
-          p[3 + row] = t;
-          p[4 + row] = t;
-          p[5 + row] = t;
-          p[6 + row] = t;
-          p[7 + row] = t;
-          continue;
-        }
-
-        // stage 4
-        v0 = (dctSqrt2 * p[0 + row] + 128) >> 8;
-        v1 = (dctSqrt2 * p[4 + row] + 128) >> 8;
-        v2 = p[2 + row];
-        v3 = p[6 + row];
-        v4 = (dctSqrt1d2 * (p[1 + row] - p[7 + row]) + 128) >> 8;
-        v7 = (dctSqrt1d2 * (p[1 + row] + p[7 + row]) + 128) >> 8;
-        v5 = p[3 + row] << 4;
-        v6 = p[5 + row] << 4;
-
-        // stage 3
-        t = (v0 - v1+ 1) >> 1;
-        v0 = (v0 + v1 + 1) >> 1;
-        v1 = t;
-        t = (v2 * dctSin6 + v3 * dctCos6 + 128) >> 8;
-        v2 = (v2 * dctCos6 - v3 * dctSin6 + 128) >> 8;
-        v3 = t;
-        t = (v4 - v6 + 1) >> 1;
-        v4 = (v4 + v6 + 1) >> 1;
-        v6 = t;
-        t = (v7 + v5 + 1) >> 1;
-        v5 = (v7 - v5 + 1) >> 1;
-        v7 = t;
-
-        // stage 2
-        t = (v0 - v3 + 1) >> 1;
-        v0 = (v0 + v3 + 1) >> 1;
-        v3 = t;
-        t = (v1 - v2 + 1) >> 1;
-        v1 = (v1 + v2 + 1) >> 1;
-        v2 = t;
-        t = (v4 * dctSin3 + v7 * dctCos3 + 2048) >> 12;
-        v4 = (v4 * dctCos3 - v7 * dctSin3 + 2048) >> 12;
-        v7 = t;
-        t = (v5 * dctSin1 + v6 * dctCos1 + 2048) >> 12;
-        v5 = (v5 * dctCos1 - v6 * dctSin1 + 2048) >> 12;
-        v6 = t;
-
-        // stage 1
-        p[0 + row] = v0 + v7;
-        p[7 + row] = v0 - v7;
-        p[1 + row] = v1 + v6;
-        p[6 + row] = v1 - v6;
-        p[2 + row] = v2 + v5;
-        p[5 + row] = v2 - v5;
-        p[3 + row] = v3 + v4;
-        p[4 + row] = v3 - v4;
-      }
-
-      // inverse DCT on columns
-      for (i = 0; i < 8; ++i) {
-        var col = i;
-
-        // check for all-zero AC coefficients
-        if (p[1*8 + col] == 0 && p[2*8 + col] == 0 && p[3*8 + col] == 0 &&
-            p[4*8 + col] == 0 && p[5*8 + col] == 0 && p[6*8 + col] == 0 &&
-            p[7*8 + col] == 0) {
-          t = (dctSqrt2 * dataIn[i+0] + 8192) >> 14;
-          p[0*8 + col] = t;
-          p[1*8 + col] = t;
-          p[2*8 + col] = t;
-          p[3*8 + col] = t;
-          p[4*8 + col] = t;
-          p[5*8 + col] = t;
-          p[6*8 + col] = t;
-          p[7*8 + col] = t;
-          continue;
-        }
-
-        // stage 4
-        v0 = (dctSqrt2 * p[0*8 + col] + 2048) >> 12;
-        v1 = (dctSqrt2 * p[4*8 + col] + 2048) >> 12;
-        v2 = p[2*8 + col];
-        v3 = p[6*8 + col];
-        v4 = (dctSqrt1d2 * (p[1*8 + col] - p[7*8 + col]) + 2048) >> 12;
-        v7 = (dctSqrt1d2 * (p[1*8 + col] + p[7*8 + col]) + 2048) >> 12;
-        v5 = p[3*8 + col];
-        v6 = p[5*8 + col];
-
-        // stage 3
-        t = (v0 - v1 + 1) >> 1;
-        v0 = (v0 + v1 + 1) >> 1;
-        v1 = t;
-        t = (v2 * dctSin6 + v3 * dctCos6 + 2048) >> 12;
-        v2 = (v2 * dctCos6 - v3 * dctSin6 + 2048) >> 12;
-        v3 = t;
-        t = (v4 - v6 + 1) >> 1;
-        v4 = (v4 + v6 + 1) >> 1;
-        v6 = t;
-        t = (v7 + v5 + 1) >> 1;
-        v5 = (v7 - v5 + 1) >> 1;
-        v7 = t;
-
-        // stage 2
-        t = (v0 - v3 + 1) >> 1;
-        v0 = (v0 + v3 + 1) >> 1;
-        v3 = t;
-        t = (v1 - v2 + 1) >> 1;
-        v1 = (v1 + v2 + 1) >> 1;
-        v2 = t;
-        t = (v4 * dctSin3 + v7 * dctCos3 + 2048) >> 12;
-        v4 = (v4 * dctCos3 - v7 * dctSin3 + 2048) >> 12;
-        v7 = t;
-        t = (v5 * dctSin1 + v6 * dctCos1 + 2048) >> 12;
-        v5 = (v5 * dctCos1 - v6 * dctSin1 + 2048) >> 12;
-        v6 = t;
-
-        // stage 1
-        p[0*8 + col] = v0 + v7;
-        p[7*8 + col] = v0 - v7;
-        p[1*8 + col] = v1 + v6;
-        p[6*8 + col] = v1 - v6;
-        p[2*8 + col] = v2 + v5;
-        p[5*8 + col] = v2 - v5;
-        p[3*8 + col] = v3 + v4;
-        p[4*8 + col] = v3 - v4;
-      }
-
-      // convert to 8-bit integers
-      for (i = 0; i < 64; ++i) {
-        var sample = 128 + ((p[i] + 8) >> 4);
-        dataOut[i] = sample < 0 ? 0 : sample > 0xFF ? 0xFF : sample;
-      }
-    }
-
-    var i, j;
-    for (var blockRow = 0; blockRow < blocksPerColumn; blockRow++) {
-      var scanLine = blockRow << 3;
-      for (i = 0; i < 8; i++)
-        lines.push(new Uint8Array(samplesPerLine));
-      for (var blockCol = 0; blockCol < blocksPerLine; blockCol++) {
-        quantizeAndInverse(component.blocks[blockRow][blockCol], r, R);
-
-        var offset = 0, sample = blockCol << 3;
-        for (j = 0; j < 8; j++) {
-          var line = lines[scanLine + j];
-          for (i = 0; i < 8; i++)
-            line[sample + i] = r[offset++];
-        }
-      }
-    }
-    return lines;
-  }
-
-  constructor.prototype = {
-    load: function load(path) {
-      var xhr = new XMLHttpRequest();
-      xhr.open("GET", path, true);
-      xhr.responseType = "arraybuffer";
-      xhr.onload = (function() {
-        // TODO catch parse error
-        var data = new Uint8Array(xhr.response || xhr.mozResponseArrayBuffer);
-        this.parse(data);
-        if (this.onload)
-          this.onload();
-      }).bind(this);
-      xhr.send(null);
-    },
-    parse: function parse(data) {
-      var offset = 0, length = data.length;
-      function readUint16() {
-        var value = (data[offset] << 8) | data[offset + 1];
-        offset += 2;
-        return value;
-      }
-      function readDataBlock() {
-        var length = readUint16();
-        var array = data.subarray(offset, offset + length - 2);
-        offset += array.length;
-        return array;
-      }
-      function prepareComponents(frame) {
-        var maxH = 0, maxV = 0;
-        var component, componentId;
-        for (componentId in frame.components) {
-          if (frame.components.hasOwnProperty(componentId)) {
-            component = frame.components[componentId];
-            if (maxH < component.h) maxH = component.h;
-            if (maxV < component.v) maxV = component.v;
-          }
-        }
-        var mcusPerLine = Math.ceil(frame.samplesPerLine / 8 / maxH);
-        var mcusPerColumn = Math.ceil(frame.scanLines / 8 / maxV);
-        for (componentId in frame.components) {
-          if (frame.components.hasOwnProperty(componentId)) {
-            component = frame.components[componentId];
-            var blocksPerLine = Math.ceil(Math.ceil(frame.samplesPerLine / 8) * component.h / maxH);
-            var blocksPerColumn = Math.ceil(Math.ceil(frame.scanLines  / 8) * component.v / maxV);
-            var blocksPerLineForMcu = mcusPerLine * component.h;
-            var blocksPerColumnForMcu = mcusPerColumn * component.v;
-            var blocks = [];
-            for (var i = 0; i < blocksPerColumnForMcu; i++) {
-              var row = [];
-              for (var j = 0; j < blocksPerLineForMcu; j++)
-                row.push(new Int32Array(64));
-              blocks.push(row);
-            }
-            component.blocksPerLine = blocksPerLine;
-            component.blocksPerColumn = blocksPerColumn;
-            component.blocks = blocks;
-          }
-        }
-        frame.maxH = maxH;
-        frame.maxV = maxV;
-        frame.mcusPerLine = mcusPerLine;
-        frame.mcusPerColumn = mcusPerColumn;
-      }
-      var jfif = null;
-      var adobe = null;
-      var pixels = null;
-      var frame, resetInterval;
-      var quantizationTables = [], frames = [];
-      var huffmanTablesAC = [], huffmanTablesDC = [];
-      var fileMarker = readUint16();
-      if (fileMarker != 0xFFD8) { // SOI (Start of Image)
-        throw "SOI not found";
-      }
-
-      fileMarker = readUint16();
-      while (fileMarker != 0xFFD9) { // EOI (End of image)
-        var i, j, l;
-        switch(fileMarker) {
-          case 0xFFE0: // APP0 (Application Specific)
-          case 0xFFE1: // APP1
-          case 0xFFE2: // APP2
-          case 0xFFE3: // APP3
-          case 0xFFE4: // APP4
-          case 0xFFE5: // APP5
-          case 0xFFE6: // APP6
-          case 0xFFE7: // APP7
-          case 0xFFE8: // APP8
-          case 0xFFE9: // APP9
-          case 0xFFEA: // APP10
-          case 0xFFEB: // APP11
-          case 0xFFEC: // APP12
-          case 0xFFED: // APP13
-          case 0xFFEE: // APP14
-          case 0xFFEF: // APP15
-          case 0xFFFE: // COM (Comment)
-            var appData = readDataBlock();
-
-            if (fileMarker === 0xFFE0) {
-              if (appData[0] === 0x4A && appData[1] === 0x46 && appData[2] === 0x49 &&
-                appData[3] === 0x46 && appData[4] === 0) { // 'JFIF\x00'
-                jfif = {
-                  version: { major: appData[5], minor: appData[6] },
-                  densityUnits: appData[7],
-                  xDensity: (appData[8] << 8) | appData[9],
-                  yDensity: (appData[10] << 8) | appData[11],
-                  thumbWidth: appData[12],
-                  thumbHeight: appData[13],
-                  thumbData: appData.subarray(14, 14 + 3 * appData[12] * appData[13])
-                };
-              }
-            }
-            // TODO APP1 - Exif
-            if (fileMarker === 0xFFEE) {
-              if (appData[0] === 0x41 && appData[1] === 0x64 && appData[2] === 0x6F &&
-                appData[3] === 0x62 && appData[4] === 0x65 && appData[5] === 0) { // 'Adobe\x00'
-                adobe = {
-                  version: appData[6],
-                  flags0: (appData[7] << 8) | appData[8],
-                  flags1: (appData[9] << 8) | appData[10],
-                  transformCode: appData[11]
-                };
-              }
-            }
-            break;
-
-          case 0xFFDB: // DQT (Define Quantization Tables)
-            var quantizationTableCount = Math.floor((readUint16() - 2) / 65);
-            for (i = 0; i < quantizationTableCount; i++) {
-              var quantizationTableSpec = data[offset++];
-              var tableData = new Int32Array(64);
-              if ((quantizationTableSpec >> 4) === 0) { // 8 bit values
-                for (j = 0; j < 64; j++) {
-                  var z = dctZigZag[j];
-                  tableData[z] = data[offset++];
-                }
-              } else if ((quantizationTableSpec >> 4) === 1) { //16 bit
-                for (j = 0; j < 64; j++) {
-                  var z = dctZigZag[j];
-                  tableData[z] = readUint16();
-                }
-              } else
-                throw "DQT: invalid table spec";
-              quantizationTables[quantizationTableSpec & 15] = tableData;
-            }
-            break;
-
-          case 0xFFC0: // SOF0 (Start of Frame, Baseline DCT)
-          case 0xFFC2: // SOF2 (Start of Frame, Progressive DCT)
-            readUint16(); // skip data length
-            frame = {};
-            frame.progressive = (fileMarker === 0xFFC2);
-            frame.precision = data[offset++];
-            frame.scanLines = readUint16();
-            frame.samplesPerLine = readUint16();
-            frame.components = {};
-            frame.componentsOrder = [];
-            var componentsCount = data[offset++], componentId;
-            var maxH = 0, maxV = 0;
-            for (i = 0; i < componentsCount; i++) {
-              componentId = data[offset];
-              var h = data[offset + 1] >> 4;
-              var v = data[offset + 1] & 15;
-              var qId = data[offset + 2];
-              frame.componentsOrder.push(componentId);
-              frame.components[componentId] = {
-                h: h,
-                v: v,
-                quantizationTable: quantizationTables[qId]
-              };
-              offset += 3;
-            }
-            prepareComponents(frame);
-            frames.push(frame);
-            break;
-
-          case 0xFFC4: // DHT (Define Huffman Tables)
-            var huffmanLength = readUint16();
-            for (i = 2; i < huffmanLength;) {
-              var huffmanTableSpec = data[offset++];
-              var codeLengths = new Uint8Array(16);
-              var codeLengthSum = 0;
-              for (j = 0; j < 16; j++, offset++)
-                codeLengthSum += (codeLengths[j] = data[offset]);
-              var huffmanValues = new Uint8Array(codeLengthSum);
-              for (j = 0; j < codeLengthSum; j++, offset++)
-                huffmanValues[j] = data[offset];
-              i += 17 + codeLengthSum;
-
-              ((huffmanTableSpec >> 4) === 0 ? 
-                huffmanTablesDC : huffmanTablesAC)[huffmanTableSpec & 15] =
-                buildHuffmanTable(codeLengths, huffmanValues);
-            }
-            break;
-
-          case 0xFFDD: // DRI (Define Restart Interval)
-            readUint16(); // skip data length
-            resetInterval = readUint16();
-            break;
-
-          case 0xFFDA: // SOS (Start of Scan)
-            var scanLength = readUint16();
-            var selectorsCount = data[offset++];
-            var components = [], component;
-            for (i = 0; i < selectorsCount; i++) {
-              component = frame.components[data[offset++]];
-              var tableSpec = data[offset++];
-              component.huffmanTableDC = huffmanTablesDC[tableSpec >> 4];
-              component.huffmanTableAC = huffmanTablesAC[tableSpec & 15];
-              components.push(component);
-            }
-            var spectralStart = data[offset++];
-            var spectralEnd = data[offset++];
-            var successiveApproximation = data[offset++];
-            var processed = decodeScan(data, offset,
-              frame, components, resetInterval,
-              spectralStart, spectralEnd,
-              successiveApproximation >> 4, successiveApproximation & 15);
-            offset += processed;
-            break;
-          default:
-            throw "unknown JPEG marker " + fileMarker.toString(16);
-        }
-        fileMarker = readUint16();
-      }
-      if (frames.length != 1)
-        throw "only single frame JPEGs supported";
-
-      this.width = frame.samplesPerLine;
-      this.height = frame.scanLines;
-      this.jfif = jfif;
-      this.adobe = adobe;
-      this.components = [];
-      for (var i = 0; i < frame.componentsOrder.length; i++) {
-        var component = frame.components[frame.componentsOrder[i]];
-        this.components.push({
-          lines: buildComponentData(frame, component),
-          scaleX: component.h / frame.maxH,
-          scaleY: component.v / frame.maxV
-        });
-      }
-    },
-    getData: function getData(width, height) {
-      function clampTo8bit(a) {
-        return a < 0 ? 0 : a > 255 ? 255 : a;
-      }
-      var scaleX = this.width / width, scaleY = this.height / height;
-
-      var component1, component2, component3, component4;
-      var component1Line, component2Line, component3Line, component4Line;
-      var x, y;
-      var offset = 0;
-      var Y, Cb, Cr, K, C, M, Ye, R, G, B;
-      var colorTransform;
-      var dataLength = width * height * this.components.length;
-      var data = new Uint8Array(dataLength);
-      switch (this.components.length) {
-        case 1:
-          component1 = this.components[0];
-          for (y = 0; y < height; y++) {
-            component1Line = component1.lines[0 | (y * component1.scaleY * scaleY)];
-            for (x = 0; x < width; x++) {
-              Y = component1Line[0 | (x * component1.scaleX * scaleX)];
-
-              data[offset++] = Y;
-            }
-          }
-          break;
-        case 3:
-          // The default transform for three components is true
-          colorTransform = true;
-          // The adobe transform marker overrides any previous setting
-          if (this.adobe && this.adobe.transformCode)
-            colorTransform = true;
-          else if (typeof this.colorTransform !== 'undefined')
-            colorTransform = !!this.colorTransform;
-
-          component1 = this.components[0];
-          component2 = this.components[1];
-          component3 = this.components[2];
-          for (y = 0; y < height; y++) {
-            component1Line = component1.lines[0 | (y * component1.scaleY * scaleY)];
-            component2Line = component2.lines[0 | (y * component2.scaleY * scaleY)];
-            component3Line = component3.lines[0 | (y * component3.scaleY * scaleY)];
-            for (x = 0; x < width; x++) {
-              if (!colorTransform) {
-                R = component1Line[0 | (x * component1.scaleX * scaleX)];
-                G = component2Line[0 | (x * component2.scaleX * scaleX)];
-                B = component3Line[0 | (x * component3.scaleX * scaleX)];
-              } else {
-                Y = component1Line[0 | (x * component1.scaleX * scaleX)];
-                Cb = component2Line[0 | (x * component2.scaleX * scaleX)];
-                Cr = component3Line[0 | (x * component3.scaleX * scaleX)];
-
-                R = clampTo8bit(Y + 1.402 * (Cr - 128));
-                G = clampTo8bit(Y - 0.3441363 * (Cb - 128) - 0.71413636 * (Cr - 128));
-                B = clampTo8bit(Y + 1.772 * (Cb - 128));
-              }
-
-              data[offset++] = R;
-              data[offset++] = G;
-              data[offset++] = B;
-            }
-          }
-          break;
-        case 4:
-          if (!this.adobe)
-            throw 'Unsupported color mode (4 components)';
-          // The default transform for four components is false
-          colorTransform = false;
-          // The adobe transform marker overrides any previous setting
-          if (this.adobe && this.adobe.transformCode)
-            colorTransform = true;
-          else if (typeof this.colorTransform !== 'undefined')
-            colorTransform = !!this.colorTransform;
-
-          component1 = this.components[0];
-          component2 = this.components[1];
-          component3 = this.components[2];
-          component4 = this.components[3];
-          for (y = 0; y < height; y++) {
-            component1Line = component1.lines[0 | (y * component1.scaleY * scaleY)];
-            component2Line = component2.lines[0 | (y * component2.scaleY * scaleY)];
-            component3Line = component3.lines[0 | (y * component3.scaleY * scaleY)];
-            component4Line = component4.lines[0 | (y * component4.scaleY * scaleY)];
-            for (x = 0; x < width; x++) {
-              if (!colorTransform) {
-                C = component1Line[0 | (x * component1.scaleX * scaleX)];
-                M = component2Line[0 | (x * component2.scaleX * scaleX)];
-                Ye = component3Line[0 | (x * component3.scaleX * scaleX)];
-                K = component4Line[0 | (x * component4.scaleX * scaleX)];
-              } else {
-                Y = component1Line[0 | (x * component1.scaleX * scaleX)];
-                Cb = component2Line[0 | (x * component2.scaleX * scaleX)];
-                Cr = component3Line[0 | (x * component3.scaleX * scaleX)];
-                K = component4Line[0 | (x * component4.scaleX * scaleX)];
-
-                C = 255 - clampTo8bit(Y + 1.402 * (Cr - 128));
-                M = 255 - clampTo8bit(Y - 0.3441363 * (Cb - 128) - 0.71413636 * (Cr - 128));
-                Ye = 255 - clampTo8bit(Y + 1.772 * (Cb - 128));
-              }
-              data[offset++] = C;
-              data[offset++] = M;
-              data[offset++] = Ye;
-              data[offset++] = K;
-            }
-          }
-          break;
-        default:
-          throw 'Unsupported color mode';
-      }
-      return data;
-    },
-    copyToImageData: function copyToImageData(imageData) {
-      var width = imageData.width, height = imageData.height;
-      var imageDataArray = imageData.data;
-      var data = this.getData(width, height);
-      var i = 0, j = 0, x, y;
-      var Y, K, C, M, R, G, B;
-      switch (this.components.length) {
-        case 1:
-          for (y = 0; y < height; y++) {
-            for (x = 0; x < width; x++) {
-              Y = data[i++];
-
-              imageDataArray[j++] = Y;
-              imageDataArray[j++] = Y;
-              imageDataArray[j++] = Y;
-              imageDataArray[j++] = 255;
-            }
-          }
-          break;
-        case 3:
-          for (y = 0; y < height; y++) {
-            for (x = 0; x < width; x++) {
-              R = data[i++];
-              G = data[i++];
-              B = data[i++];
-
-              imageDataArray[j++] = R;
-              imageDataArray[j++] = G;
-              imageDataArray[j++] = B;
-              imageDataArray[j++] = 255;
-            }
-          }
-          break;
-        case 4:
-          for (y = 0; y < height; y++) {
-            for (x = 0; x < width; x++) {
-              C = data[i++];
-              M = data[i++];
-              Y = data[i++];
-              K = data[i++];
-
-              R = 255 - clampTo8bit(C * (1 - K / 255) + K);
-              G = 255 - clampTo8bit(M * (1 - K / 255) + K);
-              B = 255 - clampTo8bit(Y * (1 - K / 255) + K);
-
-              imageDataArray[j++] = R;
-              imageDataArray[j++] = G;
-              imageDataArray[j++] = B;
-              imageDataArray[j++] = 255;
-            }
-          }
-          break;
-        default:
-          throw 'Unsupported color mode';
-      }
-    }
-  };
-
-  return constructor;
-})();
-/* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
-
-'use strict';
 
 var JpxImage = (function JpxImageClosure() {
   // Table E.1
@@ -31818,7 +32767,8 @@ var JpxImage = (function JpxImageClosure() {
                   cod.resetContextProbabilities ||
                   cod.terminationOnEachCodingPass ||
                   cod.verticalyStripe || cod.predictableTermination)
-                throw 'Unsupported COD options: ' + uneval(cod);
+                throw 'Unsupported COD options: ' +
+                  globalScope.JSON.stringify(cod);
 
               if (context.mainHeader)
                 context.COD = cod;
@@ -33436,10 +34386,6 @@ var JpxImage = (function JpxImageClosure() {
 })();
 
 
-/* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
-
-'use strict';
 
 var Jbig2Image = (function Jbig2ImageClosure() {
 
@@ -34498,10 +35444,6 @@ var Jbig2Image = (function Jbig2ImageClosure() {
   return Jbig2Image;
 })();
 
-/* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
-
-'use strict';
 
 var bidi = PDFJS.bidi = (function bidiClosure() {
   // Character types for symbols from 0000 to 00FF.
@@ -34624,11 +35566,16 @@ var bidi = PDFJS.bidi = (function bidiClosure() {
     }
   }
 
-  function bidi(text, startLevel) {
-    var str = text.str;
+  function BidiResult(str, isLTR) {
+    this.str = str;
+    this.ltr = isLTR;
+  }
+
+  function bidi(str, startLevel) {
+    var isLTR = true;
     var strLength = str.length;
     if (strLength == 0)
-      return str;
+      return new BidiResult(str, ltr);
 
     // get types, fill arrays
 
@@ -34662,16 +35609,16 @@ var bidi = PDFJS.bidi = (function bidiClosure() {
     //  if less than 30% chars are rtl then string is primarily ltr
     //  if more than 30% chars are rtl then string is primarily rtl
     if (numBidi == 0) {
-      text.direction = 'ltr';
-      return str;
+      isLTR = true;
+      return new BidiResult(str, isLTR);
     }
 
     if (startLevel == -1) {
       if ((strLength / numBidi) < 0.3) {
-        text.direction = 'ltr';
+        isLTR = true;
         startLevel = 0;
       } else {
-        text.direction = 'rtl';
+        isLTR = false;
         startLevel = 1;
       }
     }
@@ -34924,17 +35871,14 @@ var bidi = PDFJS.bidi = (function bidiClosure() {
       if (ch != '<' && ch != '>')
         result += ch;
     }
-    return result;
+
+    return new BidiResult(result, isLTR);
   }
 
   return bidi;
 })();
 
 
-/* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
-
-'use strict';
 
 var Metadata = PDFJS.Metadata = (function MetadataClosure() {
   function fixMetadata(meta) {
@@ -34985,23 +35929,19 @@ var Metadata = PDFJS.Metadata = (function MetadataClosure() {
       if (!rdf || nodeName !== 'rdf:rdf' || !rdf.hasChildNodes())
         return;
 
-      var childNodes = rdf.childNodes, desc, namespace, entries, entry;
+      var children = rdf.childNodes, desc, entry, name, i, ii, length, iLength;
 
-      for (var i = 0, length = childNodes.length; i < length; i++) {
-        desc = childNodes[i];
+      for (i = 0, length = children.length; i < length; i++) {
+        desc = children[i];
         if (desc.nodeName.toLowerCase() !== 'rdf:description')
           continue;
 
-        entries = [];
-        for (var ii = 0, iLength = desc.childNodes.length; ii < iLength; ii++) {
-          if (desc.childNodes[ii].nodeName.toLowerCase() !== '#text')
-            entries.push(desc.childNodes[ii]);
-        }
-
-        for (ii = 0, iLength = entries.length; ii < iLength; ii++) {
-          var entry = entries[ii];
-          var name = entry.nodeName.toLowerCase();
-          this.metadata[name] = entry.textContent.trim();
+        for (ii = 0, iLength = desc.childNodes.length; ii < iLength; ii++) {
+          if (desc.childNodes[ii].nodeName.toLowerCase() !== '#text') {
+            entry = desc.childNodes[ii];
+            name = entry.nodeName.toLowerCase();
+            this.metadata[name] = entry.textContent.trim();
+          }
         }
       }
     },
@@ -35017,5 +35957,946 @@ var Metadata = PDFJS.Metadata = (function MetadataClosure() {
 
   return Metadata;
 })();
+/* -*- Mode: Java; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- /
+/* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
+/*
+   Copyright 2011 notmasteryet
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
+// - The JPEG specification can be found in the ITU CCITT Recommendation T.81
+//   (www.w3.org/Graphics/JPEG/itu-t81.pdf)
+// - The JFIF specification can be found in the JPEG File Interchange Format
+//   (www.w3.org/Graphics/JPEG/jfif3.pdf)
+// - The Adobe Application-Specific JPEG markers in the Supporting the DCT Filters
+//   in PostScript Level 2, Technical Note #5116
+//   (partners.adobe.com/public/developer/en/ps/sdk/5116.DCT_Filter.pdf)
+
+var JpegImage = (function jpegImage() {
+  "use strict";
+  var dctZigZag = new Int32Array([
+     0,
+     1,  8,
+    16,  9,  2,
+     3, 10, 17, 24,
+    32, 25, 18, 11, 4,
+     5, 12, 19, 26, 33, 40,
+    48, 41, 34, 27, 20, 13,  6,
+     7, 14, 21, 28, 35, 42, 49, 56,
+    57, 50, 43, 36, 29, 22, 15,
+    23, 30, 37, 44, 51, 58,
+    59, 52, 45, 38, 31,
+    39, 46, 53, 60,
+    61, 54, 47,
+    55, 62,
+    63
+  ]);
+
+  var dctCos1  =  4017   // cos(pi/16)
+  var dctSin1  =   799   // sin(pi/16)
+  var dctCos3  =  3406   // cos(3*pi/16)
+  var dctSin3  =  2276   // sin(3*pi/16)
+  var dctCos6  =  1567   // cos(6*pi/16)
+  var dctSin6  =  3784   // sin(6*pi/16)
+  var dctSqrt2 =  5793   // sqrt(2)
+  var dctSqrt1d2 = 2896  // sqrt(2) / 2
+
+  function constructor() {
+  }
+
+  function buildHuffmanTable(codeLengths, values) {
+    var k = 0, code = [], i, j, length = 16;
+    while (length > 0 && !codeLengths[length - 1])
+      length--;
+    code.push({children: [], index: 0});
+    var p = code[0], q;
+    for (i = 0; i < length; i++) {
+      for (j = 0; j < codeLengths[i]; j++) {
+        p = code.pop();
+        p.children[p.index] = values[k];
+        while (p.index > 0) {
+          p = code.pop();
+        }
+        p.index++;
+        code.push(p);
+        while (code.length <= i) {
+          code.push(q = {children: [], index: 0});
+          p.children[p.index] = q.children;
+          p = q;
+        }
+        k++;
+      }
+      if (i + 1 < length) {
+        // p here points to last code
+        code.push(q = {children: [], index: 0});
+        p.children[p.index] = q.children;
+        p = q;
+      }
+    }
+    return code[0].children;
+  }
+
+  function decodeScan(data, offset,
+                      frame, components, resetInterval,
+                      spectralStart, spectralEnd,
+                      successivePrev, successive) {
+    var precision = frame.precision;
+    var samplesPerLine = frame.samplesPerLine;
+    var scanLines = frame.scanLines;
+    var mcusPerLine = frame.mcusPerLine;
+    var progressive = frame.progressive;
+    var maxH = frame.maxH, maxV = frame.maxV;
+
+    var startOffset = offset, bitsData = 0, bitsCount = 0;
+    function readBit() {
+      if (bitsCount > 0) {
+        bitsCount--;
+        return (bitsData >> bitsCount) & 1;
+      }
+      bitsData = data[offset++];
+      if (bitsData == 0xFF) {
+        var nextByte = data[offset++];
+        if (nextByte) {
+          throw "unexpected marker: " + ((bitsData << 8) | nextByte).toString(16);
+        }
+        // unstuff 0
+      }
+      bitsCount = 7;
+      return bitsData >>> 7;
+    }
+    function decodeHuffman(tree) {
+      var node = tree, bit;
+      while ((bit = readBit()) !== null) {
+        node = node[bit];
+        if (typeof node === 'number')
+          return node;
+        if (typeof node !== 'object')
+          throw "invalid huffman sequence";
+      }
+      return null;
+    }
+    function receive(length) {
+      var n = 0;
+      while (length > 0) {
+        var bit = readBit();
+        if (bit === null) return;
+        n = (n << 1) | bit;
+        length--;
+      }
+      return n;
+    }
+    function receiveAndExtend(length) {
+      var n = receive(length);
+      if (n >= 1 << (length - 1))
+        return n;
+      return n + (-1 << length) + 1;
+    }
+    function decodeBaseline(component, zz) {
+      var t = decodeHuffman(component.huffmanTableDC);
+      var diff = t === 0 ? 0 : receiveAndExtend(t);
+      zz[0]= (component.pred += diff);
+      var k = 1;
+      while (k < 64) {
+        var rs = decodeHuffman(component.huffmanTableAC);
+        var s = rs & 15, r = rs >> 4;
+        if (s === 0) {
+          if (r < 15)
+            break;
+          k += 16;
+          continue;
+        }
+        k += r;
+        var z = dctZigZag[k];
+        zz[z] = receiveAndExtend(s);
+        k++;
+      }
+    }
+    function decodeDCFirst(component, zz) {
+      var t = decodeHuffman(component.huffmanTableDC);
+      var diff = t === 0 ? 0 : (receiveAndExtend(t) << successive);
+      zz[0] = (component.pred += diff);
+    }
+    function decodeDCSuccessive(component, zz) {
+      zz[0] |= readBit() << successive;
+    }
+    var eobrun = 0;
+    function decodeACFirst(component, zz) {
+      if (eobrun > 0) {
+        eobrun--;
+        return;
+      }
+      var k = spectralStart, e = spectralEnd;
+      while (k <= e) {
+        var rs = decodeHuffman(component.huffmanTableAC);
+        var s = rs & 15, r = rs >> 4;
+        if (s === 0) {
+          if (r < 15) {
+            eobrun = receive(r) + (1 << r) - 1;
+            break;
+          }
+          k += 16;
+          continue;
+        }
+        k += r;
+        var z = dctZigZag[k];
+        zz[z] = receiveAndExtend(s) * (1 << successive);
+        k++;
+      }
+    }
+    var successiveACState = 0, successiveACNextValue;
+    function decodeACSuccessive(component, zz) {
+      var k = spectralStart, e = spectralEnd, r = 0;
+      while (k <= e) {
+        var z = dctZigZag[k];
+        switch (successiveACState) {
+        case 0: // initial state
+          var rs = decodeHuffman(component.huffmanTableAC);
+          var s = rs & 15, r = rs >> 4;
+          if (s === 0) {
+            if (r < 15) {
+              eobrun = receive(r) + (1 << r);
+              successiveACState = 4;
+            } else {
+              r = 16;
+              successiveACState = 1;
+            }
+          } else {
+            if (s !== 1)
+              throw "invalid ACn encoding";
+            successiveACNextValue = receiveAndExtend(s);
+            successiveACState = r ? 2 : 3;
+          }
+          continue;
+        case 1: // skipping r zero items
+        case 2:
+          if (zz[z])
+            zz[z] += (readBit() << successive);
+          else {
+            r--;
+            if (r === 0)
+              successiveACState = successiveACState == 2 ? 3 : 0;
+          }
+          break;
+        case 3: // set value for a zero item
+          if (zz[z])
+            zz[z] += (readBit() << successive);
+          else {
+            zz[z] = successiveACNextValue << successive;
+            successiveACState = 0;
+          }
+          break;
+        case 4: // eob
+          if (zz[z])
+            zz[z] += (readBit() << successive);
+          break;
+        }
+        k++;
+      }
+      if (successiveACState === 4) {
+        eobrun--;
+        if (eobrun === 0)
+          successiveACState = 0;
+      }
+    }
+    function decodeMcu(component, decode, mcu, row, col) {
+      var mcuRow = (mcu / mcusPerLine) | 0;
+      var mcuCol = mcu % mcusPerLine;
+      var blockRow = mcuRow * component.v + row;
+      var blockCol = mcuCol * component.h + col;
+      decode(component, component.blocks[blockRow][blockCol]);
+    }
+    function decodeBlock(component, decode, mcu) {
+      var blockRow = (mcu / component.blocksPerLine) | 0;
+      var blockCol = mcu % component.blocksPerLine;
+      decode(component, component.blocks[blockRow][blockCol]);
+    }
+
+    var componentsLength = components.length;
+    var component, i, j, k, n;
+    var decodeFn;
+    if (progressive) {
+      if (spectralStart === 0)
+        decodeFn = successivePrev === 0 ? decodeDCFirst : decodeDCSuccessive;
+      else
+        decodeFn = successivePrev === 0 ? decodeACFirst : decodeACSuccessive;
+    } else {
+      decodeFn = decodeBaseline;
+    }
+
+    var mcu = 0, marker;
+    var mcuExpected;
+    if (componentsLength == 1) {
+      mcuExpected = components[0].blocksPerLine * components[0].blocksPerColumn;
+    } else {
+      mcuExpected = mcusPerLine * frame.mcusPerColumn;
+    }
+    if (!resetInterval) resetInterval = mcuExpected;
+
+    var h, v;
+    while (mcu < mcuExpected) {
+      // reset interval stuff
+      for (i = 0; i < componentsLength; i++)
+        components[i].pred = 0;
+      eobrun = 0;
+
+      if (componentsLength == 1) {
+        component = components[0];
+        for (n = 0; n < resetInterval; n++) {
+          decodeBlock(component, decodeFn, mcu);
+          mcu++;
+        }
+      } else {
+        for (n = 0; n < resetInterval; n++) {
+          for (i = 0; i < componentsLength; i++) {
+            component = components[i];
+            h = component.h;
+            v = component.v;
+            for (j = 0; j < v; j++) {
+              for (k = 0; k < h; k++) {
+                decodeMcu(component, decodeFn, mcu, j, k);
+              }
+            }
+          }
+          mcu++;
+        }
+      }
+
+      // find marker
+      bitsCount = 0;
+      marker = (data[offset] << 8) | data[offset + 1];
+      if (marker <= 0xFF00) {
+        throw "marker was not found";
+      }
+
+      if (marker >= 0xFFD0 && marker <= 0xFFD7) { // RSTx
+        offset += 2;
+      }
+      else
+        break;
+    }
+
+    return offset - startOffset;
+  }
+
+  function buildComponentData(frame, component) {
+    var lines = [];
+    var blocksPerLine = component.blocksPerLine;
+    var blocksPerColumn = component.blocksPerColumn;
+    var samplesPerLine = blocksPerLine << 3;
+    var R = new Int32Array(64), r = new Uint8Array(64);
+
+    // A port of poppler's IDCT method which in turn is taken from:
+    //   Christoph Loeffler, Adriaan Ligtenberg, George S. Moschytz,
+    //   "Practical Fast 1-D DCT Algorithms with 11 Multiplications",
+    //   IEEE Intl. Conf. on Acoustics, Speech & Signal Processing, 1989,
+    //   988-991.
+    function quantizeAndInverse(zz, dataOut, dataIn) {
+      var qt = component.quantizationTable;
+      var v0, v1, v2, v3, v4, v5, v6, v7, t;
+      var p = dataIn;
+      var i;
+
+      // dequant
+      for (i = 0; i < 64; i++)
+        p[i] = zz[i] * qt[i];
+
+      // inverse DCT on rows
+      for (i = 0; i < 8; ++i) {
+        var row = 8 * i;
+
+        // check for all-zero AC coefficients
+        if (p[1 + row] == 0 && p[2 + row] == 0 && p[3 + row] == 0 &&
+            p[4 + row] == 0 && p[5 + row] == 0 && p[6 + row] == 0 &&
+            p[7 + row] == 0) {
+          t = (dctSqrt2 * p[0 + row] + 512) >> 10;
+          p[0 + row] = t;
+          p[1 + row] = t;
+          p[2 + row] = t;
+          p[3 + row] = t;
+          p[4 + row] = t;
+          p[5 + row] = t;
+          p[6 + row] = t;
+          p[7 + row] = t;
+          continue;
+        }
+
+        // stage 4
+        v0 = (dctSqrt2 * p[0 + row] + 128) >> 8;
+        v1 = (dctSqrt2 * p[4 + row] + 128) >> 8;
+        v2 = p[2 + row];
+        v3 = p[6 + row];
+        v4 = (dctSqrt1d2 * (p[1 + row] - p[7 + row]) + 128) >> 8;
+        v7 = (dctSqrt1d2 * (p[1 + row] + p[7 + row]) + 128) >> 8;
+        v5 = p[3 + row] << 4;
+        v6 = p[5 + row] << 4;
+
+        // stage 3
+        t = (v0 - v1+ 1) >> 1;
+        v0 = (v0 + v1 + 1) >> 1;
+        v1 = t;
+        t = (v2 * dctSin6 + v3 * dctCos6 + 128) >> 8;
+        v2 = (v2 * dctCos6 - v3 * dctSin6 + 128) >> 8;
+        v3 = t;
+        t = (v4 - v6 + 1) >> 1;
+        v4 = (v4 + v6 + 1) >> 1;
+        v6 = t;
+        t = (v7 + v5 + 1) >> 1;
+        v5 = (v7 - v5 + 1) >> 1;
+        v7 = t;
+
+        // stage 2
+        t = (v0 - v3 + 1) >> 1;
+        v0 = (v0 + v3 + 1) >> 1;
+        v3 = t;
+        t = (v1 - v2 + 1) >> 1;
+        v1 = (v1 + v2 + 1) >> 1;
+        v2 = t;
+        t = (v4 * dctSin3 + v7 * dctCos3 + 2048) >> 12;
+        v4 = (v4 * dctCos3 - v7 * dctSin3 + 2048) >> 12;
+        v7 = t;
+        t = (v5 * dctSin1 + v6 * dctCos1 + 2048) >> 12;
+        v5 = (v5 * dctCos1 - v6 * dctSin1 + 2048) >> 12;
+        v6 = t;
+
+        // stage 1
+        p[0 + row] = v0 + v7;
+        p[7 + row] = v0 - v7;
+        p[1 + row] = v1 + v6;
+        p[6 + row] = v1 - v6;
+        p[2 + row] = v2 + v5;
+        p[5 + row] = v2 - v5;
+        p[3 + row] = v3 + v4;
+        p[4 + row] = v3 - v4;
+      }
+
+      // inverse DCT on columns
+      for (i = 0; i < 8; ++i) {
+        var col = i;
+
+        // check for all-zero AC coefficients
+        if (p[1*8 + col] == 0 && p[2*8 + col] == 0 && p[3*8 + col] == 0 &&
+            p[4*8 + col] == 0 && p[5*8 + col] == 0 && p[6*8 + col] == 0 &&
+            p[7*8 + col] == 0) {
+          t = (dctSqrt2 * dataIn[i+0] + 8192) >> 14;
+          p[0*8 + col] = t;
+          p[1*8 + col] = t;
+          p[2*8 + col] = t;
+          p[3*8 + col] = t;
+          p[4*8 + col] = t;
+          p[5*8 + col] = t;
+          p[6*8 + col] = t;
+          p[7*8 + col] = t;
+          continue;
+        }
+
+        // stage 4
+        v0 = (dctSqrt2 * p[0*8 + col] + 2048) >> 12;
+        v1 = (dctSqrt2 * p[4*8 + col] + 2048) >> 12;
+        v2 = p[2*8 + col];
+        v3 = p[6*8 + col];
+        v4 = (dctSqrt1d2 * (p[1*8 + col] - p[7*8 + col]) + 2048) >> 12;
+        v7 = (dctSqrt1d2 * (p[1*8 + col] + p[7*8 + col]) + 2048) >> 12;
+        v5 = p[3*8 + col];
+        v6 = p[5*8 + col];
+
+        // stage 3
+        t = (v0 - v1 + 1) >> 1;
+        v0 = (v0 + v1 + 1) >> 1;
+        v1 = t;
+        t = (v2 * dctSin6 + v3 * dctCos6 + 2048) >> 12;
+        v2 = (v2 * dctCos6 - v3 * dctSin6 + 2048) >> 12;
+        v3 = t;
+        t = (v4 - v6 + 1) >> 1;
+        v4 = (v4 + v6 + 1) >> 1;
+        v6 = t;
+        t = (v7 + v5 + 1) >> 1;
+        v5 = (v7 - v5 + 1) >> 1;
+        v7 = t;
+
+        // stage 2
+        t = (v0 - v3 + 1) >> 1;
+        v0 = (v0 + v3 + 1) >> 1;
+        v3 = t;
+        t = (v1 - v2 + 1) >> 1;
+        v1 = (v1 + v2 + 1) >> 1;
+        v2 = t;
+        t = (v4 * dctSin3 + v7 * dctCos3 + 2048) >> 12;
+        v4 = (v4 * dctCos3 - v7 * dctSin3 + 2048) >> 12;
+        v7 = t;
+        t = (v5 * dctSin1 + v6 * dctCos1 + 2048) >> 12;
+        v5 = (v5 * dctCos1 - v6 * dctSin1 + 2048) >> 12;
+        v6 = t;
+
+        // stage 1
+        p[0*8 + col] = v0 + v7;
+        p[7*8 + col] = v0 - v7;
+        p[1*8 + col] = v1 + v6;
+        p[6*8 + col] = v1 - v6;
+        p[2*8 + col] = v2 + v5;
+        p[5*8 + col] = v2 - v5;
+        p[3*8 + col] = v3 + v4;
+        p[4*8 + col] = v3 - v4;
+      }
+
+      // convert to 8-bit integers
+      for (i = 0; i < 64; ++i) {
+        var sample = 128 + ((p[i] + 8) >> 4);
+        dataOut[i] = sample < 0 ? 0 : sample > 0xFF ? 0xFF : sample;
+      }
+    }
+
+    var i, j;
+    for (var blockRow = 0; blockRow < blocksPerColumn; blockRow++) {
+      var scanLine = blockRow << 3;
+      for (i = 0; i < 8; i++)
+        lines.push(new Uint8Array(samplesPerLine));
+      for (var blockCol = 0; blockCol < blocksPerLine; blockCol++) {
+        quantizeAndInverse(component.blocks[blockRow][blockCol], r, R);
+
+        var offset = 0, sample = blockCol << 3;
+        for (j = 0; j < 8; j++) {
+          var line = lines[scanLine + j];
+          for (i = 0; i < 8; i++)
+            line[sample + i] = r[offset++];
+        }
+      }
+    }
+    return lines;
+  }
+
+  function clampTo8bit(a) {
+    return a < 0 ? 0 : a > 255 ? 255 : a;
+  }
+
+  constructor.prototype = {
+    load: function load(path) {
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", path, true);
+      xhr.responseType = "arraybuffer";
+      xhr.onload = (function() {
+        // TODO catch parse error
+        var data = new Uint8Array(xhr.response || xhr.mozResponseArrayBuffer);
+        this.parse(data);
+        if (this.onload)
+          this.onload();
+      }).bind(this);
+      xhr.send(null);
+    },
+    parse: function parse(data) {
+      var offset = 0, length = data.length;
+      function readUint16() {
+        var value = (data[offset] << 8) | data[offset + 1];
+        offset += 2;
+        return value;
+      }
+      function readDataBlock() {
+        var length = readUint16();
+        var array = data.subarray(offset, offset + length - 2);
+        offset += array.length;
+        return array;
+      }
+      function prepareComponents(frame) {
+        var maxH = 0, maxV = 0;
+        var component, componentId;
+        for (componentId in frame.components) {
+          if (frame.components.hasOwnProperty(componentId)) {
+            component = frame.components[componentId];
+            if (maxH < component.h) maxH = component.h;
+            if (maxV < component.v) maxV = component.v;
+          }
+        }
+        var mcusPerLine = Math.ceil(frame.samplesPerLine / 8 / maxH);
+        var mcusPerColumn = Math.ceil(frame.scanLines / 8 / maxV);
+        for (componentId in frame.components) {
+          if (frame.components.hasOwnProperty(componentId)) {
+            component = frame.components[componentId];
+            var blocksPerLine = Math.ceil(Math.ceil(frame.samplesPerLine / 8) * component.h / maxH);
+            var blocksPerColumn = Math.ceil(Math.ceil(frame.scanLines  / 8) * component.v / maxV);
+            var blocksPerLineForMcu = mcusPerLine * component.h;
+            var blocksPerColumnForMcu = mcusPerColumn * component.v;
+            var blocks = [];
+            for (var i = 0; i < blocksPerColumnForMcu; i++) {
+              var row = [];
+              for (var j = 0; j < blocksPerLineForMcu; j++)
+                row.push(new Int32Array(64));
+              blocks.push(row);
+            }
+            component.blocksPerLine = blocksPerLine;
+            component.blocksPerColumn = blocksPerColumn;
+            component.blocks = blocks;
+          }
+        }
+        frame.maxH = maxH;
+        frame.maxV = maxV;
+        frame.mcusPerLine = mcusPerLine;
+        frame.mcusPerColumn = mcusPerColumn;
+      }
+      var jfif = null;
+      var adobe = null;
+      var pixels = null;
+      var frame, resetInterval;
+      var quantizationTables = [], frames = [];
+      var huffmanTablesAC = [], huffmanTablesDC = [];
+      var fileMarker = readUint16();
+      if (fileMarker != 0xFFD8) { // SOI (Start of Image)
+        throw "SOI not found";
+      }
+
+      fileMarker = readUint16();
+      while (fileMarker != 0xFFD9) { // EOI (End of image)
+        var i, j, l;
+        switch(fileMarker) {
+          case 0xFFE0: // APP0 (Application Specific)
+          case 0xFFE1: // APP1
+          case 0xFFE2: // APP2
+          case 0xFFE3: // APP3
+          case 0xFFE4: // APP4
+          case 0xFFE5: // APP5
+          case 0xFFE6: // APP6
+          case 0xFFE7: // APP7
+          case 0xFFE8: // APP8
+          case 0xFFE9: // APP9
+          case 0xFFEA: // APP10
+          case 0xFFEB: // APP11
+          case 0xFFEC: // APP12
+          case 0xFFED: // APP13
+          case 0xFFEE: // APP14
+          case 0xFFEF: // APP15
+          case 0xFFFE: // COM (Comment)
+            var appData = readDataBlock();
+
+            if (fileMarker === 0xFFE0) {
+              if (appData[0] === 0x4A && appData[1] === 0x46 && appData[2] === 0x49 &&
+                appData[3] === 0x46 && appData[4] === 0) { // 'JFIF\x00'
+                jfif = {
+                  version: { major: appData[5], minor: appData[6] },
+                  densityUnits: appData[7],
+                  xDensity: (appData[8] << 8) | appData[9],
+                  yDensity: (appData[10] << 8) | appData[11],
+                  thumbWidth: appData[12],
+                  thumbHeight: appData[13],
+                  thumbData: appData.subarray(14, 14 + 3 * appData[12] * appData[13])
+                };
+              }
+            }
+            // TODO APP1 - Exif
+            if (fileMarker === 0xFFEE) {
+              if (appData[0] === 0x41 && appData[1] === 0x64 && appData[2] === 0x6F &&
+                appData[3] === 0x62 && appData[4] === 0x65 && appData[5] === 0) { // 'Adobe\x00'
+                adobe = {
+                  version: appData[6],
+                  flags0: (appData[7] << 8) | appData[8],
+                  flags1: (appData[9] << 8) | appData[10],
+                  transformCode: appData[11]
+                };
+              }
+            }
+            break;
+
+          case 0xFFDB: // DQT (Define Quantization Tables)
+            var quantizationTablesLength = readUint16();
+            var quantizationTablesEnd = quantizationTablesLength + offset - 2;
+            while (offset < quantizationTablesEnd) {
+              var quantizationTableSpec = data[offset++];
+              var tableData = new Int32Array(64);
+              if ((quantizationTableSpec >> 4) === 0) { // 8 bit values
+                for (j = 0; j < 64; j++) {
+                  var z = dctZigZag[j];
+                  tableData[z] = data[offset++];
+                }
+              } else if ((quantizationTableSpec >> 4) === 1) { //16 bit
+                for (j = 0; j < 64; j++) {
+                  var z = dctZigZag[j];
+                  tableData[z] = readUint16();
+                }
+              } else
+                throw "DQT: invalid table spec";
+              quantizationTables[quantizationTableSpec & 15] = tableData;
+            }
+            break;
+
+          case 0xFFC0: // SOF0 (Start of Frame, Baseline DCT)
+          case 0xFFC2: // SOF2 (Start of Frame, Progressive DCT)
+            readUint16(); // skip data length
+            frame = {};
+            frame.progressive = (fileMarker === 0xFFC2);
+            frame.precision = data[offset++];
+            frame.scanLines = readUint16();
+            frame.samplesPerLine = readUint16();
+            frame.components = {};
+            frame.componentsOrder = [];
+            var componentsCount = data[offset++], componentId;
+            var maxH = 0, maxV = 0;
+            for (i = 0; i < componentsCount; i++) {
+              componentId = data[offset];
+              var h = data[offset + 1] >> 4;
+              var v = data[offset + 1] & 15;
+              var qId = data[offset + 2];
+              frame.componentsOrder.push(componentId);
+              frame.components[componentId] = {
+                h: h,
+                v: v,
+                quantizationTable: quantizationTables[qId]
+              };
+              offset += 3;
+            }
+            prepareComponents(frame);
+            frames.push(frame);
+            break;
+
+          case 0xFFC4: // DHT (Define Huffman Tables)
+            var huffmanLength = readUint16();
+            for (i = 2; i < huffmanLength;) {
+              var huffmanTableSpec = data[offset++];
+              var codeLengths = new Uint8Array(16);
+              var codeLengthSum = 0;
+              for (j = 0; j < 16; j++, offset++)
+                codeLengthSum += (codeLengths[j] = data[offset]);
+              var huffmanValues = new Uint8Array(codeLengthSum);
+              for (j = 0; j < codeLengthSum; j++, offset++)
+                huffmanValues[j] = data[offset];
+              i += 17 + codeLengthSum;
+
+              ((huffmanTableSpec >> 4) === 0 ? 
+                huffmanTablesDC : huffmanTablesAC)[huffmanTableSpec & 15] =
+                buildHuffmanTable(codeLengths, huffmanValues);
+            }
+            break;
+
+          case 0xFFDD: // DRI (Define Restart Interval)
+            readUint16(); // skip data length
+            resetInterval = readUint16();
+            break;
+
+          case 0xFFDA: // SOS (Start of Scan)
+            var scanLength = readUint16();
+            var selectorsCount = data[offset++];
+            var components = [], component;
+            for (i = 0; i < selectorsCount; i++) {
+              component = frame.components[data[offset++]];
+              var tableSpec = data[offset++];
+              component.huffmanTableDC = huffmanTablesDC[tableSpec >> 4];
+              component.huffmanTableAC = huffmanTablesAC[tableSpec & 15];
+              components.push(component);
+            }
+            var spectralStart = data[offset++];
+            var spectralEnd = data[offset++];
+            var successiveApproximation = data[offset++];
+            var processed = decodeScan(data, offset,
+              frame, components, resetInterval,
+              spectralStart, spectralEnd,
+              successiveApproximation >> 4, successiveApproximation & 15);
+            offset += processed;
+            break;
+          default:
+            if (data[offset - 3] == 0xFF &&
+                data[offset - 2] >= 0xC0 && data[offset - 2] <= 0xFE) {
+              // could be incorrect encoding -- last 0xFF byte of the previous
+              // block was eaten by the encoder
+              offset -= 3;
+              break;
+            }
+            throw "unknown JPEG marker " + fileMarker.toString(16);
+        }
+        fileMarker = readUint16();
+      }
+      if (frames.length != 1)
+        throw "only single frame JPEGs supported";
+
+      this.width = frame.samplesPerLine;
+      this.height = frame.scanLines;
+      this.jfif = jfif;
+      this.adobe = adobe;
+      this.components = [];
+      for (var i = 0; i < frame.componentsOrder.length; i++) {
+        var component = frame.components[frame.componentsOrder[i]];
+        this.components.push({
+          lines: buildComponentData(frame, component),
+          scaleX: component.h / frame.maxH,
+          scaleY: component.v / frame.maxV
+        });
+      }
+    },
+    getData: function getData(width, height) {
+      var scaleX = this.width / width, scaleY = this.height / height;
+
+      var component1, component2, component3, component4;
+      var component1Line, component2Line, component3Line, component4Line;
+      var x, y;
+      var offset = 0;
+      var Y, Cb, Cr, K, C, M, Ye, R, G, B;
+      var colorTransform;
+      var dataLength = width * height * this.components.length;
+      var data = new Uint8Array(dataLength);
+      switch (this.components.length) {
+        case 1:
+          component1 = this.components[0];
+          for (y = 0; y < height; y++) {
+            component1Line = component1.lines[0 | (y * component1.scaleY * scaleY)];
+            for (x = 0; x < width; x++) {
+              Y = component1Line[0 | (x * component1.scaleX * scaleX)];
+
+              data[offset++] = Y;
+            }
+          }
+          break;
+        case 3:
+          // The default transform for three components is true
+          colorTransform = true;
+          // The adobe transform marker overrides any previous setting
+          if (this.adobe && this.adobe.transformCode)
+            colorTransform = true;
+          else if (typeof this.colorTransform !== 'undefined')
+            colorTransform = !!this.colorTransform;
+
+          component1 = this.components[0];
+          component2 = this.components[1];
+          component3 = this.components[2];
+          for (y = 0; y < height; y++) {
+            component1Line = component1.lines[0 | (y * component1.scaleY * scaleY)];
+            component2Line = component2.lines[0 | (y * component2.scaleY * scaleY)];
+            component3Line = component3.lines[0 | (y * component3.scaleY * scaleY)];
+            for (x = 0; x < width; x++) {
+              if (!colorTransform) {
+                R = component1Line[0 | (x * component1.scaleX * scaleX)];
+                G = component2Line[0 | (x * component2.scaleX * scaleX)];
+                B = component3Line[0 | (x * component3.scaleX * scaleX)];
+              } else {
+                Y = component1Line[0 | (x * component1.scaleX * scaleX)];
+                Cb = component2Line[0 | (x * component2.scaleX * scaleX)];
+                Cr = component3Line[0 | (x * component3.scaleX * scaleX)];
+
+                R = clampTo8bit(Y + 1.402 * (Cr - 128));
+                G = clampTo8bit(Y - 0.3441363 * (Cb - 128) - 0.71413636 * (Cr - 128));
+                B = clampTo8bit(Y + 1.772 * (Cb - 128));
+              }
+
+              data[offset++] = R;
+              data[offset++] = G;
+              data[offset++] = B;
+            }
+          }
+          break;
+        case 4:
+          if (!this.adobe)
+            throw 'Unsupported color mode (4 components)';
+          // The default transform for four components is false
+          colorTransform = false;
+          // The adobe transform marker overrides any previous setting
+          if (this.adobe && this.adobe.transformCode)
+            colorTransform = true;
+          else if (typeof this.colorTransform !== 'undefined')
+            colorTransform = !!this.colorTransform;
+
+          component1 = this.components[0];
+          component2 = this.components[1];
+          component3 = this.components[2];
+          component4 = this.components[3];
+          for (y = 0; y < height; y++) {
+            component1Line = component1.lines[0 | (y * component1.scaleY * scaleY)];
+            component2Line = component2.lines[0 | (y * component2.scaleY * scaleY)];
+            component3Line = component3.lines[0 | (y * component3.scaleY * scaleY)];
+            component4Line = component4.lines[0 | (y * component4.scaleY * scaleY)];
+            for (x = 0; x < width; x++) {
+              if (!colorTransform) {
+                C = component1Line[0 | (x * component1.scaleX * scaleX)];
+                M = component2Line[0 | (x * component2.scaleX * scaleX)];
+                Ye = component3Line[0 | (x * component3.scaleX * scaleX)];
+                K = component4Line[0 | (x * component4.scaleX * scaleX)];
+              } else {
+                Y = component1Line[0 | (x * component1.scaleX * scaleX)];
+                Cb = component2Line[0 | (x * component2.scaleX * scaleX)];
+                Cr = component3Line[0 | (x * component3.scaleX * scaleX)];
+                K = component4Line[0 | (x * component4.scaleX * scaleX)];
+
+                C = 255 - clampTo8bit(Y + 1.402 * (Cr - 128));
+                M = 255 - clampTo8bit(Y - 0.3441363 * (Cb - 128) - 0.71413636 * (Cr - 128));
+                Ye = 255 - clampTo8bit(Y + 1.772 * (Cb - 128));
+              }
+              data[offset++] = C;
+              data[offset++] = M;
+              data[offset++] = Ye;
+              data[offset++] = K;
+            }
+          }
+          break;
+        default:
+          throw 'Unsupported color mode';
+      }
+      return data;
+    },
+    copyToImageData: function copyToImageData(imageData) {
+      var width = imageData.width, height = imageData.height;
+      var imageDataArray = imageData.data;
+      var data = this.getData(width, height);
+      var i = 0, j = 0, x, y;
+      var Y, K, C, M, R, G, B;
+      switch (this.components.length) {
+        case 1:
+          for (y = 0; y < height; y++) {
+            for (x = 0; x < width; x++) {
+              Y = data[i++];
+
+              imageDataArray[j++] = Y;
+              imageDataArray[j++] = Y;
+              imageDataArray[j++] = Y;
+              imageDataArray[j++] = 255;
+            }
+          }
+          break;
+        case 3:
+          for (y = 0; y < height; y++) {
+            for (x = 0; x < width; x++) {
+              R = data[i++];
+              G = data[i++];
+              B = data[i++];
+
+              imageDataArray[j++] = R;
+              imageDataArray[j++] = G;
+              imageDataArray[j++] = B;
+              imageDataArray[j++] = 255;
+            }
+          }
+          break;
+        case 4:
+          for (y = 0; y < height; y++) {
+            for (x = 0; x < width; x++) {
+              C = data[i++];
+              M = data[i++];
+              Y = data[i++];
+              K = data[i++];
+
+              R = 255 - clampTo8bit(C * (1 - K / 255) + K);
+              G = 255 - clampTo8bit(M * (1 - K / 255) + K);
+              B = 255 - clampTo8bit(Y * (1 - K / 255) + K);
+
+              imageDataArray[j++] = R;
+              imageDataArray[j++] = G;
+              imageDataArray[j++] = B;
+              imageDataArray[j++] = 255;
+            }
+          }
+          break;
+        default:
+          throw 'Unsupported color mode';
+      }
+    }
+  };
+
+  return constructor;
+})();
+
 
 }).call((typeof window === 'undefined') ? this : window);
+
