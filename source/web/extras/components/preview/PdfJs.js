@@ -23,8 +23,8 @@
  * provided by pdf.js within an iframe. This mode may be deprecated in the
  * future.
  * 
- * Supports the "application/pdf" mime type directly, plus any other type for
- * which a PDF thumbnail definition is available.
+ * Supports the "application/pdf" mime type directly, plus any other type
+ * for which a PDF thumbnail definition is available.
  * 
  * @namespace Alfresco.WebPreview.prototype.Plugins
  * @class Alfresco.WebPreview.prototype.Plugins.PdfJs
@@ -43,18 +43,16 @@
    /**
     * YUI aliases
     */
-   var Dom = YAHOO.util.Dom, Event = YAHOO.util.Event, Element = YAHOO.util.Element;
+   var Dom = YAHOO.util.Dom, 
+      Event = YAHOO.util.Event, 
+      Element = YAHOO.util.Element;
 
    /**
     * PdfJs plug-in constructor
     * 
     * @constructor
-    * @param wp
-    *           {Alfresco.WebPreview} The Alfresco.WebPreview instance that
-    *           decides which plugin to use
-    * @param attributes
-    *           {object} Arbitrary attributes brought in from the <plugin>
-    *           element
+    * @param wp {Alfresco.WebPreview} The Alfresco.WebPreview instance that decides which plugin to use
+    * @param attributes {object} Arbitrary attributes brought in from the <plugin> element
     */
    Alfresco.WebPreview.prototype.Plugins.PdfJs = function(wp, attributes)
    {
@@ -64,19 +62,21 @@
       return this;
    };
 
-   Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype = {
+   Alfresco.WebPreview.prototype.Plugins.PdfJs.prototype =
+   {
       /**
        * Configuration attributes
        * 
        * @property attributes
        * @type object
        */
-      attributes : {
+      attributes:
+      {
          /**
           * Decides if the node's content or one of its thumbnails shall be
-          * displayed. Leave it as it is if the node's content shall be used.
-          * Set to a custom thumbnail definition name if the node's thumbnail
-          * contains the PdfJs to display.
+          * displayed. Leave it as it is if the node's content shall be used. Set
+          * to a custom thumbnail definition name if the node's thumbnail contains
+          * the PdfJs to display.
           * 
           * @property src
           * @type String
@@ -131,8 +131,7 @@
          autoMinScale : "0.7",
 
          /**
-          * Layout to use to display pages, "single" (one page per row) or
-          * "multi" (multiple pages per row)
+          * Layout to use to display pages, "single" (one page per row) or "multi" (multiple pages per row)
           * 
           * @property pageLayout
           * @type String
@@ -141,9 +140,8 @@
          pageLayout : "multi",
 
          /**
-          * Whether text overlays on pages should be disabled. Overlays allow
-          * users to select text content in their browser but reduce rendering
-          * performance.
+          * Whether text overlays on pages should be disabled. Overlays allow users to select text
+          * content in their browser but reduce rendering performance.
           * 
           * @property disableTextLayer
           * @type String
@@ -152,8 +150,7 @@
          disableTextLayer : "false",
 
          /**
-          * Whether to use HTML5 browser storage to persist the page number and
-          * zoom level of previously-viewed documents
+          * Whether to use HTML5 browser storage to persist the page number and zoom level of previously-viewed documents
           * 
           * @property useLocalStorage
           * @type String
@@ -226,9 +223,7 @@
       maximized : false,
 
       /**
-       * Counter for pages area scroll events - incremented on event,
-       * decremented some time later. Rendering will occur only when counter
-       * reaches zero.
+       * Counter for pages area scroll events - incremented on event, decremented some time later. Rendering will occur only when counter reaches zero.
        * 
        * TODO Move this property into the DocumentView class
        * 
@@ -239,8 +234,7 @@
       renderOnScrollZero : 0,
 
       /**
-       * Counter for thumbnail area scroll events - incremented on event,
-       * decremented some time later
+       * Counter for thumbnail area scroll events - incremented on event, decremented some time later
        * 
        * TODO Move this property into the DocumentView class
        * 
@@ -251,8 +245,7 @@
       renderOnThumbnailsScrollZero : 0,
 
       /**
-       * Stored configuration for this particular document, including page
-       * number and zoom level. Persisted to local browser storage.
+       * Stored configuration for this particular document, including page number and zoom level. Persisted to local browser storage.
        * 
        * @property documentConfig
        * @type {object}
@@ -305,7 +298,8 @@
                   // Guessing for the same for safari
                   canvassupport = false;
                }
-               //It actually works with ie9, but lack fo support for typed arrays makes performance terrible.
+               // It actually works with ie9, but lack fo support for typed
+               // arrays makes performance terrible.
                if (YAHOO.env.ua.ie > 0 && YAHOO.env.ua.ie < 10)
                {
                   canvassupport = false;
@@ -317,7 +311,8 @@
                }
             }
 
-         } else
+         }
+         else
          {
             canvassupport = true;
          }
@@ -328,9 +323,7 @@
             return this.wp.msg("label.browserReport", "&lt;canvas&gt; element");
          }
 
-         // Try to detect bug
-         // http://code.google.com/p/chromium/issues/detail?id=122465 (seems to
-         // be triggered by all PDFs generated by OpenOffice)
+         // Try to detect bug http://code.google.com/p/chromium/issues/detail?id=122465 (seems to be triggered by all PDFs generated by OpenOffice)
          if (this.attributes.src && YAHOO.env.ua.os == "windows" && YAHOO.env.ua.chrome >= 16.0)
          {
             return this.wp.msg("label.browserReport", "PDF renditions generated by OpenOffice");
@@ -356,33 +349,31 @@
             var fileurl;
             if (this.attributes.src)
             {
-               // We do not use the built in function to get url, since pdf.js
-               // will
+                // We do not use the built in function to get url, since pdf.js will
                // strip
-               // attributes from the url. Instead we add it back in
-               // pdfviewer.js
-               fileurl = Alfresco.constants.PROXY_URI + "api/node/" + this.wp.options.nodeRef.replace(":/", "") + "/content/thumbnails/pdf/"
-                     + this.wp.options.name + '.pdf';
-            } else
+                // attributes from the url. Instead we add it back in pdfviewer.js
+                fileurl = Alfresco.constants.PROXY_URI + "api/node/" + this.wp.options.nodeRef.replace(":/", "") + "/content/thumbnails/pdf/" + this.wp.options.name
+                      + '.pdf';
+             }
+             else
             {
                fileurl = this.wp.getContentUrl();
             }
             var previewHeight = this.wp.setupPreviewSize();
             Dom.setAttribute(this.wp.getPreviewerElement(), "height", (previewHeight - 10).toString());
-            var displaysource = '<iframe id="PdfJs" name="PdfJs" src="' + Alfresco.constants.URL_SERVICECONTEXT + 'extras/components/preview/pdfviewer?htmlid='
-                  + encodeURIComponent(this.wp.id) + '&file=' + encodeURIComponent(fileurl)
-                  + '" scrolling="yes" marginwidth="0" marginheight="0" frameborder="0" vspace="5" hspace="5"  style="height:' + previewHeight.toString()
-                  + 'px;"></iframe>';
+             var displaysource = '<iframe id="PdfJs" name="PdfJs" src="' + Alfresco.constants.URL_SERVICECONTEXT + 'extras/components/preview/pdfviewer?htmlid=' + encodeURIComponent(this.wp.id) + '&file=' + encodeURIComponent(fileurl)
+             + '" scrolling="yes" marginwidth="0" marginheight="0" frameborder="0" vspace="5" hspace="5"  style="height:' + previewHeight.toString()
+             + 'px;"></iframe>';
 
             // Return HTML that will be set as the innerHTML of the previewer
             return displaysource;
-         } else
+         }
+         else
          {
             Alfresco.util.YUILoaderHelper.require([ "tabview" ], this.onComponentsLoaded, this);
             Alfresco.util.YUILoaderHelper.loadComponents();
 
-            // Return null means WebPreview instance will not overwrite the
-            // innerHTML of the preview area
+             // Return null means WebPreview instance will not overwrite the innerHTML of the preview area
             return null;
          }
       },
@@ -404,10 +395,9 @@
          var urlParams = Alfresco.util.getQueryStringParameters(window.location.hash.replace("#", ""));
          this.pageNum = urlParams.page || (this.documentConfig.pageNum ? parseInt(this.documentConfig.pageNum) : this.pageNum);
 
-         // Viewer HTML is contained in an external web script, which we load
-         // via XHR, then onViewerLoad() does the rest
+         // Viewer HTML is contained in an external web script, which we load via XHR, then onViewerLoad() does the rest
          Alfresco.util.Ajax.request({
-            url : Alfresco.constants.URL_SERVICECONTEXT + 'extras/components/preview/pdfjs?htmlid=' + encodeURIComponent(this.wp.id),
+            url: Alfresco.constants.URL_SERVICECONTEXT + 'extras/components/preview/pdfjs?htmlid=' + encodeURIComponent(this.wp.id),
             successCallback : {
                fn : this.onViewerLoaded,
                scope : this
@@ -443,8 +433,7 @@
          this.pageNumber = Dom.get(this.wp.id + "-pageNumber");
          this.sidebar = Dom.get(this.wp.id + "-sidebar");
          this.viewer = Dom.get(this.wp.id + "-viewer");
-         Event.addListener(this.viewer, "scroll", function(e)
-         {
+         Event.addListener(this.viewer, "scroll", function (e) {
             this.renderOnScrollZero++;
             YAHOO.lang.later(500, this, this.onViewerScroll);
          }, this, true);
@@ -456,9 +445,7 @@
          }
 
          // Set up toolbar
-         this.widgets.sidebarButton = Alfresco.util.createYUIButton(this, "sidebarBtn", this.onSidebarToggle, {
-            type : "checkbox"
-         });
+         this.widgets.sidebarButton = Alfresco.util.createYUIButton(this, "sidebarBtn", this.onSidebarToggle, {type: "checkbox"});
          this.widgets.nextButton = Alfresco.util.createYUIButton(this, "next", this.onPageNext);
          this.widgets.previousButton = Alfresco.util.createYUIButton(this, "previous", this.onPagePrevious);
          Event.addListener(this.wp.id + "-pageNumber", "change", this.onPageChange, this, true);
@@ -469,24 +456,12 @@
             menu : this.id + "-scaleSelect"
          });
          this.widgets.scaleMenu.getMenu().subscribe("click", this.onZoomChange, null, this);
-         var downloadMenu = [ {
-            text : this.wp.msg("link.download"),
-            value : "",
-            onclick : {
-               fn : this.onDownloadClick,
-               scope : this
-            }
-         }, ];
+         var downloadMenu = [
+            { text: this.wp.msg("link.download"), value: "", onclick: { fn: this.onDownloadClick, scope: this } },
+         ];
          if (this.attributes.src)
          {
-            downloadMenu.push({
-               text : this.wp.msg("link.downloadPdf"),
-               value : "",
-               onclick : {
-                  fn : this.onDownloadPDFClick,
-                  scope : this
-               }
-            });
+            downloadMenu.push({ text: this.wp.msg("link.downloadPdf"), value: "", onclick: { fn: this.onDownloadPDFClick, scope: this } });
          }
          this.widgets.downloadButton = new YAHOO.widget.Button(this.id + "-download", {
             type : "menu",
@@ -508,15 +483,18 @@
          });
          this.widgets.previousSearchButton = Alfresco.util.createYUIButton(this, "findPrevious", this.onFindChange);
          this.widgets.nextSearchButton = Alfresco.util.createYUIButton(this, "findNext", this.onFindChange);
-         this.widgets.searchHighlight = Alfresco.util.createYUIButton(this, "findHighlightAll", this.onFindChangeHighlight, {
-            type : "checkbox"
-         });
-         this.widgets.searchMatchCase = Alfresco.util.createYUIButton(this, "findMatchCase", this.onFindChangeMatchCase, {
-            type : "checkbox"
-         });
-         this.widgets.searchBarToggle = Alfresco.util.createYUIButton(this, "searchBarToggle", this.onToggleSearchBar, {
-            type : "checkbox"
-         });
+         this.widgets.searchHighlight = Alfresco.util.createYUIButton(this, "findHighlightAll",
+               this.onFindChangeHighlight, {
+                  type : "checkbox"
+               });
+         this.widgets.searchMatchCase = Alfresco.util.createYUIButton(this, "findMatchCase",
+               this.onFindChangeMatchCase, {
+                  type : "checkbox"
+               });
+         this.widgets.searchBarToggle = Alfresco.util.createYUIButton(this, "searchBarToggle", this.onToggleSearchBar,
+               {
+                  type : "checkbox"
+               });
 
          // Set height of the container and the viewer area
          this._setPreviewerElementHeight();
@@ -532,26 +510,19 @@
          // Keyboard shortcuts
          if (!this.inWikiPage && !this.inDashlet)
          {
-            new YAHOO.util.KeyListener(document, {
-               keys : 37
-            }, { // left arrow
+            new YAHOO.util.KeyListener(document, { keys: 37 }, { // left arrow
                fn : this.onPagePrevious,
                scope : this,
                correctScope : true
             }).enable();
-            new YAHOO.util.KeyListener(document, {
-               keys : 39
-            }, { // right arrow
+            new YAHOO.util.KeyListener(document, { keys: 39 }, { // right arrow
                fn : this.onPageNext,
                scope : this,
                correctScope : true
             }).enable();
          }
-         new YAHOO.util.KeyListener(document, {
-            keys : 27
-         }, { // escape
-            fn : function(e)
-            {
+         new YAHOO.util.KeyListener(document, { keys: 27 }, { // escape
+            fn: function (e) {
                if (this.maximized)
                {
                   this.onMaximizeClick();
@@ -577,24 +548,26 @@
             if (this.inDashlet)
             {
                Dom.setStyle(this.wp.getPreviewerElement(), "height", "100%");
-            } else if (this.inWikiPage)
+            }
+            else if (this.inWikiPage)
             {
                Dom.setStyle(this.wp.getPreviewerElement(), "height", null);
-            } else
+            }
+            else
             {
                var previewHeight = this.wp.setupPreviewSize();
                Dom.setStyle(this.wp.getPreviewerElement(), "height", (previewHeight - 10).toString() + "px");
             }
-         } else
+         }
+         else
          {
             Dom.setStyle(this.wp.getPreviewerElement(), "height", (Dom.getViewportHeight()).toString() + "px");
          }
       },
 
       /**
-       * Set the height of the viewer area where content is displayed, so that
-       * it occupies the height of the parent previewer element minus the menu
-       * bar.
+       * Set the height of the viewer area where content is displayed, so that it occupies the height of the parent previewer element
+       * minus the menu bar.
        * 
        * @method _setViewerHeight
        * @private
@@ -636,21 +609,21 @@
        */
       _loadPdf : function PdfJs__loadPdf()
       {
-         var me = this, fileurl = this.attributes.src ? this.wp.getThumbnailUrl(this.attributes.src) : this.wp.getContentUrl();
+         var me = this, fileurl = this.attributes.src ? this.wp.getThumbnailUrl(this.attributes.src) : this.wp
+               .getContentUrl();
          // Add the full protocol + host as pdf.js require this
-         if(fileurl.substr(0,4).toLowerCase()!=='http'){
+         if (fileurl.substr(0, 4).toLowerCase() !== 'http')
+         {
             fileurl = window.location.protocol + '//' + window.location.host + fileurl;
          }
-
 
          // Add the loading spinner to the viewer area
          Dom.addClass(this.viewer, "loading");
 
          // Set the worker source
-         PDFJS.workerSrc = Alfresco.constants.URL_CONTEXT + 'res/extras/components/preview/pdfjs/pdf' + (Alfresco.constants.DEBUG ? '.js' : '-min.js');
+         PDFJS.workerSrc = Alfresco.constants.URL_CONTEXT + 'res/extras/components/preview/pdfjs/pdf' +  (Alfresco.constants.DEBUG ? '.js' : '-min.js'); 
 
-         PDFJS.getDocument(fileurl).then(function(pdf)
-         {
+         PDFJS.getDocument(fileurl).then(function(pdf) {
             me.pdfDoc = pdf;
             me.numPages = me.pdfDoc.numPages;
             me._renderPdf.call(me);
@@ -709,8 +682,7 @@
             Dom.removeClass(this.viewer, "loading");
 
             this.documentView.render();
-            // Scroll to the current page, this will force the visible content
-            // to render
+            // Scroll to the current page, this will force the visible content to render
             this.documentView.scrollTo(this.pageNum);
 
             // Enable the sidebar
@@ -719,20 +691,16 @@
             this._updateZoomControls();
             Dom.get(this.wp.id + "-numPages").textContent = this.numPages;
 
-
          }, this);
 
-         var setDestinations = Alfresco.util.bind(function(destinations)
-         {
+         var setDestinations = Alfresco.util.bind(function (destinations) {
             this.destinations = destinations;
          }, this);
 
-         var getOutline = Alfresco.util.bind(function(outline)
-         {
+         var getOutline = Alfresco.util.bind(function (outline) {
             this._addOutline(outline);
          }, this);
-         var setupOutline = Alfresco.util.bind(function()
-         {
+         var setupOutline = Alfresco.util.bind(function () {
             this.pdfDoc.getOutline().then(getOutline);
          }, this);
 
@@ -781,8 +749,7 @@
        * Scroll the displayed document to the specified page
        * 
        * @method _scrollToPage
-       * @param n
-       *           {int} Number of the page to scroll to, must be 1 or greater.
+       * @param n {int} Number of the page to scroll to, must be 1 or greater.
        * @private
        */
       _scrollToPage : function PdfJs__scrollToPage(n)
@@ -795,22 +762,19 @@
 
          // Update sidebar, if visible
          // TODO define an isRendered() method on the view object
-         if (this.thumbnailView && this.thumbnailView.pages && this.thumbnailView.pages[0] && this.thumbnailView.pages[0].container)
+         if (this.thumbnailView.pages && this.thumbnailView.pages[0] && this.thumbnailView.pages[0].container)
          {
             this.thumbnailView.setActivePage(this.pageNum);
          }
       },
 
       /**
-       * Use the specified document outline object to render a basic outline
-       * view in the sidebar
+       * Use the specified document outline object to render a basic outline view in the sidebar
        * 
-       * TODO Use an event to load this only when the docunent outline tab is
-       * first displayed
+       * TODO Use an event to load this only when the docunent outline tab is first displayed
        * 
        * @method _addOutline
-       * @param outline
-       *           {object} Outline object as passed to us by pdf.js
+       * @param outline {object} Outline object as passed to us by pdf.js
        * @private
        */
       _addOutline : function PdfJs__addOutline(outline)
@@ -819,10 +783,7 @@
 
          if (outline && outline.length > 0)
          {
-            var queue = [ {
-               parent : pEl,
-               items : outline
-            } ];
+            var queue = [{parent: pEl, items: outline}];
             while (queue.length > 0)
             {
                var levelData = queue.shift();
@@ -834,29 +795,25 @@
                   div.className = 'outlineItem';
                   var a = document.createElement('a');
                   Dom.setAttribute(a, "href", "#");
-                  YAHOO.util.Event.addListener(a, "click", function(e, obj)
-                  {
+                  YAHOO.util.Event.addListener(a, "click", function(e, obj) {
                      YAHOO.util.Event.stopEvent(e);
                      this._navigateTo(obj);
                   }, item.dest, this);
                   a.textContent = item.title;
                   div.appendChild(a);
 
-                  if (item.items.length > 0)
-                  {
+                  if (item.items.length > 0) {
                      var itemsDiv = document.createElement('div');
                      itemsDiv.className = 'outlineItems';
                      div.appendChild(itemsDiv);
-                     queue.push({
-                        parent : itemsDiv,
-                        items : item.items
-                     });
+                     queue.push({parent: itemsDiv, items: item.items});
                   }
 
                   levelData.parent.appendChild(div);
                }
             }
-         } else
+         }
+         else
          {
             pEl.innerHTML = "<p>" + this.wp.msg("msg.noOutline") + "</p>";
          }
@@ -866,8 +823,7 @@
        * Navigate the viewer to the specified document outline item
        * 
        * @method _navigateTo
-       * @param dest
-       *           {object} outline object item, from the document outline
+       * @param dest {object} outline object item, from the document outline
        * @private
        */
       _navigateTo : function PdfJs__navigateTo(dest)
@@ -878,7 +834,8 @@
             return; // invalid destination
          // dest array looks like that: <page-ref> </XYZ|FitXXX> <args..>
          var destRef = dest[0];
-         var pageNumber = destRef instanceof Object ? this.pagesRefMap[destRef.num + ' ' + destRef.gen + ' R'] : (destRef + 1);
+        var pageNumber = destRef instanceof Object ?
+          this.pagesRefMap[destRef.num + ' ' + destRef.gen + ' R'] : (destRef + 1);
          if (pageNumber > this.documentView.pages.length - 1)
             pageNumber = this.documentView.pages.length - 1;
          if (typeof pageNumber == "number")
@@ -898,7 +855,8 @@
          if (this.attributes.useLocalStorage != "true" || !this._browserSupportsHtml5Storage())
          {
             this.documentConfig = {};
-         } else
+         }
+         else
          {
             var base = "org.sharextras.media-viewers.pdfjs.document." + this.wp.options.nodeRef.replace(":/", "").replace("/", ".") + ".";
             this.documentConfig = {
@@ -919,7 +877,8 @@
          try
          {
             return 'localStorage' in window && window['localStorage'] !== null;
-         } catch (e)
+         }
+         catch (e)
          {
             return false;
          }
@@ -941,7 +900,8 @@
          if (sbshown)
          {
             Dom.removeClass(this.viewer, "sideBarVisible");
-         } else
+          }
+          else
          {
             Dom.addClass(this.viewer, "sideBarVisible");
             if (!this.thumbnailView)
@@ -959,8 +919,7 @@
          // Render any pages that have appeared
          this.documentView.renderVisiblePages();
 
-         var goToPage = function goToPage(e, obj)
-         {
+          var goToPage = function goToPage(e, obj) {
             YAHOO.util.Event.stopEvent(e);
             this._scrollToPage(obj.pn);
          };
@@ -974,20 +933,15 @@
             this.thumbnailView.render();
             for ( var i = 0; i < this.thumbnailView.pages.length; i++)
             {
-               YAHOO.util.Event.addListener(this.thumbnailView.pages[i].container, "click", function(e, obj)
-               {
+                YAHOO.util.Event.addListener(this.thumbnailView.pages[i].container, "click", function(e, obj) {
                   this.thumbnailView.setActivePage(obj.pn);
                   this.documentView.scrollTo(obj.pn);
-               }, {
-                  pn : i + 1
-               }, this);
+                }, {pn: i+1}, this);
             }
-            // Scroll to the current page, this will force the visible content
-            // to render
+             // Scroll to the current page, this will force the visible content to render
             this.thumbnailView.scrollTo(this.pageNum);
             this.thumbnailView.setActivePage(this.pageNum);
-            YAHOO.util.Event.addListener(this.id + "-thumbnailView", "scroll", function(e)
-            {
+             YAHOO.util.Event.addListener(this.id + "-thumbnailView", "scroll", function (e) {
                this.renderOnThumbnailsScrollZero++;
                YAHOO.lang.later(500, this, this.onThumbnailsScroll);
             }, this, true);
@@ -1033,7 +987,8 @@
             Alfresco.util.PopupManager.displayPrompt({
                text : this.wp.msg('error.badpage')
             });
-         } else
+          }
+          else
          {
             this.pageNum = pn;
             this._scrollToPage(this.pageNum);
@@ -1049,7 +1004,7 @@
             this.onRecalculatePreviewLayout();
             // Trigger text extraction
             // Initialize find class
-            if(!this.pdfFindController.documentView)
+            if (!this.pdfFindController.documentView)
             {
                this.pdfFindController.initialize(this.documentView);
                // Extract text
@@ -1086,8 +1041,8 @@
          if (!query)
             return;
 
-         var event = document.createEvent('CustomEvent'), findPrevious = false, eventid = 'find', highlight = this.widgets.searchHighlight.get("checked"), caseSensitive = this.widgets.searchMatchCase
-               .get("checked"), triggerevent;
+         var event = document.createEvent('CustomEvent'), findPrevious = false, eventid = 'find', highlight = this.widgets.searchHighlight
+               .get("checked"), caseSensitive = this.widgets.searchMatchCase.get("checked"), triggerevent;
 
          if (e_obj.currentTarget)
          {
@@ -1201,8 +1156,7 @@
       onZoomChange : function PdfJs_onZoomChange(p_sType, p_aArgs)
       {
          var oEvent = p_aArgs[0], // DOM event
-         oMenuItem = p_aArgs[1]; // MenuItem instance that was the target of the
-                                 // event
+             oMenuItem = p_aArgs[1]; // MenuItem instance that was the target of the event
 
          var newScale = oMenuItem.value;
          this.documentView.setScale(this.documentView.parseScale(newScale));
@@ -1243,7 +1197,8 @@
          {
             Dom.addClass(this.wp.getPreviewerElement(), "fullPage");
             this.widgets.maximize.set("label", this.wp.msg("button.minimize"));
-         } else
+          }
+          else
          {
             Dom.removeClass(this.wp.getPreviewerElement(), "fullPage");
             this.widgets.maximize.set("label", this.wp.msg("button.maximize"));
@@ -1270,12 +1225,12 @@
        */
       onLinkClick : function PdfJs_onLinkClick(p_obj)
       {
-         var dialogid = this.id + "-linkDialog", inputid = dialogid + "-input";
+          var dialogid = this.id + "-linkDialog",
+             inputid = dialogid + "-input";
 
-         var fnSelectLink = function PdfJs_onLinkClick_fnSelectLink()
-         {
+          var fnSelectLink = function PdfJs_onLinkClick_fnSelectLink() {
             var btnid = this.widgets.linkDialogBg.get('checkedButton').get('id');
-            var link = window.location.href.replace(window.location.hash, "") + (btnid.indexOf("-doc") > 0 ? "" : "#page=" + this.pageNum);
+             var link = window.location.href.replace(window.location.hash, "") + (btnid.indexOf("-doc") > 0 ? "" : "#page=" + this.pageNum);
             var iel = Dom.get(inputid);
             iel.value = link;
             iel.focus();
@@ -1284,7 +1239,8 @@
 
          if (!this.widgets.linkDialog)
          {
-            var linkDialog = new YAHOO.widget.SimpleDialog(dialogid, {
+             var linkDialog = new YAHOO.widget.SimpleDialog(dialogid,
+             {
                close : true,
                draggable : false,
                effect : null,
@@ -1305,8 +1261,7 @@
             this.widgets.linkDialogBg = linkDialogBg;
             this.widgets.linkDialog = linkDialog;
 
-            YAHOO.util.Event.addListener(inputid, "click", function()
-            {
+             YAHOO.util.Event.addListener(inputid, "click", function() {
                this.focus();
                this.select();
             });
@@ -1315,7 +1270,8 @@
          {
             this.widgets.linkDialog.show();
             fnSelectLink.call(this);
-         } else
+          }
+          else
          {
             this.widgets.linkDialog.hide();
          }
@@ -1362,7 +1318,8 @@
                Alfresco.util.PopupManager.displayPrompt({
                   text : this.wp.msg('error.badpage')
                });
-            } else
+             }
+             else
             {
                this.pageNum = pn;
                this._scrollToPage(this.pageNum);
@@ -1371,8 +1328,7 @@
       },
 
       /**
-       * Window unload event handler to save document configuration to local
-       * storage
+        * Window unload event handler to save document configuration to local storage
        * 
        * @method onWindowUnload
        */
@@ -1380,7 +1336,7 @@
       {
          if (this.attributes.useLocalStorage == "true" && this._browserSupportsHtml5Storage())
          {
-            var base = "org.sharextras.media-viewers.pdfjs.document." + this.wp.options.nodeRef.replace(":/", "").replace("/", ".") + ".";
+             var base = "org.sharextras.media-viewers.pdfjs.document." + this.wp.options.nodeRef.replace(":/", "").replace("/", ".") + ".";
             window.localStorage[base + "pageNum"] = this.pageNum;
             window.localStorage[base + "scale"] = this.documentView.currentScale;
          }
@@ -1405,10 +1361,10 @@
       this.base = base;
    }
 
-   DocumentPage.prototype = {
+   DocumentPage.prototype =
+   {
       /**
-       * Render a specific page in the container. This does not render the
-       * content of the page itself, just the container divs.
+       * Render a specific page in the container. This does not render the content of the page itself, just the container divs.
        * 
        * @method _renderPageContainer
        * @private
@@ -1432,15 +1388,15 @@
       },
 
       /**
-       * Get the vertical position of the pae relative to the top of the parent
-       * element. A negative number means that the page is above the current
-       * scroll position, a positive number means it is below.
+        * Get the vertical position of the pae relative to the top of the parent element. A negative number
+        * means that the page is above the current scroll position, a positive number means it is below.
        * 
        * @method getVPos
        */
       getVPos : function DocumentPage_getVPos(page)
       {
-         var vregion = this.parent.viewerRegion, pregion = Dom.getRegion(this.container);
+          var vregion = this.parent.viewerRegion,
+             pregion = Dom.getRegion(this.container);
 
          return pregion.top - vregion.top;
       },
@@ -1456,7 +1412,8 @@
          {
             Dom.setStyle(this.loadingIconDiv, "display", "none");
          }
-         var region = Dom.getRegion(this.container), canvas = document.createElement('canvas');
+          var region = Dom.getRegion(this.container),
+             canvas = document.createElement('canvas');
          canvas.id = this.container.id.replace('-pageContainer-', '-canvas-');
          canvas.mozOpaque = true;
          this.container.appendChild(canvas);
@@ -1476,7 +1433,9 @@
          if (this.textLayer)
             this.textLayer.pdfFindController = this.base.pdfFindController;
 
-         var content = this.content, view = content.view, ctx = canvas.getContext('2d');
+          var content = this.content,
+             view = content.view,
+             ctx = canvas.getContext('2d');
 
          canvas.width = region.width;
          canvas.height = region.height;
@@ -1514,7 +1473,8 @@
        */
       _setPageSize : function DocumentPage__setPageSize(page)
       {
-         var pageContainer = this.container, content = this.content, viewPort = content.getViewport(this.parent.currentScale);
+         var pageContainer = this.container, content = this.content,
+            viewPort = content.getViewport(this.parent.currentScale);
          Dom.setStyle(pageContainer, "height", "" + Math.floor(viewPort.height) + "px");
          Dom.setStyle(pageContainer, "width", "" + Math.floor(viewPort.width) + "px");
       },
@@ -1604,8 +1564,7 @@
    /**
     * Document View utility class. Used for main view and thumbnail view.
     */
-   var DocumentView = function(elId, config)
-   {
+   var DocumentView = function(elId, config) {
       this.id = elId;
       this.config = config || {};
       this.pages = [];
@@ -1657,8 +1616,7 @@
       },
 
       /**
-       * Render page containers and set their sizes. This does not render the
-       * page content itself, neither canvas or text layers.
+       * Render page containers and set their sizes. This does not render the page content itself, neither canvas or text layers.
        * 
        * @method render
        */
@@ -1673,11 +1631,11 @@
          // Set scale, if not already set
          if (this.currentScale === K_UNKNOWN_SCALE)
          {
-            // Scale was not initialized: invalid bookmark or scale was not
-            // specified.
+            // Scale was not initialized: invalid bookmark or scale was not specified.
             // Setting the default one.
             this.setScale(this.parseScale(this.config.defaultScale));
-         } else
+         }
+         else
          {
             this.alignRows();
          }
@@ -1701,8 +1659,7 @@
       },
 
       /**
-       * Centre the rows of pages horizontally within their parent viewer
-       * element by adding the correct amount of left padding
+       * Centre the rows of pages horizontally  within their parent viewer element by adding the correct amount of left padding
        * 
        * @method alignRows
        */
@@ -1715,12 +1672,10 @@
             for ( var i = 0; i < this.pages.length; i++)
             {
                var page = this.pages[i], container = page.container, vpos = page.getVPos();
-               // If multi-page mode is on, we need to add custom extra margin
-               // to the LHS of the 1st item in the row to make it centred
+               // If multi-page mode is on, we need to add custom extra margin to the LHS of the 1st item in the row to make it centred
                if (vpos != rowPos)
                {
-                  rowWidth = parseInt(Dom.getStyle(container, "margin-left")); 
-                  // Rather than start from zero assume equal right padding on last row item
+                  rowWidth = parseInt(Dom.getStyle(container, "margin-left")); // Rather than start from zero assume equal right padding on last row item
                }
                rowWidth += Dom.getRegion(container).width + parseInt(Dom.getStyle(container, "margin-left"));
                largestRow = Math.max(largestRow, rowWidth);
@@ -1731,8 +1686,7 @@
       },
 
       /**
-       * Render pages in the visible area of the viewer (or near it) given the
-       * current scroll position
+       * Render pages in the visible area of the viewer (or near it) given the current scroll position
        * 
        * @method renderVisiblePages
        */
@@ -1760,12 +1714,12 @@
        * Scroll the viewer to the given page number
        * 
        * @method scrollTo
-       * @param n
-       *           {int} Number of the page to scroll to, 1 or greater.
+       * @param n {int} Number of the page to scroll to, 1 or greater.
        */
       scrollTo : function DocumentView_scrollTo(n, offsetY)
       {
-         var newPos = this.pages[n - 1].getVPos(), firstPos = this.pages[0].getVPos();
+         var newPos = this.pages[n - 1].getVPos(),
+            firstPos = this.pages[0].getVPos();
 
          if (Alfresco.logger.isDebugEnabled())
          {
@@ -1795,12 +1749,10 @@
       },
 
       /**
-       * Set the scale of the view and remove all previously-rendered document
-       * content
+       * Set the scale of the view and remove all previously-rendered document content
        * 
        * @method setScale
-       * @param value
-       *           {float} numerical scale value
+       * @param value {float} numerical scale value
        */
       setScale : function DocumentView_setScale(value)
       {
@@ -1818,10 +1770,8 @@
       },
 
       /**
-       * Calculate page zoom level based on the supplied value. Recognises
-       * numerical values and special string constants, e.g. 'page-fit'.
-       * Normally used in conjunction with setScale(), since this method does
-       * not set the current value.
+       * Calculate page zoom level based on the supplied value. Recognises numerical values and special string constants, e.g. 'page-fit'.
+       * Normally used in conjunction with setScale(), since this method does not set the current value.
        * 
        * @method parseScale
        * @private
@@ -1837,66 +1787,83 @@
 
          if (this.pages.length > 0)
          {
-            var currentPage = this.pages[0], container = currentPage.container, hmargin = parseInt(Dom.getStyle(container, "margin-left"))
-                  + parseInt(Dom.getStyle(container, "margin-right")), vmargin = parseInt(Dom.getStyle(container, "margin-top"))
-                  + parseInt(Dom.getStyle(container, "margin-bottom")), contentWidth = parseInt(currentPage.content.pageInfo.view[2]), contentHeight = parseInt(currentPage.content.pageInfo.view[3]), clientWidth = this.viewer.clientWidth - 1, 
-                  // allow an extra pixel in width otherwise 2-up view wraps
-                  
+             var currentPage = this.pages[0],
+                container = currentPage.container,
+                hmargin = parseInt(Dom.getStyle(container, "margin-left")) + parseInt(Dom.getStyle(container, "margin-right")),
+                vmargin = parseInt(Dom.getStyle(container, "margin-top")) + parseInt(Dom.getStyle(container, "margin-bottom")),
+                contentWidth = parseInt(currentPage.content.pageInfo.view[2]),
+                contentHeight = parseInt(currentPage.content.pageInfo.view[3]),
+                clientWidth = this.viewer.clientWidth - 1, // allow an extra pixel in width otherwise 2-up view wraps
             clientHeight = this.viewer.clientHeight;
 
             if ('page-width' == value)
             {
                var pageWidthScale = (clientWidth - hmargin * 2) / contentWidth;
                return pageWidthScale;
-            } else if ('two-page-width' == value)
+             }
+             else if ('two-page-width' == value)
             {
                var pageWidthScale = (clientWidth - hmargin * 3) / contentWidth;
                return pageWidthScale / 2;
-            } else if ('page-height' == value)
+             }
+             else if ('page-height' == value)
             {
                var pageHeightScale = (clientHeight - vmargin * 2) / contentHeight;
                return pageHeightScale;
-            } else if ('page-fit' == value)
+             }
+             else if ('page-fit' == value)
             {
-               var pageWidthScale = (clientWidth - hmargin * 2) / contentWidth, pageHeightScale = (clientHeight - vmargin * 2) / contentHeight;
+                var pageWidthScale = (clientWidth - hmargin*2) / contentWidth,
+                   pageHeightScale = (clientHeight - vmargin*2) / contentHeight;
                return Math.min(pageWidthScale, pageHeightScale);
-            } else if ('two-page-fit' == value)
+             }
+             else if ('two-page-fit' == value)
             {
-               var pageWidthScale = (clientWidth - hmargin * 3) / contentWidth, pageHeightScale = (clientHeight - vmargin * 2) / contentHeight;
+                var pageWidthScale = (clientWidth - hmargin*3) / contentWidth,
+                   pageHeightScale = (clientHeight - vmargin*2) / contentHeight;
                return Math.min(pageWidthScale / 2, pageHeightScale);
-            } else if ('auto' == value)
+             }
+             else if ('auto' == value)
             {
-               var tpf = this.parseScale("two-page-fit"), opf = this.parseScale("page-fit"), opw = this.parseScale("page-width"), tpw = this
-                     .parseScale("two-page-width"), minScale = this.config.autoMinScale;
+                var tpf = this.parseScale("two-page-fit"),
+                   opf = this.parseScale("page-fit"),
+                   opw = this.parseScale("page-width"),
+                   tpw = this.parseScale("two-page-width"),
+                   minScale = this.config.autoMinScale;
                if (tpf > minScale)
                {
                   return tpf;
-               } else if (opf > minScale)
+                }
+                else if (opf > minScale)
                {
                   return opf;
-               } else if (tpw > minScale)
+                }
+                else if (tpw > minScale)
                {
                   return tpw;
-               } else if (opw > minScale)
+                }
+                else if (opw > minScale)
                {
                   return opw;
-               } else
+                }
+                else
                {
                   return minScale;
                }
-            } else
+             }
+             else
             {
                throw "Unrecognised zoom level '" + value + "'";
             }
-         } else
+          }
+          else
          {
             throw "Unrecognised zoom level - no pages";
          }
       },
 
       /**
-       * Return the number of the page (1 or greater) that should be considered
-       * the 'current' page given the scroll position.
+       * Return the number of the page (1 or greater) that should be considered the 'current' page given the scroll position.
        * 
        * @method getScrolledPageNumber
        * @returns {int} Number of the current page, 1 or greater
@@ -1906,7 +1873,8 @@
          // Calculate new page number
          for ( var i = 0; i < this.pages.length; i++)
          {
-            var page = this.pages[i], vpos = page.getVPos();
+            var page = this.pages[i],
+               vpos = page.getVPos();
             if (vpos + parseInt(page.container.style.height) / 2 > 0)
             {
                return i + 1;
@@ -1932,8 +1900,7 @@
    }
 
    /**
-    * Text layer builder, used to render text layer into pages. Copied from
-    * pdf.js viewer.
+    * Text layer builder, used to render text layer into pages. Copied from pdf.js viewer.
     */
    var TextLayerBuilder = function textLayerBuilder(textLayerDiv, pageIdx, base)
    {
@@ -1978,36 +1945,35 @@
          {
             return;
          }
-         
 
-            for ( var i = 0, ii = textDivs.length; i < ii; i++)
+         for ( var i = 0, ii = textDivs.length; i < ii; i++)
+         {
+            var textDiv = textDivs[i];
+            textLayerFrag.appendChild(textDiv);
+
+            ctx.font = textDiv.style.fontSize + ' ' + textDiv.style.fontFamily;
+            var width = ctx.measureText(textDiv.textContent).width;
+
+            if (width > 0)
             {
-               var textDiv = textDivs[i];
-               textLayerFrag.appendChild(textDiv);
+               var textScale = textDiv.dataset.canvasWidth / width;
 
-               ctx.font = textDiv.style.fontSize + ' ' + textDiv.style.fontFamily;
-               var width = ctx.measureText(textDiv.textContent).width;
+               // Share extras changed to use Yahoo doom.
+               // TODO: Work out some more efficient way of determining
+               // prefix as original method do, instead of setting all.
+               Dom.setStyle(textDiv, '-ms-transform', 'scale(' + textScale + ', 1)');
+               Dom.setStyle(textDiv, '-webkit-transform', 'scale(' + textScale + ', 1)');
+               Dom.setStyle(textDiv, '-moz-transform', 'scale(' + textScale + ', 1)');
+               Dom.setStyle(textDiv, '-ms-transformOrigin', '0% 0%');
+               Dom.setStyle(textDiv, '-webkit-transformOrigin', '0% 0%');
+               Dom.setStyle(textDiv, '-moz-transformOrigin', '0% 0%');
+               // CustomStyle.setProp('transform' , textDiv,
+               // 'scale(' + textScale + ', 1)');
+               // CustomStyle.setProp('transformOrigin' , textDiv, '0% 0%');
 
-               if (width > 0)
-               {
-                  var textScale = textDiv.dataset.canvasWidth / width;
-
-                  // Share extras changed to use Yahoo doom.
-                  // TODO: Work out some more efficient way of determining
-                  // prefix as original method do, instead of setting all.
-                  Dom.setStyle(textDiv, '-ms-transform', 'scale(' + textScale + ', 1)');
-                  Dom.setStyle(textDiv, '-webkit-transform', 'scale(' + textScale + ', 1)');
-                  Dom.setStyle(textDiv, '-moz-transform', 'scale(' + textScale + ', 1)');
-                  Dom.setStyle(textDiv, '-ms-transformOrigin', '0% 0%');
-                  Dom.setStyle(textDiv, '-webkit-transformOrigin', '0% 0%');
-                  Dom.setStyle(textDiv, '-moz-transformOrigin', '0% 0%');
-                  // CustomStyle.setProp('transform' , textDiv,
-                  // 'scale(' + textScale + ', 1)');
-                  // CustomStyle.setProp('transformOrigin' , textDiv, '0% 0%');
-
-                  textLayerDiv.appendChild(textDiv);
-               }
+               textLayerDiv.appendChild(textDiv);
             }
+         }
 
          this.renderingDone = true;
          this.updateMatches();
@@ -2631,7 +2597,7 @@
 
       updateUIState : function(state, previous)
       {
-         //PDFFindBar.updateUIState(state, previous);
+         // PDFFindBar.updateUIState(state, previous);
       }
    };
 })();
