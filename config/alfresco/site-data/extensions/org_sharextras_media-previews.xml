@@ -90,7 +90,7 @@
                     <sourcePackageRoot>org.sharextras.customization.media-previews.webodf</sourcePackageRoot>
                 </customization>
             </customizations>
-            <auto-deploy>true</auto-deploy>
+            <auto-deploy>false</auto-deploy>
         </module>
         
         <module>
