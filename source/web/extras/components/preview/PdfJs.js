@@ -2591,7 +2591,44 @@
 
       updateUIState : function(state, previous)
       {
-         // PDFFindBar.updateUIState(state, previous);
+         var findMsg = '';
+         var status = '';
+
+         /**
+          * TODO: For now do not display for hits, gets very noisy when stepping.
+          * Possibly change color or similar in search box to indicate hit instead
+          * Pending cand be ajax gif on search bar until state is found, then removed. 
+          * See pdf.js default Implementation
+          */
+
+         if(state===FindStates.FIND_FOUND||state===FindStates.FIND_PENDING)
+            return;
+         
+         switch (state) {
+           case FindStates.FIND_FOUND:
+             findMsg = this.documentView.pdfJsPlugin.wp.msg('search.message.found');
+             break;
+
+           case FindStates.FIND_PENDING:
+             findMsg = this.documentView.pdfJsPlugin.wp.msg('search.message.pending');
+             break;
+
+           case FindStates.FIND_NOTFOUND:
+             findMsg = this.documentView.pdfJsPlugin.wp.msg('search.message.notfound');
+             break;
+
+           case FindStates.FIND_WRAPPED:
+             if (previous) {
+                findMsg = this.documentView.pdfJsPlugin.wp.msg('search.message.wrapped.bottom');
+             } else {
+                findMsg = this.documentView.pdfJsPlugin.wp.msg('search.message.wrapped.top');
+             }
+             break;
+         }
+         
+         Alfresco.util.PopupManager.displayMessage({
+            text : findMsg
+         });
       }
    };
 })();
