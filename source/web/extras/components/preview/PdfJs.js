@@ -1000,6 +1000,11 @@
          if (e_obj.newValue === true)
          {
             this.widgets.searchDialog.show();
+            //Set focus on input box
+            var iel = Dom.get(this.wp.id + "-findInput");
+            iel.focus();
+            iel.select();
+            
             if (!this.pdfFindController.documentView)
             {
                this.pdfFindController.initialize(this.documentView);
