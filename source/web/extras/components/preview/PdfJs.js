@@ -651,17 +651,11 @@
                defaultScale : this.attributes.defaultScale,
                disableTextLayer : this.attributes.disableTextLayer == "true",
                autoMinScale : parseFloat(this.attributes.autoMinScale),
-               base : self
+               pdfJsPlugin : self
             });
             // Defer rendering
             this.thumbnailView = null
-            // this.thumbnailView = new DocumentView(this.id + "-thumbnailView",
-            // {
-            // pageLayout: "single",
-            // defaultScale: "page-width",
-            // disableTextLayer: true,
-            // base: self
-            // });
+
             this.pages = promisedPages;
             this.documentView.addPages(promisedPages);
             // this.thumbnailView.addPages(promisedPages);
@@ -904,7 +898,7 @@
                   pageLayout : "single",
                   defaultScale : "page-width",
                   disableTextLayer : true,
-                  base : self
+                  pdfJsPlugin : self
                });
                this.thumbnailView.addPages(this.pages);
             }
@@ -1346,7 +1340,7 @@
    /**
     * Page helper class
     */
-   var DocumentPage = function(id, content, parent, config, base)
+   var DocumentPage = function(id, content, parent, config, pdfJsPlugin)
    {
       this.id = id;
       this.content = content;
@@ -1358,7 +1352,7 @@
       this.config = config || {};
       this.textContent = null;
       this.textLayerDiv = null;
-      this.base = base;
+      this.pdfJsPlugin = pdfJsPlugin;
    }
 
    DocumentPage.prototype =
@@ -1429,9 +1423,9 @@
             this.container.appendChild(textLayerDiv);
          }
          this.textLayerDiv = textLayerDiv;
-         this.textLayer = textLayerDiv ? new TextLayerBuilder(textLayerDiv, this.id - 1, this.base) : null;
+         this.textLayer = textLayerDiv ? new TextLayerBuilder(textLayerDiv, this.id - 1, this.pdfJsPlugin) : null;
          if (this.textLayer)
-            this.textLayer.pdfFindController = this.base.pdfFindController;
+            this.textLayer.pdfFindController = this.pdfJsPlugin.pdfFindController;
 
           var content = this.content,
              view = content.view,
@@ -1571,7 +1565,7 @@
       this.viewer = Dom.get(elId);
       this.viewerRegion = Dom.getRegion(this.viewer);
       this.currentScale = config.currentScale || K_UNKNOWN_SCALE;
-      this.base = config.base;
+      this.pdfJsPlugin = config.pdfJsPlugin;
 
       // Used for setupRenderLayoutTimer in TextLayerbuilder
       this.lastScroll = 0;
@@ -1597,7 +1591,7 @@
        */
       addPage : function DocumentView_addPage(id, content)
       {
-         var page = new DocumentPage(id, content, this, {}, this.base);
+         var page = new DocumentPage(id, content, this, {}, this.pdfJsPlugin);
          this.pages.push(page);
       },
 
@@ -1902,7 +1896,7 @@
    /**
     * Text layer builder, used to render text layer into pages. Copied from pdf.js viewer.
     */
-   var TextLayerBuilder = function textLayerBuilder(textLayerDiv, pageIdx, base)
+   var TextLayerBuilder = function textLayerBuilder(textLayerDiv, pageIdx, pdfJsPlugin)
    {
       var textLayerFrag = document.createDocumentFragment();
 
@@ -1911,7 +1905,7 @@
       this.divContentDone = false;
       this.pageIdx = pageIdx;
       this.matches = [];
-      this.base = base
+      this.pdfJsPlugin = pdfJsPlugin
 
       this.beginLayout = function textLayerBuilderBeginLayout()
       {
@@ -1988,7 +1982,7 @@
          var kRenderDelay = 300; // in ms
          var self = this;
 
-         if (Date.now() - self.base.documentView.lastScroll > kRenderDelay)
+         if (Date.now() - self.pdfJsPlugin.documentView.lastScroll > kRenderDelay)
          {
             // Render right away
             this.renderLayer();
