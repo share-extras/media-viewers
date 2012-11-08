@@ -8,11 +8,6 @@
           </button>
       </div>
 
-      <span class="searchBarToggle">
-         <button id="${el}-searchBarToggle">${msg("button.search")}
-         </button>
-      </span>    
-      <div class="separator"></div>
       <button id="${el}-previous">
         <img src="${url.context}/res/components/images/back-arrow.png" align="top" height="16"/>
         ${msg("button.previous")}
@@ -73,28 +68,37 @@
            <img src="${url.context}/res/components/images/link-16.png" align="top" height="16"/>
          </button>
       </span>
+      <div class="separator"></div>     
+       <span class="searchBarToggle">
+         <button id="${el}-searchBarToggle">${msg("button.search")}
+         </button>
+      </span>    
       
     </div>
     
-    <div id="${el}-searchControls" class="controls controlssearch flat-button hidden">
-    <#-- Search bar -->
-      <label for="${el}-findInput">${msg("button.search")}</label>:
-      <input id="${el}-findInput" type="search" size="30">
-      <button id="${el}-findPrevious">
-        <img src="${url.context}/res/components/images/back-arrow.png" align="top" height="16"/>
-        ${msg("button.previoushit")}
-      </button>
-
-      <button id="${el}-findNext">
-        <img src="${url.context}/res/components/images/forward-arrow-16.png" align="top" height="16"/>
-        ${msg("button.nexthit")}
-      </button>
-       <button id="${el}-findHighlightAll">
-         ${msg("button.highlightall")}
-       </button>
-       <button id="${el}-findMatchCase">
-         ${msg("button.matchcase")}
-       </button>  
+    <div class="searchDialogCenter">
+       <div id="${el}-searchDialog" class="searchDialog">
+          <div id="${el}-searchControls" class="controlssearch flat-button">
+          <#-- Search bar -->
+            <span class="yui-button">
+               <label for="${el}-findInput">${msg("button.search")}:</label>
+               <input id="${el}-findInput" type="search" size="30">
+            </span>
+            <button id="${el}-findPrevious">
+              <img src="${url.context}/res/components/images/back-arrow.png" align="top" height="16" title="${msg("button.previoushit")}"/>           
+            </button>
+      
+            <button id="${el}-findNext">
+              <img src="${url.context}/res/components/images/forward-arrow-16.png" align="top" height="16" title="${msg("button.nexthit")}"/>
+            </button>
+            <span class="buttonHighLightAll">
+                <button id="${el}-findHighlightAll" title="${msg("button.highlightall")}">&nbsp;&nbsp;&nbsp;</button>
+             </span>
+             <span class="buttonMatchCase">
+                <button id="${el}-findMatchCase" title="${msg("button.matchcase")}">&nbsp;&nbsp;&nbsp;</button>
+             </span>
+          </div>
+       </div>
     </div>
     
     <div id="${el}-linkDialog" class="linkDialog">

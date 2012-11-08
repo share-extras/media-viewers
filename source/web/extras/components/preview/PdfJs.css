@@ -135,6 +135,37 @@
 	color: black;
 }
 
+.searchDialog {
+   visibility: hidden;
+   position: absolute;
+}
+
+.searchDialogCenter {
+   margin-left: auto;
+   margin-right: 260px;
+   width: 30px;
+}
+
+.previewer.PdfJs .controlssearch {
+   background-color: #F6F6F6;
+   border: 1px solid #CCCCCC;
+   padding: 5px 3px 2px 3px;
+   height: 25px;
+   width: 100%;
+   white-space: nowrap;
+   overflow: hidden;
+   font-size: 0.9em;
+   margin-top: 3px;
+}
+
+.previewer.PdfJs .controlssearch button {
+   line-height: 1.5em;
+   border-color: #B7B7B7;
+   border-width: 1px;
+   background-color: transparent;
+   padding: 0 2px;
+}
+
 .previewer.PdfJs .controlssearch input[type="search"] {
 	width: 10em;
 	font-size: 0.9em;
@@ -142,23 +173,36 @@
 
 .previewer.PdfJs .controlssearch .yui-checkbox-button .first-child { 
     border: none; 
-    padding-left: 1.3em; 
+    padding-right: 0.3em;
+    padding-left: 0.3em;
 }
 
-.previewer.PdfJs .controlssearch .yui-checkbox-button { 
-    background-image: url(../../../../components/images/enabled-indicator-off-16.png); 
+.previewer.PdfJs .controlssearch .buttonHighLightAll .yui-checkbox-button { 
+    background-image: url(images/highlight-all-off-16.png); 
     background-position: 0 3px; 
     background-repeat: no-repeat; 
     border: none; 
 } 
-.previewer.PdfJs .controlssearch .yui-checkbox-button-checked { 
-	background-image: url(../../../../components/images/enabled-indicator-on-16.png);
+.previewer.PdfJs .controlssearch .buttonHighLightAll .yui-checkbox-button-checked { 
+	background-image: url(images/highlight-all-on-16.png);
 	background-color: transparent;
+}
+
+.previewer.PdfJs .controlssearch .buttonMatchCase .yui-checkbox-button { 
+    background-image: url(images/case-sensitive-off-16.png); 
+    background-position: 0 3px; 
+    background-repeat: no-repeat; 
+    border: none; 
+} 
+.previewer.PdfJs .controlssearch .buttonMatchCase .yui-checkbox-button-checked { 
+   background-image: url(images/case-sensitive-on-16.png);
+   background-color: transparent;
 }
 
 .previewer.PdfJs .controlssearch .yui-checkbox-button-checked button { 
 	color: black;
 }
+
 /* Hide the link button in the dashlet, as the panel CSS is broken */
 .body .previewer.PdfJs .controls .linkbutton {
 	display: none;

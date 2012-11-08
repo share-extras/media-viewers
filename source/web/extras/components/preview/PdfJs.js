@@ -590,13 +590,7 @@
                newHeight = Dom.getViewportHeight() - controlRegion.height;
             }
          }
-         // Check if searhbar is active, subtract for that
-         if (this.widgets.searchBarToggle.get("checked"))
-         {
-            // It's the same height as the standard toolbar, use that for
-            // subrtraction
-            newHeight = newHeight - controlRegion.height;
-         }
+
          Dom.setStyle(this.viewer, "height", newHeight.toString() + "px");
          Dom.setStyle(this.sidebar, "height", newHeight.toString() + "px");
       },
@@ -997,26 +991,32 @@
 
       onToggleSearchBar : function PdfJs_onToggleSearchBar(e_obj)
       {
-         var searchBar = Dom.get(this.id + '-searchControls');
+         if(!this.widgets.searchDialog)
+         {
+            this.widgets.searchDialog = new YAHOO.widget.SimpleDialog(this.id + '-searchDialog',
+                  {
+                    close : true,
+                    draggable : false,
+                    effect : null,
+                    modal : false,
+                    visible : false
+                 });
+         }
+         
          if (e_obj.newValue === true)
          {
-            Dom.removeClass(searchBar, 'hidden');
-            this.onRecalculatePreviewLayout();
-            // Trigger text extraction
-            // Initialize find class
+            this.widgets.searchDialog.show();
             if (!this.pdfFindController.documentView)
             {
                this.pdfFindController.initialize(this.documentView);
                // Extract text
                this.pdfFindController.extractText();
             }
-
-         } else
+         }
+         else
          {
-            Dom.addClass(searchBar, 'hidden');
-            // Set the findController to inactive state
+            this.widgets.searchDialog.hide();
             this.pdfFindController.active = false;
-            this.onRecalculatePreviewLayout();
          }
       },
 
