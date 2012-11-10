@@ -13,7 +13,7 @@
                     <sourcePackageRoot>org.sharextras.customization.media-previews.flvplayer</sourcePackageRoot>
                 </customization>
             </customizations>
-            <auto-deploy>true</auto-deploy>
+            <auto-deploy>false</auto-deploy>
         </module>
         
         <module>
@@ -24,7 +24,7 @@
                     <sourcePackageRoot>org.sharextras.customization.media-previews.flvplayer-config</sourcePackageRoot>
                 </customization>
             </customizations>
-            <auto-deploy>true</auto-deploy>
+            <auto-deploy>false</auto-deploy>
         </module>
         
         <module>
@@ -35,7 +35,7 @@
                     <sourcePackageRoot>org.sharextras.customization.media-previews.mp3player</sourcePackageRoot>
                 </customization>
             </customizations>
-            <auto-deploy>true</auto-deploy>
+            <auto-deploy>false</auto-deploy>
         </module>
         
         <module>
@@ -46,7 +46,7 @@
                     <sourcePackageRoot>org.sharextras.customization.media-previews.mp3player-config</sourcePackageRoot>
                 </customization>
             </customizations>
-            <auto-deploy>true</auto-deploy>
+            <auto-deploy>false</auto-deploy>
         </module>
         
         <module>
@@ -57,7 +57,7 @@
                     <sourcePackageRoot>org.sharextras.customization.media-previews.pdfjs</sourcePackageRoot>
                 </customization>
             </customizations>
-            <auto-deploy>true</auto-deploy>
+            <auto-deploy>false</auto-deploy>
         </module>
         
         <module>
@@ -68,7 +68,7 @@
                     <sourcePackageRoot>org.sharextras.customization.media-previews.pdfjs-config</sourcePackageRoot>
                 </customization>
             </customizations>
-            <auto-deploy>true</auto-deploy>
+            <auto-deploy>false</auto-deploy>
         </module>
         
         <module>
@@ -79,7 +79,7 @@
                     <sourcePackageRoot>org.sharextras.customization.media-previews.embed</sourcePackageRoot>
                 </customization>
             </customizations>
-            <auto-deploy>true</auto-deploy>
+            <auto-deploy>false</auto-deploy>
         </module>
         
         <module>
@@ -112,7 +112,7 @@
                     <sourcePackageRoot>org.sharextras.customization.media-previews.prettify</sourcePackageRoot>
                 </customization>
             </customizations>
-            <auto-deploy>true</auto-deploy>
+            <auto-deploy>false</auto-deploy>
         </module>
         
         <module>
@@ -123,7 +123,7 @@
                     <sourcePackageRoot>org.sharextras.customization.media-previews.prettify-config</sourcePackageRoot>
                 </customization>
             </customizations>
-            <auto-deploy>true</auto-deploy>
+            <auto-deploy>false</auto-deploy>
         </module>
         
     </modules>
