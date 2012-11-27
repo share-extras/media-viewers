@@ -26,11 +26,11 @@ if (model.widgets)
             },
             plugins: [{
                name: "PdfJs",
-               attributes: {}
+               attributes: { src: "pdf" }
             },
             {
                name: "Embed",
-               attributes: {}
+               attributes: { src: "pdf" }
             }]
          });
          var oldConditions = eval("(" + widget.options.pluginConditions + ")");
