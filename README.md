@@ -143,13 +143,21 @@ To deploy the add-on files into a local Tomcat instance for testing, you can
 use the `hotcopy-tomcat-jar` task. You will need to set the `tomcat.home`
 property in Ant.
 
-    ant -Dtomcat.home=C:/Alfresco/tomcat clean hotcopy-tomcat-jar
+    ant -f project.xml -Dtomcat.home=C:/Alfresco/tomcat hotcopy-tomcat-jar
 
 After you have deployed the JAR file you will need to restart Tomcat to ensure 
 it picks up the changes.
 
 Configuration
 -------------
+
+You must enable the **PdfJs** module in Share's Module Deployment console, which
+can be accessed by navigating to `http://hostname:port/share/page/modules/deploy`
+on your Alfresco server.
+
+*If you are using the `trunk` codeline from r1340 onwards on Alfresco 4.2, then you can use the 
+second module **PdfJs Configuration** to automatically enable the viewer in the 
+Document Details page. Otherwise follow the instructions below.*
 
 After installing the add-on in Alfresco 4, you must then configure the `web-preview.get`
 component to use the particular viewers that you wish to enable. To do this, you must
