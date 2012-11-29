@@ -745,7 +745,7 @@
 
          // Update sidebar, if visible
          // TODO define an isRendered() method on the view object
-         if (this.thumbnailView.pages && this.thumbnailView.pages[0] && this.thumbnailView.pages[0].container)
+         if (this.thumbnailView && this.thumbnailView.pages && this.thumbnailView.pages[0] && this.thumbnailView.pages[0].container)
          {
             this.thumbnailView.setActivePage(this.pageNum);
          }
