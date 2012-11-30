@@ -290,14 +290,17 @@
 }
 
 .sidebar .thumbnailView .page {
-	box-shadow: 0 2px 5px #666666 !important;
+	box-shadow: 0 0 5px #666666 !important;
+   -moz-box-shadow: 0 0 5px #666666 !important;
+   -webkit-box-shadow: 0 0 5px #666666 !important;
 	cursor: pointer !important;
 	margin: 10px 0 0 10px !important;
 }
 
 .previewer.PdfJs .sidebar .thumbnailView .page.activePage {
-	margin: 8px 0 0 8px;
-	border: 2px solid #6CA5CE;
+   box-shadow: 0 0 8px #6CA5CE !important;
+   -moz-box-shadow: 0 0 8px #6CA5CE !important;
+   -webkit-box-shadow: 0 0 8px #6CA5CE !important;
 }
 
 .previewer.PdfJs .thumbnailView .page:last-child {
