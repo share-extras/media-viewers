@@ -68,16 +68,21 @@
            <img src="${url.context}/res/components/images/link-16.png" align="top" height="16"/>
          </button>
       </span>
-      <div class="separator"></div>     
-       <span class="searchBarToggle">
-         <button id="${el}-searchBarToggle">${msg("button.search")}
+      
+      <div class="separator"></div>
+      
+      <span class="searchBarToggle">
+         <button id="${el}-searchBarToggle">
+           <img src="${url.context}/res/components/images/search-16.png" align="top" height="16"/>
+           ${msg("button.search")}
          </button>
       </span>    
       
     </div>
     
-    <div class="searchDialogCenter">
-       <div id="${el}-searchDialog" class="searchDialog">
+    <div id="${el}-searchDialog" class="searchDialog">
+       <div class="hd"></div>
+       <div class="bd">
           <div id="${el}-searchControls" class="controlssearch flat-button">
           <#-- Search bar -->
             <span class="yui-button">
@@ -99,11 +104,12 @@
              </span>
           </div>
        </div>
+       <div class="ft"></div>
     </div>
     
     <div id="${el}-linkDialog" class="linkDialog">
         <div class="hd"></div>
-        <div class="bd">
+        <div class="bd flat-button">
             <div id="${el}-linkDialog-bg" class="yui-buttongroup">
                 <input type="radio" name="target" id="${el}-doc" value="${msg("link.document")}" />
                 <input type="radio" name="target" id="${el}-page" value="${msg("link.page")}" checked="checked" />
@@ -113,6 +119,7 @@
             </div>
             <div>${msg("link.info")}</div>
         </div>
+       <div class="ft"></div>
     </div>
 
     <div id="${el}-sidebar" class="sidebar">

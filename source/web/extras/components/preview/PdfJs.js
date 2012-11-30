@@ -463,7 +463,7 @@
             menu : downloadMenu
          });
          this.widgets.maximize = Alfresco.util.createYUIButton(this, "fullpage", this.onMaximizeClick);
-         this.widgets.linkBn = Alfresco.util.createYUIButton(this, "link", this.onLinkClick);
+         this.widgets.linkBn = Alfresco.util.createYUIButton(this, "link", this.onLinkClick, {type: "checkbox"});
 
          // Set up search toolbar
          Event.addListener(this.wp.id + "-findInput", "change", this.onFindChange, this, true);
@@ -986,13 +986,17 @@
          if(!this.widgets.searchDialog)
          {
             this.widgets.searchDialog = new YAHOO.widget.SimpleDialog(this.id + '-searchDialog',
-                  {
-                    close : true,
-                    draggable : false,
-                    effect : null,
-                    modal : false,
-                    visible : false
-                 });
+            {
+               close : false,
+               draggable : false,
+               effect : null,
+               modal : false,
+               visible : false,
+               width: "310px",
+               context : [ this.viewer, "tr", "tr", [ "beforeShow", "windowResize" ], [-20, 3] ],
+               underlay: "none"
+            });
+            this.widgets.searchDialog.render();
          }
          
          if (e_obj.newValue === true)
@@ -1238,13 +1242,14 @@
          {
              var linkDialog = new YAHOO.widget.SimpleDialog(dialogid,
              {
-               close : true,
+               close : false,
                draggable : false,
                effect : null,
                modal : false,
                visible : false,
-               context : [ this.viewer, "tr", "tr", [ "beforeShow", "windowResize" ] ],
-               width : "40em"
+               context : [ this.viewer, "tr", "tr", [ "beforeShow", "windowResize" ], [-20, 3] ],
+               width : "40em",
+               underlay: "none"
             });
             var slideurl = window.location.href.replace(window.location.hash, "") + "#page=" + this.pageNum;
             linkDialog.render();
