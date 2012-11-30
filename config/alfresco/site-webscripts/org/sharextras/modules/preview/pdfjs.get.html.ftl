@@ -8,17 +8,17 @@
           </button>
       </div>
 
-      <button id="${el}-previous">
+      <button id="${el}-previous" disabled="disabled">
         <img src="${url.context}/res/components/images/back-arrow.png" align="top" height="16"/>
         ${msg("button.previous")}
       </button>
 
-      <button id="${el}-next">
+      <button id="${el}-next" disabled="disabled">
         <img src="${url.context}/res/components/images/forward-arrow-16.png" align="top" height="16"/>
         ${msg("button.next")}
       </button>
     
-      <input type="number" id="${el}-pageNumber" value="1" size="4" min="1" />
+      <input type="number" id="${el}-pageNumber" value="1" size="4" min="1" disabled="disabled" />
 
       <span>/</span>
       <span id="${el}-numPages" class="numPages">--</span>

@@ -673,6 +673,8 @@
             // Update toolbar
             this._updateZoomControls();
             Dom.get(this.wp.id + "-numPages").textContent = this.numPages;
+            Dom.setAttribute(this.wp.id + "-pageNumber", "max", this.numPages);
+            Dom.get(this.wp.id + "-pageNumber").removeAttribute("disabled");
 
          }, this);
 
@@ -967,9 +969,10 @@
          var pn = parseInt(e_obj.currentTarget.value);
          if (pn < 1 || pn > this.numPages)
          {
-            Alfresco.util.PopupManager.displayPrompt({
+            Alfresco.util.PopupManager.displayMessage({
                text : this.wp.msg('error.badpage')
             });
+            return false;
           }
           else
          {
