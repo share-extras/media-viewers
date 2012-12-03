@@ -156,7 +156,16 @@
           * @type String
           * @default "true"
           */
-         useLocalStorage : "true"
+         useLocalStorage : "true",
+
+         /**
+          * If the user came from the search page, should the search feature be automatically triggered?
+          * 
+          * @property autoSearch
+          * @type String
+          * @default "true"
+          */
+         autoSearch : "true"
       },
 
       /**
@@ -685,6 +694,20 @@
             Dom.get(this.wp.id + "-numPages").textContent = this.numPages;
             Dom.setAttribute(this.wp.id + "-pageNumber", "max", this.numPages);
             Dom.get(this.wp.id + "-pageNumber").removeAttribute("disabled");
+            
+            // If the user clicked through to the document details from the search page, open
+            // the search dialog and perform a search for that term
+            
+            if (this.attributes.autoSearch && document.referrer && document.referrer.indexOf("/search?") > 0)
+            {
+               var st = Alfresco.util.getQueryStringParameter("t", document.referrer);
+               if (st)
+               {
+                  this.widgets.searchBarToggle.set("checked", true); // Toggle the search box on
+                  Dom.get(this.wp.id + "-findInput").value = st;
+                  this.onFindChange("find");
+               }
+            }
 
          }, this);
 
