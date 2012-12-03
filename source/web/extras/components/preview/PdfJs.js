@@ -569,8 +569,10 @@
        */
       _setViewerHeight : function _setViewerHeight()
       {
-         var previewRegion = Dom.getRegion(this.viewer.parentNode), controlRegion = Dom.getRegion(this.controls), newHeight = previewRegion.height
-               - controlRegion.height;
+         var previewRegion = Dom.getRegion(this.viewer.parentNode), 
+            controlRegion = Dom.getRegion(this.controls),
+            newHeight = previewRegion.height - controlRegion.height -1; // Allow for bottom border
+         
          if (newHeight === 0)
          {
             // Some browser get viewer.parentNode wrong (same as this.controls),
@@ -579,11 +581,19 @@
             // use the default to get height.
             if (!this.maximized)
             {
-               newHeight = this.wp.setupPreviewSize() - 10 - controlRegion.height;
-            } else
-            {
-               newHeight = Dom.getViewportHeight() - controlRegion.height;
+               var previewSize = this.wp.setupPreviewSize();
+               newHeight = previewSize - 
+                  10 - controlRegion.height -1; // Allow for bottom border of 1px
             }
+            else
+            {
+               newHeight = Dom.getViewportHeight() - controlRegion.height - 1;
+            }
+         }
+         
+         if (Alfresco.logger.isDebugEnabled())
+         {
+            Alfresco.logger.debug("Setting height to " + newHeight + "px (toolbar " + controlRegion.height + "px, container " + previewRegion.height + "px");
          }
 
          Dom.setStyle(this.viewer, "height", newHeight.toString() + "px");
