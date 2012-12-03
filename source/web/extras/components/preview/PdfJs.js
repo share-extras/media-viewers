@@ -524,6 +524,14 @@
                scope : this,
                correctScope : true
             }).enable();
+            new YAHOO.util.KeyListener(document, { keys: 70, ctrl: true }, { // Ctrl+F
+               fn : this.onFullScreen,
+               scope : this,
+               correctScope : true
+            }).enable();
+            Event.addListener(window, "fullscreenchange", this.onFullScreenChange, this, true);
+            Event.addListener(window, "mozfullscreenchange", this.onFullScreenChange, this, true);
+            Event.addListener(window, "webkitfullscreenchange", this.onFullScreenChange, this, true);
          }
          new YAHOO.util.KeyListener(document, { keys: 27 }, { // escape
             fn: function (e) {
@@ -544,7 +552,7 @@
        * @method _setPreviewerElementHeight
        * @private
        */
-      _setPreviewerElementHeight : function _setPreviewerElementHeight()
+      _setPreviewerElementHeight : function PdfJs_setPreviewerElementHeight()
       {
          // Is the viewer maximized?
          if (!this.maximized)
@@ -563,9 +571,13 @@
                Dom.setStyle(this.wp.getPreviewerElement(), "height", (previewHeight - 10).toString() + "px");
             }
          }
+         else if (this.fullscreen)
+         {
+            // Do nothing
+         }
          else
          {
-            Dom.setStyle(this.wp.getPreviewerElement(), "height", (Dom.getViewportHeight()).toString() + "px");
+            Dom.setStyle(this.wp.getPreviewerElement(), "height", (window.innerHeight || Dom.getViewportHeight()).toString() + "px");
          }
       },
 
@@ -576,11 +588,12 @@
        * @method _setViewerHeight
        * @private
        */
-      _setViewerHeight : function _setViewerHeight()
+      _setViewerHeight : function PdfJs_setViewerHeight()
       {
          var previewRegion = Dom.getRegion(this.viewer.parentNode), 
             controlRegion = Dom.getRegion(this.controls),
-            newHeight = previewRegion.height - controlRegion.height -1; // Allow for bottom border
+            controlHeight = !this.fullscreen ? controlRegion.height : 0,
+            newHeight = previewRegion.height - controlHeight -1; // Allow for bottom border
          
          if (newHeight === 0)
          {
@@ -592,21 +605,31 @@
             {
                var previewSize = this.wp.setupPreviewSize();
                newHeight = previewSize - 
-                  10 - controlRegion.height -1; // Allow for bottom border of 1px
+                  10 - controlHeight -1; // Allow for bottom border of 1px
             }
             else
             {
-               newHeight = Dom.getViewportHeight() - controlRegion.height - 1;
+               newHeight = Dom.getViewportHeight() - controlHeight - 1;
             }
          }
          
-         if (Alfresco.logger.isDebugEnabled())
+         if (!this.fullscreen)
          {
-            Alfresco.logger.debug("Setting height to " + newHeight + "px (toolbar " + controlRegion.height + "px, container " + previewRegion.height + "px");
+            if (Alfresco.logger.isDebugEnabled())
+            {
+               Alfresco.logger.debug("Setting viewer height to " + newHeight + "px (toolbar " + controlHeight + "px, container " + previewRegion.height + "px");
+            }
+            Dom.setStyle(this.viewer, "height", newHeight.toString() + "px");
+            Dom.setStyle(this.sidebar, "height", newHeight.toString() + "px");
          }
-
-         Dom.setStyle(this.viewer, "height", newHeight.toString() + "px");
-         Dom.setStyle(this.sidebar, "height", newHeight.toString() + "px");
+         else
+         {
+            if (Alfresco.logger.isDebugEnabled())
+            {
+               Alfresco.logger.debug("Setting viewer height to 100% (full-screen)");
+            }
+            Dom.setStyle(this.viewer, "height", "100%");
+         }
       },
 
       /**
@@ -993,6 +1016,103 @@
       },
 
       /**
+       * Full screen key press
+       * 
+       * @method onFullScreen
+       */
+      onFullScreen : function PdfJs_onFullScreen(e_obj)
+      {
+         var el = this.viewer;
+         if ((document.fullScreenElement && document.fullScreenElement !== null) ||    // alternative standard method
+               (!document.mozFullScreenElement && !document.webkitFullScreenElement && !document.webkitFullscreenElement)) // current working methods
+         {
+            // Remove window resize behaviour
+            Event.removeListener(window, "resize", this.onRecalculatePreviewLayout, this, true);
+            
+            if (el.requestFullScreen)
+            {
+               el.requestFullScreen();
+            }
+            else if (el.mozRequestFullScreen)
+            {
+               el.mozRequestFullScreen();
+            }
+            else if (el.webkitRequestFullScreen)
+            {
+               el.webkitRequestFullScreen(Element.ALLOW_KEYBOARD_INPUT);
+            }
+         }
+         else
+         {
+            if (document.cancelFullScreen)
+            {
+               document.cancelFullScreen();
+            }
+            else if (document.mozCancelFullScreen)
+            {
+               document.mozCancelFullScreen();
+            }
+            else if (document.webkitCancelFullScreen)
+            {
+               document.webkitCancelFullScreen();
+            }
+         }
+      },
+      
+      /**
+       * Full screen change event received
+       * 
+       * See https://developer.mozilla.org/en-US/docs/DOM/Using_fullscreen_mode
+       * 
+       * @method onFullScreenChange
+       */
+      onFullScreenChange: function PdfJs_onFullScreenChange(e_obj)
+      {
+         if ((document.fullScreenElement && document.fullScreenElement !== null) ||    // alternative standard method
+               (!document.mozFullScreenElement && !document.webkitFullScreenElement && !document.webkitFullscreenElement)) // current working methods
+         {
+            Alfresco.logger.debug("Leaving full screen mode");
+            this.fullscreen = false;
+            this.documentView.fullscreen = false;
+            
+            this.documentView.setScale(this.oldScale);
+            this.pageNum = this.oldPageNum;
+
+            this._setViewerHeight();
+            
+            // TODO viewerRegion should be populated by an event?
+            this.documentView.viewerRegion = Dom.getRegion(this.viewer);
+            // Now redefine the row margins
+            this.documentView.alignRows();
+            
+            this._scrollToPage(this.pageNum);
+            
+            // Re-add window resize behaviour
+            Event.addListener(window, "resize", this.onRecalculatePreviewLayout, this, true);
+         }
+         else
+         {
+            Alfresco.logger.debug("Entering full screen mode");
+            this.documentView.fullscreen = true;
+            this.fullscreen = true;
+            
+            // Remember the old scale and page numbers
+            this.oldScale = this.documentView.currentScale;
+            this.oldPageNum = this.pageNum;
+            
+            this._setViewerHeight();
+
+            // TODO viewerRegion should be populated by an event?
+            this.documentView.viewerRegion = Dom.getRegion(this.viewer);
+            // Now redefine the row margins
+            this.documentView.alignRows();
+            // Render any pages that have appeared
+            this.documentView.setScale(this.documentView.parseScale("page-fit"));
+            this._scrollToPage(this.pageNum);
+         }
+      },
+
+      /**
        * Page number changed in text input field
        * 
        * @method onPageChange
@@ -1319,6 +1439,7 @@
        */
       onRecalculatePreviewLayout : function PdfJs_onRecalculatePreviewLayout(p_obj)
       {
+         Alfresco.logger.debug("onRecalculatePreviewLayout");
          this._setPreviewerElementHeight();
          this._setViewerHeight();
          // TODO viewerRegion should be populated by an event?
@@ -1660,6 +1781,10 @@
          // Render each page (not canvas or text layers)
          for ( var i = 0; i < this.pages.length; i++)
          {
+            if (Alfresco.logger.isDebugEnabled())
+            {
+               Alfresco.logger.debug("Rendering container " + i);
+            }
             this.pages[i].render();
          }
 
@@ -1727,19 +1852,25 @@
        */
       renderVisiblePages : function DocumentView_renderVisiblePages()
       {
+         Alfresco.logger.debug("Render visible pages");
          // region may not be populated properly if the div was hidden
          this.viewerRegion = Dom.getRegion(this.viewer);
+         
+         if (Alfresco.logger.isDebugEnabled())
+         {
+            Alfresco.logger.debug("Viewer region is " + this.viewerRegion.height + "px");
+         }
 
          // Render visible pages
          for ( var i = 0; i < this.pages.length; i++)
          {
-            if (Alfresco.logger.isDebugEnabled())
-            {
-               Alfresco.logger.debug("Rendering Page " + i);
-            }
             var page = this.pages[i];
             if (page.container && !page.canvas && page.getVPos() < this.viewerRegion.height * 1.5 && page.getVPos() > this.viewerRegion.height * -1.5)
             {
+               if (Alfresco.logger.isDebugEnabled())
+               {
+                  Alfresco.logger.debug("Rendering page " + i + " content");
+               }
                page.renderContent();
             }
          }
@@ -1795,6 +1926,10 @@
          {
             return;
          }
+         if (Alfresco.logger.isDebugEnabled())
+         {
+            Alfresco.logger.debug("Scale is now " + value);
+         }
          this.currentScale = value;
 
          // Remove all the existing canvas elements
@@ -1828,8 +1963,10 @@
                 vmargin = parseInt(Dom.getStyle(container, "margin-top")),
                 contentWidth = parseInt(currentPage.content.pageInfo.view[2]),
                 contentHeight = parseInt(currentPage.content.pageInfo.view[3]),
-                clientWidth = this.viewer.clientWidth - 1, // allow an extra pixel in width otherwise 2-up view wraps
-            clientHeight = this.viewer.clientHeight;
+                clientWidth = this.fullscreen ? window.screen.width : this.viewer.clientWidth - 1, // allow an extra pixel in width otherwise 2-up view wraps
+                clientHeight = this.fullscreen ? window.screen.height : this.viewer.clientHeight;
+            
+            Alfresco.logger.debug("Client height: " + this.viewer.clientHeight);
 
             if ('page-width' == value)
             {

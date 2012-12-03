@@ -15,6 +15,7 @@
 	left: 0px;
 	right: 0px;
 	bottom: 0px;
+	max-height: none;
 }
 
 .previewer.PdfJs .viewer {
@@ -24,6 +25,13 @@
 .previewer.PdfJs .viewer.loading {
 	background: url('../../../themes/default/images/wait.gif') center
 		no-repeat;
+}
+
+.previewer.PdfJs .viewer:-webkit-full-screen {
+   width: 100%;
+   height: 100%;
+   max-height: none;
+   background-color: #808080;
 }
 
 .previewer.PdfJs [hidden] {
