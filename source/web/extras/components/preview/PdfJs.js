@@ -1802,7 +1802,7 @@
              var currentPage = this.pages[0],
                 container = currentPage.container,
                 hmargin = parseInt(Dom.getStyle(container, "margin-left")) + parseInt(Dom.getStyle(container, "margin-right")),
-                vmargin = parseInt(Dom.getStyle(container, "margin-top")) + parseInt(Dom.getStyle(container, "margin-bottom")),
+                vmargin = parseInt(Dom.getStyle(container, "margin-top")),
                 contentWidth = parseInt(currentPage.content.pageInfo.view[2]),
                 contentHeight = parseInt(currentPage.content.pageInfo.view[3]),
                 clientWidth = this.viewer.clientWidth - 1, // allow an extra pixel in width otherwise 2-up view wraps
