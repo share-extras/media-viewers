@@ -95,15 +95,6 @@
          skipbrowsertest : "false",
 
          /**
-          * Display mode, either "iframe" or "block"
-          * 
-          * @property mode
-          * @type String
-          * @default "block"
-          */
-         mode : "block",
-
-         /**
           * Default zoom level for new documents
           * 
           * @property defaultScale
@@ -345,41 +336,11 @@
          this.inWikiPage = Dom.getAncestorByClassName(this.wp.getPreviewerElement(), "wiki-page") != null;
          this.inDashlet = Dom.getAncestorByClassName(this.wp.getPreviewerElement(), "body") != null;
 
-         // html5 is supported, display with pdf.js
-         // id and name needs to be equal, easier if you need scripting access
-         // to iframe
-         if (this.attributes.mode == "iframe")
-         {
-            var fileurl;
-            if (this.attributes.src)
-            {
-                // We do not use the built in function to get url, since pdf.js will
-               // strip
-                // attributes from the url. Instead we add it back in pdfviewer.js
-                fileurl = Alfresco.constants.PROXY_URI + "api/node/" + this.wp.options.nodeRef.replace(":/", "") + "/content/thumbnails/pdf/" + this.wp.options.name
-                      + '.pdf';
-             }
-             else
-            {
-               fileurl = this.wp.getContentUrl();
-            }
-            var previewHeight = this.wp.setupPreviewSize();
-            Dom.setAttribute(this.wp.getPreviewerElement(), "height", (previewHeight - 10).toString());
-             var displaysource = '<iframe id="PdfJs" name="PdfJs" src="' + Alfresco.constants.URL_SERVICECONTEXT + 'extras/components/preview/pdfviewer?htmlid=' + encodeURIComponent(this.wp.id) + '&file=' + encodeURIComponent(fileurl)
-             + '" scrolling="yes" marginwidth="0" marginheight="0" frameborder="0" vspace="5" hspace="5"  style="height:' + previewHeight.toString()
-             + 'px;"></iframe>';
+         Alfresco.util.YUILoaderHelper.require([ "tabview" ], this.onComponentsLoaded, this);
+         Alfresco.util.YUILoaderHelper.loadComponents();
 
-            // Return HTML that will be set as the innerHTML of the previewer
-            return displaysource;
-         }
-         else
-         {
-            Alfresco.util.YUILoaderHelper.require([ "tabview" ], this.onComponentsLoaded, this);
-            Alfresco.util.YUILoaderHelper.loadComponents();
-
-             // Return null means WebPreview instance will not overwrite the innerHTML of the preview area
-            return null;
-         }
+          // Return null means WebPreview instance will not overwrite the innerHTML of the preview area
+         return null;
       },
 
       /**
