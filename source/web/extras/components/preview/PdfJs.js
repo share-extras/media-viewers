@@ -1562,7 +1562,9 @@
          ctx.fillStyle = 'rgb(255, 255, 255)';
          ctx.fillRect(0, 0, canvas.width, canvas.height);
          ctx.restore();
-         ctx.translate(-view[0] * this.parent.currentScale, -view[1] * this.parent.currentScale);
+         
+         // Removed to fix issue 112, since this no longer seems to appear in pdf.js's own viewer.js
+         //ctx.translate(-view[0] * this.parent.currentScale, -view[1] * this.parent.currentScale);
 
          // Render the content itself
          var renderContext = {
