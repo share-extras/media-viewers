@@ -1965,7 +1965,7 @@
                    opw = this.parseScale("page-width"),
                    tpw = this.parseScale("two-page-width"),
                    minScale = this.config.autoMinScale;
-               if (tpf > minScale)
+               if (tpf > minScale && this.numPages > 1)
                {
                   return tpf;
                 }
@@ -1973,7 +1973,7 @@
                {
                   return opf;
                 }
-                else if (tpw > minScale)
+                else if (tpw > minScale && this.numPages > 1)
                {
                   return tpw;
                 }
