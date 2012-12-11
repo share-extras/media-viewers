@@ -2,7 +2,7 @@
 <!DOCTYPE beans PUBLIC '-//SPRING//DTD BEAN//EN' 'http://www.springframework.org/dtd/spring-beans.dtd'>
 
 <beans>
-   <bean class="org.springframework.beans.factory.config.MethodInvokingFactoryBean">
+   <bean id="thumbnail.register.pdfpreview" class="org.springframework.beans.factory.config.MethodInvokingFactoryBean">
       <property name="targetObject" ref="thumbnailRegistry" />
       <property name="targetMethod" value="addThumbnailDefinition" />
       <property name="arguments">
