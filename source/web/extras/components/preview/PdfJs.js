@@ -338,6 +338,9 @@
 
          Alfresco.util.YUILoaderHelper.require([ "tabview" ], this.onComponentsLoaded, this);
          Alfresco.util.YUILoaderHelper.loadComponents();
+         
+         // Remove the annoying 'Setting up Previewer' message
+         this.wp.getPreviewerElement().innerHTML = "";
 
           // Return null means WebPreview instance will not overwrite the innerHTML of the preview area
          return null;
@@ -610,7 +613,24 @@
          }
 
          // Add the loading spinner to the viewer area
-         Dom.addClass(this.viewer, "loading");
+         //Dom.addClass(this.viewer, "loading");
+         this.spinner = new Spinner({
+            lines: 13, // The number of lines to draw
+            length: 7, // The length of each line
+            width: 4, // The line thickness
+            radius: 10, // The radius of the inner circle
+            corners: 1, // Corner roundness (0..1)
+            rotate: 0, // The rotation offset
+            color: '#fff', // #rgb or #rrggbb
+            speed: 1, // Rounds per second
+            trail: 60, // Afterglow percentage
+            shadow: false, // Whether to render a shadow
+            hwaccel: false, // Whether to use hardware acceleration
+            className: 'spinner', // The CSS class to assign to the spinner
+            zIndex: 2e9, // The z-index (defaults to 2000000000)
+            top: 'auto', // Top position relative to parent in px
+            left: 'auto' // Left position relative to parent in px
+         }).spin(this.viewer);
 
          // Set the worker source
          PDFJS.workerSrc = Alfresco.constants.URL_CONTEXT + 'res/extras/components/preview/pdfjs/pdf' +  (Alfresco.constants.DEBUG ? '.js' : '-min.js'); 
@@ -665,7 +685,8 @@
             }
 
             // Remove the loading spinner
-            Dom.removeClass(this.viewer, "loading");
+            //Dom.removeClass(this.viewer, "loading");
+            this.spinner.stop();
 
             this.documentView.render();
             // Scroll to the current page, this will force the visible content to render
