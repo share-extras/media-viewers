@@ -1556,17 +1556,16 @@
        */
       renderContent : function DocumentPage_renderContent()
       {
-         if (this.loadingIconDiv)
-         {
-            Dom.setStyle(this.loadingIconDiv, "display", "none");
-         }
-          var region = Dom.getRegion(this.container),
+         var region = Dom.getRegion(this.container),
              canvas = document.createElement('canvas');
          canvas.id = this.container.id.replace('-pageContainer-', '-canvas-');
          canvas.mozOpaque = true;
          this.container.appendChild(canvas);
 
          this.canvas = canvas;
+         
+         // Hide the canvas until we've finished drawing the content, so the loading spinner shows through
+         Dom.setStyle(canvas, "visibility", "hidden");
 
          // Add text layer
          var textLayerDiv = null;
@@ -1603,8 +1602,30 @@
             viewport : this.content.getViewport(this.parent.parseScale(this.parent.currentScale)),
             textLayer : this.textLayer
          };
-         content.render(renderContext);
-         var self = this;
+         
+         var self = this, startTime = 0;
+         
+         if (Alfresco.logger.isDebugEnabled())
+         {
+            startTime = new Date().getTime();
+         }
+         
+         content.render(renderContext).then(function()
+         {
+            // Hide the loading icon and make the canvas visible again
+            if (self.loadingIconDiv)
+            {
+               Dom.setStyle(self.loadingIconDiv, "display", "none");
+            }
+            Dom.setStyle(self.canvas, "visibility", "visible");
+            
+            // Log time taken to draw the page
+            if (Alfresco.logger.isDebugEnabled())
+            {
+               Alfresco.logger.debug("Rendered page " + self.id + " in " + (new Date().getTime() - startTime) + "ms");
+            }
+         });
+         
          if (self.textLayer)
          {
             this.getTextContent().then(function textContentResolved(textContent)
@@ -1777,7 +1798,7 @@
          {
             if (Alfresco.logger.isDebugEnabled())
             {
-               Alfresco.logger.debug("Rendering container " + i);
+               Alfresco.logger.debug("Rendering page container " + (i+1));
             }
             this.pages[i].render();
          }
@@ -1874,7 +1895,7 @@
             {
                if (Alfresco.logger.isDebugEnabled())
                {
-                  Alfresco.logger.debug("Rendering page " + i + " content (page top:" + top + ", bottom " + bottom + ")");
+                  Alfresco.logger.debug("Rendering page " + (i+1) + " content (page top:" + top + ", bottom:" + bottom + ")");
                }
                page.renderContent();
             }
