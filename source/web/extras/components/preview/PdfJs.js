@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2012 Share Extras contributors
+ * Copyright (C) 2010-2013 Share Extras contributors
  *
  * This file is part of the Share Extras project.
  *
