@@ -1504,8 +1504,7 @@
       /**
        * Render a specific page in the container. This does not render the content of the page itself, just the container divs.
        * 
-       * @method _renderPageContainer
-       * @private
+       * @method render
        */
       render : function DocumentPage_render()
       {
@@ -1524,6 +1523,17 @@
 
          this._setPageSize();
       },
+      
+      /**
+       * Get the region in the document taken by this page
+       * 
+       * @method getRegion
+       * @returns {object} Object containing region dimensions as returned by YAHOO.util.Dom.getRegion()
+       */
+      getRegion : function DocumentPage_getRegion()
+      {
+         return Dom.getRegion(this.container);
+      },
 
       /**
         * Get the vertical position of the pae relative to the top of the parent element. A negative number
@@ -1534,7 +1544,7 @@
       getVPos : function DocumentPage_getVPos(page)
       {
           var vregion = this.parent.viewerRegion,
-             pregion = Dom.getRegion(this.container);
+             pregion = this.getRegion();
 
          return pregion.top - vregion.top;
       },
@@ -1836,24 +1846,35 @@
        */
       renderVisiblePages : function DocumentView_renderVisiblePages()
       {
-         Alfresco.logger.debug("Render visible pages");
          // region may not be populated properly if the div was hidden
          this.viewerRegion = Dom.getRegion(this.viewer);
          
+         var vheight = this.viewerRegion.height, vtop = this.viewerRegion.top;
+         
          if (Alfresco.logger.isDebugEnabled())
          {
-            Alfresco.logger.debug("Viewer region is " + this.viewerRegion.height + "px");
+            Alfresco.logger.debug("Render visible pages: viewer height " + this.viewerRegion.height + "px");
          }
 
          // Render visible pages
          for ( var i = 0; i < this.pages.length; i++)
          {
-            var page = this.pages[i];
-            if (page.container && !page.canvas && page.getVPos() < this.viewerRegion.height * 1.5 && page.getVPos() > this.viewerRegion.height * -1.5)
+            var page = this.pages[i], 
+               pregion = page.getRegion(),
+               top = pregion.top - vtop,
+               bottom = top + pregion.height,
+               vicinity = 0.6;
+            
+            // WA - improve algorith for selecting which pages to render, based on the following criteria
+            // Page top is above the viewer top edge, bottom below the bottom edge OR
+            // Bottom is within half the viewer height of the top edge OR
+            // Top is within half the viewer height of the bottom edge
+            if (page.container && !page.canvas && 
+                  (top < 0 && 0 < bottom || vheight * -1 * vicinity < bottom && bottom < vheight || 0 < top && top < vheight * (vicinity + 1) ))
             {
                if (Alfresco.logger.isDebugEnabled())
                {
-                  Alfresco.logger.debug("Rendering page " + i + " content");
+                  Alfresco.logger.debug("Rendering page " + i + " content (page top:" + top + ", bottom " + bottom + ")");
                }
                page.renderContent();
             }
