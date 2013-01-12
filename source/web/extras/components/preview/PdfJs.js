@@ -531,7 +531,12 @@
             }
             else
             {
-               var previewHeight = this.wp.setupPreviewSize();
+               var previewHeight = this.wp.setupPreviewSize({
+                  commentsList: true,
+                  commentContent: false,
+                  siteNavigation: true,
+                  nodeHeader: true
+               });
                Dom.setStyle(this.wp.getPreviewerElement(), "height", (previewHeight - 10).toString() + "px");
             }
          }
@@ -567,7 +572,12 @@
             // use the default to get height.
             if (!this.maximized)
             {
-               var previewSize = this.wp.setupPreviewSize();
+               var previewSize = this.wp.setupPreviewSize({
+                  commentsList: true,
+                  commentContent: false,
+                  siteNavigation: true,
+                  nodeHeader: true
+               });
                newHeight = previewSize - 
                   10 - controlHeight -1; // Allow for bottom border of 1px
             }
