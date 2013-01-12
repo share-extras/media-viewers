@@ -703,6 +703,10 @@
             this.documentView.scrollTo(this.pageNum);
 
             // Enable the sidebar
+            if (this.documentConfig.sidebarEnabled)
+            {
+               this.widgets.sidebarButton.set("checked", true);
+            }
 
             // Update toolbar
             this._updateZoomControls();
@@ -894,7 +898,8 @@
             var base = "org.sharextras.media-viewers.pdfjs.document." + this.wp.options.nodeRef.replace(":/", "").replace("/", ".") + ".";
             this.documentConfig = {
                pageNum : window.localStorage[base + "pageNum"],
-               scale : window.localStorage[base + "scale"]
+               scale : window.localStorage[base + "scale"],
+               sidebarEnabled : ("true" == window.localStorage[base + "sidebar-enabled"])
             };
          }
       },
@@ -1484,9 +1489,11 @@
       {
          if (this.attributes.useLocalStorage == "true" && this._browserSupportsHtml5Storage())
          {
-             var base = "org.sharextras.media-viewers.pdfjs.document." + this.wp.options.nodeRef.replace(":/", "").replace("/", ".") + ".";
+            var base = "org.sharextras.media-viewers.pdfjs.document." + this.wp.options.nodeRef.replace(":/", "").replace("/", ".") + ".",
+               sbshown = this.widgets.sidebarButton.get("checked");
             window.localStorage[base + "pageNum"] = this.pageNum;
             window.localStorage[base + "scale"] = this.documentView.currentScale;
+            window.localStorage[base + "sidebar-enabled"] = sbshown;
          }
       }
    };
