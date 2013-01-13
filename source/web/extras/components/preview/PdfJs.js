@@ -64,6 +64,7 @@
        * Custom events
        */
       this.onPdfLoaded = new YAHOO.util.CustomEvent("pdfLoaded", this);
+      this.onResize = new YAHOO.util.CustomEvent("resize", this);
       
       return this;
    };
@@ -1116,8 +1117,8 @@
 
             this._setViewerHeight();
             
-            // TODO viewerRegion should be populated by an event?
-            this.documentView.viewerRegion = Dom.getRegion(this.viewer);
+            this.onResize.fire();
+            
             // Now redefine the row margins
             this.documentView.alignRows();
             
@@ -1138,8 +1139,8 @@
             
             this._setViewerHeight();
 
-            // TODO viewerRegion should be populated by an event?
-            this.documentView.viewerRegion = Dom.getRegion(this.viewer);
+            this.onResize.fire();
+            
             // Now redefine the row margins
             this.documentView.alignRows();
             // Render any pages that have appeared
@@ -1396,8 +1397,7 @@
 
          this._setPreviewerElementHeight();
          this._setViewerHeight();
-         // TODO viewerRegion should be populated by an event?
-         this.documentView.viewerRegion = Dom.getRegion(this.viewer);
+         this.onResize.fire();
          // Now redefine the row margins
          this.documentView.alignRows();
          // Render any pages that have appeared
@@ -1480,8 +1480,7 @@
             Alfresco.logger.debug("onRecalculatePreviewLayout");
             this._setPreviewerElementHeight();
             this._setViewerHeight();
-            // TODO viewerRegion should be populated by an event?
-            this.documentView.viewerRegion = Dom.getRegion(this.viewer);
+            this.onResize.fire();
             // Now redefine the row margins
             this.documentView.alignRows();
             // Render any pages that have appeared
@@ -1799,7 +1798,6 @@
       this.config = config || {};
       this.pages = [];
       this.viewer = Dom.get(elId);
-      this.viewerRegion = Dom.getRegion(this.viewer);
       this.currentScale = config.currentScale || K_UNKNOWN_SCALE;
       this.pdfJsPlugin = config.pdfJsPlugin;
 
@@ -1810,6 +1808,8 @@
       {
          self.lastScroll = Date.now();
       }, false);
+      
+      this.pdfJsPlugin.onResize.subscribe(this.onResize, this, true);
    }
 
    DocumentView.prototype = {
@@ -1932,14 +1932,13 @@
        */
       renderVisiblePages : function DocumentView_renderVisiblePages()
       {
-         // region may not be populated properly if the div was hidden
-         this.viewerRegion = Dom.getRegion(this.viewer);
+         var viewerRegion = Dom.getRegion(this.viewer);
          
-         var vheight = this.viewerRegion.height, vtop = this.viewerRegion.top;
+         var vheight = viewerRegion.height, vtop = viewerRegion.top;
          
          if (Alfresco.logger.isDebugEnabled())
          {
-            Alfresco.logger.debug("Render visible pages: viewer height " + this.viewerRegion.height + "px");
+            Alfresco.logger.debug("Render visible pages: viewer height " + viewerRegion.height + "px");
          }
 
          // Render visible pages
@@ -2163,6 +2162,10 @@
          }
          Dom.addClass(this.pages[n - 1].container, "activePage");
          this.activePage = this.pages[n - 1];
+      },
+      
+      onResize: function onResize()
+      {
       }
    }
 
