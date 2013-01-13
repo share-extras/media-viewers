@@ -1650,14 +1650,15 @@
             
          }, this);
          
+         var setTextFn = Alfresco.util.bind(function textContentResolved(textContent) {
+            this.textLayer.setTextContent(textContent);
+         }, this);
+         
          content.render(renderContext).then(renderFn);
          
-         if (self.textLayer)
+         if (this.textLayer)
          {
-            this.getTextContent().then(function textContentResolved(textContent)
-            {
-               self.textLayer.setTextContent(textContent);
-            });
+            this.getTextContent().then(setTextFn);
          }
 
       },
