@@ -675,8 +675,8 @@
             var self = this;
             this.documentView = new DocumentView(this.id + "-viewer", {
                pageLayout : this.attributes.pageLayout,
-               currentScale : this.documentConfig.scale ? parseFloat(this.documentConfig.scale) : K_UNKNOWN_SCALE,
-               defaultScale : this.attributes.defaultScale,
+               currentScale : K_UNKNOWN_SCALE,
+               defaultScale : this.documentConfig.scale ? this.documentConfig.scale : this.attributes.defaultScale,
                disableTextLayer : this.attributes.disableTextLayer == "true",
                autoMinScale : parseFloat(this.attributes.autoMinScale),
                pdfJsPlugin : self
@@ -1492,7 +1492,7 @@
             var base = "org.sharextras.media-viewers.pdfjs.document." + this.wp.options.nodeRef.replace(":/", "").replace("/", ".") + ".",
                sbshown = this.widgets.sidebarButton.get("checked");
             window.localStorage[base + "pageNum"] = this.pageNum;
-            window.localStorage[base + "scale"] = this.documentView.currentScale;
+            window.localStorage[base + "scale"] = this.documentView.lastScale;
             window.localStorage[base + "sidebar-enabled"] = sbshown;
          }
       }
@@ -1616,7 +1616,7 @@
          // Render the content itself
          var renderContext = {
             canvasContext : ctx,
-            viewport : this.content.getViewport(this.parent.parseScale(this.parent.currentScale)),
+            viewport : this.content.getViewport(this.parent.currentScale),
             textLayer : this.textLayer
          };
          
@@ -1777,6 +1777,12 @@
        * @property activePage
        */
       activePage : null,
+      
+      /**
+       * Name of last scale to be auto-selected or selected by the user. This is the value which will be persisted when the
+       * document is unloaded and used to set up the same view the next time it is loaded.
+       */
+      lastScale : null,
 
       /**
        * Add a single page from a PDF document to this view
@@ -1995,6 +2001,7 @@
          var scale = parseFloat(value);
          if (scale)
          {
+            this.lastScale = value;
             return scale;
          }
 
@@ -2014,29 +2021,29 @@
             if ('page-width' == value)
             {
                var pageWidthScale = (clientWidth - hmargin * 2) / contentWidth;
-               return pageWidthScale;
+               scale = pageWidthScale;
              }
              else if ('two-page-width' == value)
             {
                var pageWidthScale = (clientWidth - hmargin * 3) / contentWidth;
-               return pageWidthScale / 2;
+               scale = pageWidthScale / 2;
              }
              else if ('page-height' == value)
             {
                var pageHeightScale = (clientHeight - vmargin * 2) / contentHeight;
-               return pageHeightScale;
+               scale = pageHeightScale;
              }
              else if ('page-fit' == value)
             {
                 var pageWidthScale = (clientWidth - hmargin*2) / contentWidth,
                    pageHeightScale = (clientHeight - vmargin*2) / contentHeight;
-               return Math.min(pageWidthScale, pageHeightScale);
+                scale = Math.min(pageWidthScale, pageHeightScale);
              }
              else if ('two-page-fit' == value)
             {
                 var pageWidthScale = (clientWidth - hmargin*3) / contentWidth,
                    pageHeightScale = (clientHeight - vmargin*2) / contentHeight;
-               return Math.min(pageWidthScale / 2, pageHeightScale);
+                scale = Math.min(pageWidthScale / 2, pageHeightScale);
              }
              else if ('auto' == value)
             {
@@ -2047,23 +2054,23 @@
                    minScale = this.config.autoMinScale;
                if (tpf > minScale && this.numPages > 1)
                {
-                  return tpf;
+                  scale = tpf;
                 }
                 else if (opf > minScale)
                {
-                  return opf;
+                   scale = opf;
                 }
                 else if (tpw > minScale && this.numPages > 1)
                {
-                  return tpw;
+                   scale = tpw;
                 }
                 else if (opw > minScale)
                {
-                  return opw;
+                   scale = opw;
                 }
                 else
                {
-                  return minScale;
+                   scale = minScale;
                }
              }
              else
@@ -2075,6 +2082,9 @@
          {
             throw "Unrecognised zoom level - no pages";
          }
+         
+         this.lastScale = value;
+         return scale;
       },
 
       /**
