@@ -1333,11 +1333,13 @@
          {
             Dom.addClass(this.wp.getPreviewerElement(), "fullPage");
             this.widgets.maximize.set("label", this.wp.msg("button.minimize"));
+            this.widgets.maximize.set("title", this.wp.msg("button.minimize.tip"));
           }
           else
          {
             Dom.removeClass(this.wp.getPreviewerElement(), "fullPage");
             this.widgets.maximize.set("label", this.wp.msg("button.maximize"));
+            this.widgets.maximize.set("title", this.wp.msg("button.maximize.tip"));
          }
 
          this._setPreviewerElementHeight();
