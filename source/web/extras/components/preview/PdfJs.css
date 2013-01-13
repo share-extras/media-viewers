@@ -212,7 +212,6 @@
 	float: left;
 	font-size: 0.9em;
 	text-align: left;
-	padding: 2px;
 }
 
 /* Causes Safari to add padding on RHS as well as LHS and seemingly not needed anyway */
@@ -228,7 +227,7 @@
 /* Need .yui-skin-default to ensure background is overridden from base CSS */
 .sidebar .yui-navset .yui-content {
 	background-color: transparent !important;
-	border-width: 1px !important;
+	border-width: 0px !important;
 	position: absolute !important;
 	top: 25px !important;
 	bottom: 0px !important;
@@ -313,7 +312,7 @@
 }
 
 .previewer.PdfJs .thumbnailView .page:last-child {
-	margin-bottom: 10px;
+	margin-bottom: 10px !important;
 }
 
 .sidebar .thumbnailView .page.highlighted {
