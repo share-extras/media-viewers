@@ -1436,15 +1436,18 @@
        */
       onRecalculatePreviewLayout : function PdfJs_onRecalculatePreviewLayout(p_obj)
       {
-         Alfresco.logger.debug("onRecalculatePreviewLayout");
-         this._setPreviewerElementHeight();
-         this._setViewerHeight();
-         // TODO viewerRegion should be populated by an event?
-         this.documentView.viewerRegion = Dom.getRegion(this.viewer);
-         // Now redefine the row margins
-         this.documentView.alignRows();
-         // Render any pages that have appeared
-         this.documentView.renderVisiblePages();
+         if (this.documentView)
+         {
+            Alfresco.logger.debug("onRecalculatePreviewLayout");
+            this._setPreviewerElementHeight();
+            this._setViewerHeight();
+            // TODO viewerRegion should be populated by an event?
+            this.documentView.viewerRegion = Dom.getRegion(this.viewer);
+            // Now redefine the row margins
+            this.documentView.alignRows();
+            // Render any pages that have appeared
+            this.documentView.renderVisiblePages();
+         }
          if (this.thumbnailView)
          {
             this.thumbnailView.renderVisiblePages();
@@ -1487,7 +1490,7 @@
        */
       onWindowUnload : function PdfJs_onWindowUnload()
       {
-         if (this.attributes.useLocalStorage == "true" && this._browserSupportsHtml5Storage())
+         if (this.attributes.useLocalStorage == "true" && this._browserSupportsHtml5Storage() && this.documentView)
          {
             var base = "org.sharextras.media-viewers.pdfjs.document." + this.wp.options.nodeRef.replace(":/", "").replace("/", ".") + ".",
                sbshown = this.widgets.sidebarButton.get("checked");
