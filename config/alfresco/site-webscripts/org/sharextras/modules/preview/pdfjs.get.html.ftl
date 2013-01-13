@@ -3,7 +3,7 @@
     <div id="${el}-controls" class="controls flat-button">
       
       <div class="sidebarBtn">
-          <button id="${el}-sidebarBtn">
+          <button id="${el}-sidebarBtn" disabled="disabled">
             <img src="${url.context}/res/extras/components/preview/pdfjs/images/sidebar-show-16.png" align="top" height="16" title="${msg("button.sidebar")}" />
           </button>
       </div>
@@ -25,14 +25,14 @@
 
       <div class="separator"></div>
       
-      <button id="${el}-zoomOut" title="${msg("button.zoomout")}">
+      <button id="${el}-zoomOut" title="${msg("button.zoomout")}" disabled="disabled">
         <img src="${url.context}/res/extras/components/preview/pdfjs/images/zoom-out.svg" align="top" height="16"/>
       </button>
-      <button id="${el}-zoomIn" title="${msg("button.zoomin")}">
+      <button id="${el}-zoomIn" title="${msg("button.zoomin")}" disabled="disabled">
         <img src="${url.context}/res/extras/components/preview/pdfjs/images/zoom-in.svg" align="top" height="16"/>
       </button>
 
-      <button id="${el}-scaleSelectBtn"></button>
+      <button id="${el}-scaleSelectBtn" disabled="disabled"></button>
       <select id="${el}-scaleSelect">
         <option value="0.25">25%</option>
         <option value="0.5">50%</option>
@@ -72,7 +72,7 @@
       <div class="separator"></div>
       
       <span class="searchBarToggle">
-         <button id="${el}-searchBarToggle">
+         <button id="${el}-searchBarToggle" disabled="disabled">
            <img src="${url.context}/res/components/images/search-16.png" align="top" height="16"/>
            ${msg("button.search")}
          </button>

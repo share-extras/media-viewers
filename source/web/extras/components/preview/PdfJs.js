@@ -59,6 +59,12 @@
       this.wp = wp;
       this.id = wp.id; // needed by Alfresco.util.createYUIButton
       this.attributes = YAHOO.lang.merge(Alfresco.util.deepCopy(this.attributes), attributes);
+      
+      /*
+       * Custom events
+       */
+      this.onPdfLoaded = new YAHOO.util.CustomEvent("pdfLoaded", this);
+      
       return this;
    };
 
@@ -413,15 +419,27 @@
          }
 
          // Set up toolbar
-         this.widgets.sidebarButton = Alfresco.util.createYUIButton(this, "sidebarBtn", this.onSidebarToggle, {type: "checkbox"});
-         this.widgets.nextButton = Alfresco.util.createYUIButton(this, "next", this.onPageNext);
-         this.widgets.previousButton = Alfresco.util.createYUIButton(this, "previous", this.onPagePrevious);
+         this.widgets.sidebarButton = Alfresco.util.createYUIButton(this, "sidebarBtn", this.onSidebarToggle, {
+            type: "checkbox",
+            disabled: true
+         });
+         this.widgets.nextButton = Alfresco.util.createYUIButton(this, "next", this.onPageNext, {
+            disabled: true
+         });
+         this.widgets.previousButton = Alfresco.util.createYUIButton(this, "previous", this.onPagePrevious, {
+            disabled: true
+         });
          Event.addListener(this.wp.id + "-pageNumber", "change", this.onPageChange, this, true);
-         this.widgets.zoomOutButton = Alfresco.util.createYUIButton(this, "zoomOut", this.onZoomOut);
-         this.widgets.zoomInButton = Alfresco.util.createYUIButton(this, "zoomIn", this.onZoomIn);
+         this.widgets.zoomOutButton = Alfresco.util.createYUIButton(this, "zoomOut", this.onZoomOut, {
+            disabled: true
+         });
+         this.widgets.zoomInButton = Alfresco.util.createYUIButton(this, "zoomIn", this.onZoomIn, {
+            disabled: true
+         });
          this.widgets.scaleMenu = new YAHOO.widget.Button(this.id + "-scaleSelectBtn", {
             type : "menu",
-            menu : this.id + "-scaleSelect"
+            menu : this.id + "-scaleSelect",
+            disabled: true
          });
          this.widgets.scaleMenu.getMenu().subscribe("click", this.onZoomChange, null, this);
          var downloadMenu = [
@@ -436,7 +454,9 @@
             menu : downloadMenu
          });
          this.widgets.maximize = Alfresco.util.createYUIButton(this, "fullpage", this.onMaximizeClick);
-         this.widgets.linkBn = Alfresco.util.createYUIButton(this, "link", this.onLinkClick, {type: "checkbox"});
+         this.widgets.linkBn = Alfresco.util.createYUIButton(this, "link", this.onLinkClick, {
+            type: "checkbox"
+         });
 
          // Set up search toolbar
          Event.addListener(this.wp.id + "-findInput", "change", this.onFindChange, this, true);
@@ -461,8 +481,17 @@
                });
          this.widgets.searchBarToggle = Alfresco.util.createYUIButton(this, "searchBarToggle", this.onToggleSearchBar,
                {
-                  type : "checkbox"
+                  type : "checkbox",
+                  disabled: true
                });
+         
+         // Enable sidebar, scale drop-down and search button when PDF is loaded
+         // Other buttons are enabled by custom functions
+         this.onPdfLoaded.subscribe(function onPdfLoadEnableButtons(p_type, p_args) {
+            this.widgets.sidebarButton.set("disabled", false);
+            this.widgets.scaleMenu.set("disabled", false);
+            this.widgets.searchBarToggle.set("disabled", false);
+         }, this, true);
 
          // Set height of the container and the viewer area
          this._setPreviewerElementHeight();
@@ -623,8 +652,7 @@
          }
 
          // Add the loading spinner to the viewer area
-         //Dom.addClass(this.viewer, "loading");
-         this.spinner = new Spinner({
+         var spinner = new Spinner({
             lines: 13, // The number of lines to draw
             length: 7, // The length of each line
             width: 4, // The line thickness
@@ -641,15 +669,29 @@
             top: 'auto', // Top position relative to parent in px
             left: 'auto' // Left position relative to parent in px
          }).spin(this.viewer);
+         
+         this.onPdfLoaded.subscribe(function onPdfLoadStopSpinner(p_type, p_args) {
+            spinner.stop();
+         }, this, true);
 
          // Set the worker source
-         PDFJS.workerSrc = Alfresco.constants.URL_CONTEXT + 'res/extras/components/preview/pdfjs/pdf' +  (Alfresco.constants.DEBUG ? '.js' : '-min.js'); 
+         PDFJS.workerSrc = Alfresco.constants.URL_CONTEXT + 'res/extras/components/preview/pdfjs/pdf' +  (Alfresco.constants.DEBUG ? '.js' : '-min.js');
+         
+         if (Alfresco.logger.isDebugEnabled())
+         {
+            Alfresco.logger.debug("Loading PDF file from " + fileurl);
+         }
 
          PDFJS.getDocument(fileurl).then(function(pdf) {
+            if (Alfresco.logger.isDebugEnabled())
+            {
+               Alfresco.logger.debug("PDF file loaded (" + pdf.numPages + " pages)");
+            }
             me.pdfDoc = pdf;
             me.numPages = me.pdfDoc.numPages;
             me._renderPdf.call(me);
             me._updatePageControls();
+            me.onPdfLoaded.fire(pdf);
          });
       },
 
@@ -694,10 +736,6 @@
                pagesRefMap[pageRef.num + ' ' + pageRef.gen + ' R'] = i;
             }
 
-            // Remove the loading spinner
-            //Dom.removeClass(this.viewer, "loading");
-            this.spinner.stop();
-
             this.documentView.render();
             // Scroll to the current page, this will force the visible content to render
             this.documentView.scrollTo(this.pageNum);
@@ -712,6 +750,7 @@
             this._updateZoomControls();
             Dom.get(this.wp.id + "-numPages").textContent = this.numPages;
             Dom.setAttribute(this.wp.id + "-pageNumber", "max", this.numPages);
+            Dom.setAttribute(this.wp.id + "-pageNumber", "disabled", this.numPages > 1 ? null : "disabled");
             Dom.get(this.wp.id + "-pageNumber").removeAttribute("disabled");
             
             // If the user clicked through to the document details from the search page, open
