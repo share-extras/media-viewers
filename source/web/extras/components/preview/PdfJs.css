@@ -194,7 +194,7 @@
 	padding: 0.25em 0 !important;
 }
 
-.yui-skin-default .yui-panel.linkDialog .ft, .yui-panel.searchDialog .ft {
+.yui-panel.linkDialog .ft, .yui-panel.searchDialog .ft {
 	border-top: none;
 	padding: 0;
 }
