@@ -230,28 +230,6 @@
       maximized : false,
 
       /**
-       * Counter for pages area scroll events - incremented on event, decremented some time later. Rendering will occur only when counter reaches zero.
-       * 
-       * TODO Move this property into the DocumentView class
-       * 
-       * @property renderOnScrollZero
-       * @type int
-       * @default 0
-       */
-      renderOnScrollZero : 0,
-
-      /**
-       * Counter for thumbnail area scroll events - incremented on event, decremented some time later
-       * 
-       * TODO Move this property into the DocumentView class
-       * 
-       * @property renderOnThumbnailsScrollZero
-       * @type int
-       * @default 0
-       */
-      renderOnThumbnailsScrollZero : 0,
-
-      /**
        * Stored configuration for this particular document, including page number and zoom level. Persisted to local browser storage.
        * 
        * @property documentConfig
@@ -408,10 +386,6 @@
          this.pageNumber = Dom.get(this.wp.id + "-pageNumber");
          this.sidebar = Dom.get(this.wp.id + "-sidebar");
          this.viewer = Dom.get(this.wp.id + "-viewer");
-         Event.addListener(this.viewer, "scroll", function (e) {
-            this.renderOnScrollZero++;
-            YAHOO.lang.later(500, this, this.onViewerScroll);
-         }, this, true);
 
          // Set up viewer
          if (this.attributes.pageLayout == "multi")
@@ -717,6 +691,7 @@
          {
             var self = this;
             this.documentView = new DocumentView(this.id + "-viewer", {
+               name: "documentView",
                pageLayout : this.attributes.pageLayout,
                currentScale : K_UNKNOWN_SCALE,
                defaultScale : this.documentConfig.scale ? this.documentConfig.scale : this.attributes.defaultScale,
@@ -724,6 +699,15 @@
                autoMinScale : parseFloat(this.attributes.autoMinScale),
                pdfJsPlugin : self
             });
+            this.documentView.onScrollChange.subscribe(function onDocumentViewScroll() {
+               var newPn = this.documentView.getScrolledPageNumber();
+               if (this.pageNum != newPn)
+               {
+                  this.pageNum = newPn;
+                  this._updatePageControls();
+               }
+            }, this, true);
+            
             // Defer rendering
             this.thumbnailView = null
 
@@ -744,7 +728,8 @@
             // Enable the sidebar
             if (this.documentConfig.sidebarEnabled)
             {
-               this.widgets.sidebarButton.set("checked", true);
+               // WA Disabled for now since rendering the same page in two places at once causes the second render to never complete
+               //this.widgets.sidebarButton.set("checked", true);
             }
 
             // Update toolbar
@@ -985,10 +970,11 @@
             if (!this.thumbnailView)
             {
                this.thumbnailView = new DocumentView(this.id + "-thumbnailView", {
+                  name: "thumbnailView",
                   pageLayout : "single",
                   defaultScale : "page-width",
                   disableTextLayer : true,
-                  pdfJsPlugin : self
+                  pdfJsPlugin : this
                });
                this.thumbnailView.addPages(this.pages);
             }
@@ -1019,10 +1005,6 @@
              // Scroll to the current page, this will force the visible content to render
             this.thumbnailView.scrollTo(this.pageNum);
             this.thumbnailView.setActivePage(this.pageNum);
-             YAHOO.util.Event.addListener(this.id + "-thumbnailView", "scroll", function (e) {
-               this.renderOnThumbnailsScrollZero++;
-               YAHOO.lang.later(500, this, this.onThumbnailsScroll);
-            }, this, true);
          }
       },
 
@@ -1273,43 +1255,6 @@
             findPrevious : findPrevious
          });
          window.dispatchEvent(event);
-      },
-
-      /**
-       * Event handler for scroll event within the page view area
-       * 
-       * @method onViewerScroll
-       */
-      onViewerScroll : function PdfJs_onViewerScroll(e_obj)
-      {
-         this.renderOnScrollZero--;
-         if (this.renderOnScrollZero == 0)
-         {
-            // Render visible pages
-            this.documentView.renderVisiblePages();
-
-            var newPn = this.documentView.getScrolledPageNumber();
-            if (this.pageNum != newPn)
-            {
-               this.pageNum = newPn;
-               this._updatePageControls();
-            }
-         }
-      },
-
-      /**
-       * Event handler for scroll event within the thumbnail area
-       * 
-       * @method onThumbnailsScroll
-       */
-      onThumbnailsScroll : function PdfJs_onThumbnailsScroll(e_obj)
-      {
-         this.renderOnThumbnailsScrollZero--;
-         if (this.renderOnThumbnailsScrollZero == 0)
-         {
-            // Render visible pages
-            this.thumbnailView.renderVisiblePages();
-         }
       },
 
       /**
@@ -1661,28 +1606,31 @@
             textLayer : this.textLayer
          };
          
-         var self = this, startTime = 0;
+         var startTime = 0;
          
          if (Alfresco.logger.isDebugEnabled())
          {
             startTime = new Date().getTime();
          }
          
-         content.render(renderContext).then(function()
-         {
+         var renderFn = Alfresco.util.bind(function renderPageFn() {
+
             // Hide the loading icon and make the canvas visible again
-            if (self.loadingIconDiv)
+            if (this.loadingIconDiv)
             {
-               Dom.setStyle(self.loadingIconDiv, "display", "none");
+               Dom.setStyle(this.loadingIconDiv, "display", "none");
             }
-            Dom.setStyle(self.canvas, "visibility", "visible");
+            Dom.setStyle(this.canvas, "visibility", "visible");
             
             // Log time taken to draw the page
             if (Alfresco.logger.isDebugEnabled())
             {
-               Alfresco.logger.debug("Rendered page " + self.id + " in " + (new Date().getTime() - startTime) + "ms");
+               Alfresco.logger.debug("Rendered " + this.parent.name + " page " + this.id + " in " + (new Date().getTime() - startTime) + "ms");
             }
-         });
+            
+         }, this);
+         
+         content.render(renderContext).then(renderFn);
          
          if (self.textLayer)
          {
@@ -1800,6 +1748,7 @@
       this.viewer = Dom.get(elId);
       this.viewerRegion = Dom.getRegion(this.viewer);
       this.currentScale = config.currentScale || K_UNKNOWN_SCALE;
+      this.name = this.config.name || "";
       this.pdfJsPlugin = config.pdfJsPlugin;
 
       // Used for setupRenderLayoutTimer in TextLayerbuilder
@@ -1811,6 +1760,16 @@
       }, false);
       
       this.pdfJsPlugin.onResize.subscribe(this.onResize, this, true);
+      
+      Event.addListener(this.viewer, "scroll", function (e) {
+         this.renderOnScrollZero++;
+         YAHOO.lang.later(500, this, this.onScroll);
+      }, this, true);
+      
+      /*
+       * Custom events generated by this component
+       */
+      this.onScrollChange = new YAHOO.util.CustomEvent("scrollChange", this);
    }
 
    DocumentView.prototype = {
@@ -1826,6 +1785,15 @@
        * document is unloaded and used to set up the same view the next time it is loaded.
        */
       lastScale : null,
+
+      /**
+       * Counter for viewer scroll events - incremented on event, decremented some time later. Rendering will occur only when counter reaches zero.
+       * 
+       * @property renderOnScrollZero
+       * @type int
+       * @default 0
+       */
+      renderOnScrollZero : 0,
 
       /**
        * Add a single page from a PDF document to this view
@@ -1864,7 +1832,7 @@
          {
             if (Alfresco.logger.isDebugEnabled())
             {
-               Alfresco.logger.debug("Rendering page container " + (i+1));
+               Alfresco.logger.debug("Rendering " + this.name + " page container " + (i+1));
             }
             this.pages[i].render();
          }
@@ -1940,7 +1908,7 @@
          
          if (Alfresco.logger.isDebugEnabled())
          {
-            Alfresco.logger.debug("Render visible pages: viewer height " + this.viewerRegion.height + "px");
+            Alfresco.logger.debug("Render " + this.name + " visible pages: viewer height " + this.viewerRegion.height + "px");
          }
 
          // Render visible pages
@@ -1961,7 +1929,7 @@
             {
                if (Alfresco.logger.isDebugEnabled())
                {
-                  Alfresco.logger.debug("Rendering page " + (i+1) + " content (page top:" + top + ", bottom:" + bottom + ")");
+                  Alfresco.logger.debug("Rendering " + this.name + " page " + (i+1) + " content (page top:" + top + ", bottom:" + bottom + ")");
                }
                page.renderContent();
             }
@@ -1981,9 +1949,9 @@
 
          if (Alfresco.logger.isDebugEnabled())
          {
-            Alfresco.logger.debug("Scrolling to page " + n);
-            Alfresco.logger.debug("New page top is " + newPos + "px");
-            Alfresco.logger.debug("First page top is " + firstPos + "px");
+            Alfresco.logger.debug("Scrolling " + this.name + " to page " + n + 
+                  ". New page top is " + newPos + "px" + 
+                  ". First page top is " + firstPos + "px");
          }
 
          var scrollTop = newPos - firstPos;
@@ -2170,6 +2138,23 @@
       {
          // TODO viewerRegion should be populated by an event?
          this.viewerRegion = Dom.getRegion(this.viewer);
+      },
+
+      /**
+       * Event handler for scroll event within the view area
+       * 
+       * @method onScroll
+       */
+      onScroll : function PdfJs_onViewerScroll(e_obj)
+      {
+         this.renderOnScrollZero--;
+         if (this.renderOnScrollZero == 0)
+         {
+            // Render visible pages
+            this.renderVisiblePages();
+            // Fire custom event
+            this.onScrollChange.fire(this);
+         }
       }
    }
 
