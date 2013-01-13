@@ -1798,6 +1798,7 @@
       this.config = config || {};
       this.pages = [];
       this.viewer = Dom.get(elId);
+      this.viewerRegion = Dom.getRegion(this.viewer);
       this.currentScale = config.currentScale || K_UNKNOWN_SCALE;
       this.pdfJsPlugin = config.pdfJsPlugin;
 
@@ -1932,13 +1933,14 @@
        */
       renderVisiblePages : function DocumentView_renderVisiblePages()
       {
-         var viewerRegion = Dom.getRegion(this.viewer);
+         // region may not be populated properly if the div was hidden
+         this.viewerRegion = Dom.getRegion(this.viewer);
          
-         var vheight = viewerRegion.height, vtop = viewerRegion.top;
+         var vheight = this.viewerRegion.height, vtop = this.viewerRegion.top;
          
          if (Alfresco.logger.isDebugEnabled())
          {
-            Alfresco.logger.debug("Render visible pages: viewer height " + viewerRegion.height + "px");
+            Alfresco.logger.debug("Render visible pages: viewer height " + this.viewerRegion.height + "px");
          }
 
          // Render visible pages
@@ -2166,6 +2168,8 @@
       
       onResize: function onResize()
       {
+         // TODO viewerRegion should be populated by an event?
+         this.viewerRegion = Dom.getRegion(this.viewer);
       }
    }
 
