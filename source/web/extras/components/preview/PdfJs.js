@@ -618,8 +618,12 @@
        */
       _loadPdf : function PdfJs__loadPdf()
       {
+         // Workaround for ALF-17458
+         this.wp.options.name = this.wp.options.name.replace(/[^\w_\-\. ]/g, "");
+         
          var me = this, fileurl = this.attributes.src ? this.wp.getThumbnailUrl(this.attributes.src) : this.wp
                .getContentUrl();
+         
          // Add the full protocol + host as pdf.js require this
          if (fileurl.substr(0, 4).toLowerCase() !== 'http')
          {
