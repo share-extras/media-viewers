@@ -51,7 +51,7 @@
 
       <div class="separator"></div>
       
-      <button id="${el}-fullpage">
+      <button id="${el}-fullpage" title="${msg("button.maximize.tip")}">
         <img src="${url.context}/res/components/documentlibrary/actions/default-16.png" align="top" height="16"/>
         ${msg("button.maximize")}
       </button>
