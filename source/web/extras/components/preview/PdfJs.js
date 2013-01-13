@@ -1169,6 +1169,15 @@
                underlay: "none"
             });
             this.widgets.searchDialog.render();
+            
+            new YAHOO.util.KeyListener(Dom.get(this.id + "-searchDialog"), { keys: 27 }, { // escape
+               fn: function (e) {
+                  Event.stopEvent(e);
+                  this.widgets.searchBarToggle.set("checked", false);
+               },
+               scope : this,
+               correctScope : true
+            }).enable();
          }
          
          if (e_obj.newValue === true)
@@ -1389,6 +1398,15 @@
             });
             var slideurl = window.location.href.replace(window.location.hash, "") + "#page=" + this.pageNum;
             linkDialog.render();
+
+            new YAHOO.util.KeyListener(Dom.get(dialogid), { keys: 27 }, { // escape
+               fn: function (e) {
+                  Event.stopEvent(e);
+                  this.widgets.linkBn.set("checked", false);
+               },
+               scope : this,
+               correctScope : true
+            }).enable();
 
             var linkDialogBg = new YAHOO.widget.ButtonGroup(dialogid + "-bg");
             for ( var i = 0; i < linkDialogBg.getCount(); i++)
