@@ -515,18 +515,8 @@
                scope : this,
                correctScope : true
             }).enable();
-            new YAHOO.util.KeyListener(document, { keys: 70 }, { // Cmd+F
-               fn : findShortcutHandler,
-               scope : this,
-               correctScope : true
-            }).enable();
             new YAHOO.util.KeyListener(document, { keys: 70, ctrl: true }, { // Ctrl+F
                fn : findShortcutHandler,
-               scope : this,
-               correctScope : true
-            }).enable();
-            new YAHOO.util.KeyListener(document, { keys: 13 }, { // Cmd+Enter
-               fn : fullscreenShortcutHandler,
                scope : this,
                correctScope : true
             }).enable();
@@ -535,6 +525,21 @@
                scope : this,
                correctScope : true
             }).enable();
+            
+            if (YAHOO.env.ua.os == "macintosh")
+            {
+               new YAHOO.util.KeyListener(document, { keys: 13 }, { // Cmd+Enter
+                  fn : fullscreenShortcutHandler,
+                  scope : this,
+                  correctScope : true
+               }).enable();
+               new YAHOO.util.KeyListener(document, { keys: 70 }, { // Cmd+F
+                  fn : findShortcutHandler,
+                  scope : this,
+                  correctScope : true
+               }).enable();
+            }
+            
             Event.addListener(window, "fullscreenchange", this.onFullScreenChange, this, true);
             Event.addListener(window, "mozfullscreenchange", this.onFullScreenChange, this, true);
             Event.addListener(window, "webkitfullscreenchange", this.onFullScreenChange, this, true);
