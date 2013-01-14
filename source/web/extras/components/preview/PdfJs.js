@@ -1191,6 +1191,7 @@
          if (e_obj.newValue === true)
          {
             this.widgets.searchDialog.show();
+            this.widgets.searchDialog.bringToTop();
             //Set focus on input box
             var iel = Dom.get(this.wp.id + "-findInput");
             iel.focus();
@@ -1457,6 +1458,7 @@
          if (!this.widgets.linkDialog.cfg.getProperty("visible"))
          {
             this.widgets.linkDialog.show();
+            this.widgets.linkDialog.bringToTop();
             fnSelectLink.call(this);
           }
           else
