@@ -1380,6 +1380,16 @@
          {
             this.thumbnailView.renderVisiblePages();
          }
+         
+         // Re-align the dialogs to the viewer
+         if (this.widgets.searchDialog)
+         {
+            this.widgets.searchDialog.align("tr", "tr");
+         }
+         if (this.widgets.linkDialog)
+         {
+            this.widgets.linkDialog.align("tr", "tr");
+         }
       },
 
       /**
