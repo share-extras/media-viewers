@@ -4,7 +4,7 @@
       
       <div class="sidebarBtn">
           <button id="${el}-sidebarBtn" disabled="disabled">
-            <img src="${url.context}/res/extras/components/preview/pdfjs/images/sidebar-show-16.png" align="top" height="16" title="${msg("button.sidebar")}" />
+            <img src="${url.context}/res/extras/components/preview/images/sidebar-show-16.png" align="top" height="16" title="${msg("button.sidebar")}" />
           </button>
       </div>
 
@@ -26,10 +26,10 @@
       <div class="separator"></div>
       
       <button id="${el}-zoomOut" title="${msg("button.zoomout")}" disabled="disabled">
-        <img src="${url.context}/res/extras/components/preview/pdfjs/images/zoom-out.svg" align="top" height="16"/>
+        <img src="${url.context}/res/extras/components/preview/images/zoom-out.svg" align="top" height="16"/>
       </button>
       <button id="${el}-zoomIn" title="${msg("button.zoomin")}" disabled="disabled">
-        <img src="${url.context}/res/extras/components/preview/pdfjs/images/zoom-in.svg" align="top" height="16"/>
+        <img src="${url.context}/res/extras/components/preview/images/zoom-in.svg" align="top" height="16"/>
       </button>
 
       <button id="${el}-scaleSelectBtn" disabled="disabled"></button>
@@ -125,8 +125,8 @@
     <div id="${el}-sidebar" class="sidebar">
         <div id="${el}-sidebarTabView" class="yui-navset">
             <ul class="yui-nav">
-                <li class="selected"><a href="#${el}-thumbnailView"><em><img src="${url.context}/res/extras/components/preview/pdfjs/images/thumbnail-view-16.png" height="16" /></em></a></li>
-                <li><a href="#${el}-outlineView"><em><img src="${url.context}/res/extras/components/preview/pdfjs/images/outline-view-16.png" height="16" /></em></a></li>
+                <li class="selected"><a href="#${el}-thumbnailView"><em><img src="${url.context}/res/extras/components/preview/images/thumbnail-view-16.png" height="16" /></em></a></li>
+                <li><a href="#${el}-outlineView"><em><img src="${url.context}/res/extras/components/preview/images/outline-view-16.png" height="16" /></em></a></li>
             </ul>
             <div class="yui-content">
                 <div id="${el}-thumbnailView" class="thumbnailView documentView"></div>
