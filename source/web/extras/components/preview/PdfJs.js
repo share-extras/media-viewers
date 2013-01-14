@@ -1254,10 +1254,20 @@
             eventid += 'casesensitivitychange';
             break;
          default:
-            // Set inactive for find event, this will trigger a fresh search
-            // this.pdfFindController.active = false;
-            break;
+            if (query === this.lastSearchQuery)
+            {
+               eventid += 'again';
+               break;
+            }
+            else
+            {
+               // Set inactive for find event, this will trigger a fresh search
+               // this.pdfFindController.active = false;
+               break;
+            }
          }
+         
+         this.lastSearchQuery = query;
 
          // PDFFindController has its own event handling, so for now use that
          // instead of yahoo.bubbling
