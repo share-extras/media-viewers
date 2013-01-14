@@ -428,7 +428,10 @@
             type : "menu",
             menu : downloadMenu
          });
-         this.widgets.maximize = Alfresco.util.createYUIButton(this, "fullpage", this.onMaximizeClick);
+         this.widgets.maximize = Alfresco.util.createYUIButton(this, "fullpage", this.onMaximizeClick, {
+            title: this.wp.msg("button.maximize.tip", 
+                  YAHOO.env.ua.os == "macintosh" ? this.wp.msg("key.meta") : this.wp.msg("key.ctrl"))
+         });
          this.widgets.linkBn = Alfresco.util.createYUIButton(this, "link", this.onLinkClick, {
             type: "checkbox"
          });
@@ -455,10 +458,12 @@
                   type : "checkbox"
                });
          this.widgets.searchBarToggle = Alfresco.util.createYUIButton(this, "searchBarToggle", this.onToggleSearchBar,
-               {
-                  type : "checkbox",
-                  disabled: true
-               });
+         {
+            type : "checkbox",
+            disabled: true,
+            title: this.wp.msg("button.search.tip", 
+                  YAHOO.env.ua.os == "macintosh" ? this.wp.msg("key.meta") : this.wp.msg("key.ctrl"))
+         });
          
          // Enable sidebar, scale drop-down and search button when PDF is loaded
          // Other buttons are enabled by custom functions
@@ -482,6 +487,24 @@
          // Keyboard shortcuts
          if (!this.inWikiPage && !this.inDashlet)
          {
+            var findShortcutHandler = function findShortcutHandler(type, args) {
+               var e = args[1];
+               if ((e.ctrlKey || e.metaKey) && this.widgets.searchBarToggle)
+               {
+                  Event.stopEvent(e);
+                  e.newValue = (!this.widgets.searchDialog || !this.widgets.searchDialog.cfg.getProperty("visible"));
+                  this.widgets.searchBarToggle.set("checked", !this.widgets.searchBarToggle.get("checked"));
+               }
+            }
+            var fullscreenShortcutHandler = function fullscreenShortcutHandler(type, args) {
+               var e = args[1];
+               if (e.ctrlKey || e.metaKey)
+               {
+                  Event.stopEvent(e);
+                  this.onFullScreen(e);
+               }
+            }
+            
             new YAHOO.util.KeyListener(document, { keys: 37 }, { // left arrow
                fn : this.onPagePrevious,
                scope : this,
@@ -492,8 +515,23 @@
                scope : this,
                correctScope : true
             }).enable();
+            new YAHOO.util.KeyListener(document, { keys: 70 }, { // Cmd+F
+               fn : findShortcutHandler,
+               scope : this,
+               correctScope : true
+            }).enable();
             new YAHOO.util.KeyListener(document, { keys: 70, ctrl: true }, { // Ctrl+F
-               fn : this.onFullScreen,
+               fn : findShortcutHandler,
+               scope : this,
+               correctScope : true
+            }).enable();
+            new YAHOO.util.KeyListener(document, { keys: 13 }, { // Cmd+Enter
+               fn : fullscreenShortcutHandler,
+               scope : this,
+               correctScope : true
+            }).enable();
+            new YAHOO.util.KeyListener(document, { keys: 13, ctrl: true }, { // Ctrl+Enter
+               fn : fullscreenShortcutHandler,
                scope : this,
                correctScope : true
             }).enable();
