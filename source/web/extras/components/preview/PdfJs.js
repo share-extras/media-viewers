@@ -1175,9 +1175,13 @@
             this.widgets.searchDialog.render();
             
             new YAHOO.util.KeyListener(Dom.get(this.id + "-searchDialog"), { keys: 27 }, { // escape
-               fn: function (e) {
-                  Event.stopEvent(e);
-                  this.widgets.searchBarToggle.set("checked", false);
+               fn: function (type, args) {
+                  if (this.widgets.searchBarToggle.get("checked"))
+                  {
+                     var e = args[1];
+                     Event.stopEvent(e);
+                     this.widgets.searchBarToggle.set("checked", false);
+                  }
                },
                scope : this,
                correctScope : true
@@ -1414,9 +1418,13 @@
             linkDialog.render();
 
             new YAHOO.util.KeyListener(Dom.get(dialogid), { keys: 27 }, { // escape
-               fn: function (e) {
-                  Event.stopEvent(e);
-                  this.widgets.linkBn.set("checked", false);
+               fn: function (type, args) {
+                  if (this.widgets.linkBn.get("checked"))
+                  {
+                     var e = args[1];
+                     Event.stopEvent(e);
+                     this.widgets.linkBn.set("checked", false);
+                  }
                },
                scope : this,
                correctScope : true
