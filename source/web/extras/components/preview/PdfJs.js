@@ -48,6 +48,11 @@
       Element = YAHOO.util.Element;
 
    /**
+    * Alfresco Slingshot aliases
+    */
+   var $html = Alfresco.util.encodeHTML;
+
+   /**
     * PdfJs plug-in constructor
     * 
     * @constructor
@@ -659,7 +664,7 @@
        * @method _loadPdf
        * @private
        */
-      _loadPdf : function PdfJs__loadPdf()
+      _loadPdf : function PdfJs__loadPdf(params)
       {
          // Workaround for ALF-17458
          this.wp.options.name = this.wp.options.name.replace(/[^\w_\-\. ]/g, "");
@@ -673,8 +678,11 @@
             fileurl = window.location.protocol + '//' + window.location.host + fileurl;
          }
 
+         params = params || {};
+         params.url = fileurl;
+
          // Add the loading spinner to the viewer area
-         var spinner = new Spinner({
+         this.spinner = new Spinner({
             lines: 13, // The number of lines to draw
             length: 7, // The length of each line
             width: 4, // The line thickness
@@ -693,7 +701,7 @@
          }).spin(this.viewer);
          
          this.onPdfLoaded.subscribe(function onPdfLoadStopSpinner(p_type, p_args) {
-            spinner.stop();
+            this.spinner.stop();
          }, this, true);
 
          // Set the worker source
@@ -704,17 +712,118 @@
             Alfresco.logger.debug("Loading PDF file from " + fileurl);
          }
 
-         PDFJS.getDocument(fileurl).then(function(pdf) {
-            if (Alfresco.logger.isDebugEnabled())
-            {
-               Alfresco.logger.debug("PDF file loaded (" + pdf.numPages + " pages)");
+         PDFJS.getDocument(params).then
+         (
+            Alfresco.util.bind(this._onGetDocumentSuccess, this),
+            Alfresco.util.bind(this._onGetDocumentFailure, this),
+            Alfresco.util.bind(this._onGetDocumentProgress, this)
+         );
+      },
+      
+      /**
+       * PDF document retieved successfully
+       * 
+       * @function _onGetDocumentSuccess
+       * @private
+       */
+      _onGetDocumentSuccess: function PdfJs__onGetDocumentSuccess(pdf)
+      {
+         this.pdfDoc = pdf;
+         this.numPages = this.pdfDoc.numPages;
+         this._renderPdf();
+         this._updatePageControls();
+         this.onPdfLoaded.fire(pdf);
+      },
+
+      /**
+       * Error encountered retrieving PDF document
+       * 
+       * @function _onGetDocumentFailure
+       * @private
+       */
+      _onGetDocumentFailure: function PdfJs__onGetDocumentFailure(message, exception)
+      {
+         this.spinner.stop();
+         if (exception && exception.name === 'PasswordException') {
+            var textMsgId = 'prompt.password.text';
+            if (exception.code === 'incorrectpassword') {
+               textMsgId = 'error.incorrectpassword';
             }
-            me.pdfDoc = pdf;
-            me.numPages = me.pdfDoc.numPages;
-            me._renderPdf.call(me);
-            me._updatePageControls();
-            me.onPdfLoaded.fire(pdf);
+            if (exception.code === 'needpassword' || exception.code === 'incorrectpassword') {
+               var me = this, id = Alfresco.util.generateDomId(),
+                  submitPassword = Alfresco.util.bind(function(password) {
+                     if (password && password.length > 0)
+                     {
+                        this._loadPdf({
+                           password: password
+                        });
+                     }
+                  }, this),
+                  prompt = Alfresco.util.PopupManager.getUserInput({
+                     title: this.wp.msg('prompt.password.title'),
+                     html: '<label for="' + id + '">' + $html(this.wp.msg(textMsgId)) + '</label><br/><br/><input id="' + id + '" tabindex="0" type="password" value=""/>',
+                     buttons: [
+                         {
+                            text: Alfresco.util.message("button.ok", this.name),
+                            handler: function PdfJs__onGetDocumentFailure_okClick() {
+                               // Grab the input, destroy the pop-up, then callback with the value
+                               submitPassword(Dom.get(id).value);
+                               this.destroy();
+                            },
+                            isDefault: true
+                         },
+                         {
+                            text: Alfresco.util.message("button.cancel", this.name),
+                            handler: function PdfJs__onGetDocumentFailure_cancelClick() {
+                               this.destroy();
+                            }
+                         }
+                      ]
+                  }),
+                  okButton = prompt.getButtons()[0];
+               // Enable OK button when value typed
+               YAHOO.util.Event.addListener(id, "keyup", function(event, okButton) {
+                  if (okButton != null)
+                  {
+                     okButton.set("disabled", YAHOO.lang.trim(this.value || this.text || "").length == 0);
+                  }
+               }, okButton);
+               // Enter key listener
+               new YAHOO.util.KeyListener(id, {
+                  keys: [ YAHOO.util.KeyListener.KEY.ENTER ]
+               }, function onPasswordEnter(e) {
+                  submitPassword(Dom.get(id).value);
+                  prompt.destroy();
+               }).enable();
+               // Focus the input element
+               if (Dom.get(id))
+               {
+                  Dom.get(id).focus();
+               }
+               return;
+            }
+         }
+         var loadingErrorMessage = this.wp.msg('error.pdfload');
+         if (exception && exception.name === 'InvalidPDFException') {
+            // change error message also for other builds
+            loadingErrorMessage = this.wp.msg('error.invalidpdf');
+         }
+         Alfresco.util.PopupManager.displayMessage({
+            text: loadingErrorMessage
          });
+         Alfresco.logger.error("Could not load PDF due to error " + exception.name + " (code " + exception.code + "): " + message);
+      },
+
+      /**
+       * Notifications of progress receiving the PDF document. Not currently used.
+       * 
+       * @function _onGetDocumentProgress
+       * @private
+       */
+      _onGetDocumentProgress: function PdfJs__onGetDocumentProgress(progressData)
+      {
+         // Do nothing
+         //this.progress(progressData.loaded / progressData.total);
       },
 
       /**
