@@ -176,9 +176,15 @@
 	color: black;
 }
 
-/* Hide the link button in the dashlet, as the panel CSS is broken */
-.body .previewer.PdfJs .controls .linkbutton {
-	display: none;
+/* Hide the link and search buttons in the dashlet, as the panel CSS is broken */
+.body .previewer.PdfJs .controls .linkbutton,
+.body .previewer.PdfJs .controls .searchBarToggle {
+   display: none;
+}
+
+/* Hide the Maximize in the dashlet, since this suffers from z-index issues at present */
+.body .previewer.PdfJs .controls .maximizebutton {
+   display: none;
 }
 
 .linkDialog, .searchDialog {

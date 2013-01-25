@@ -51,12 +51,14 @@
 
       <div class="separator"></div>
       
-      <button id="${el}-fullpage" title="">
-        <img src="${url.context}/res/components/documentlibrary/actions/default-16.png" align="top" height="16"/>
-        ${msg("button.maximize")}
-      </button>
+      <span class="maximizebutton">
+         <button id="${el}-fullpage" title="">
+           <img src="${url.context}/res/components/documentlibrary/actions/default-16.png" align="top" height="16"/>
+           ${msg("button.maximize")}
+         </button>
 
-      <div class="separator"></div>
+         <div class="separator"></div>
+      </span>
 
       <button id="${el}-download" title="${msg("button.download")}">
         <img src="${url.context}/res/components/documentlibrary/actions/document-download-16.png" align="top" height="16"/>
@@ -69,9 +71,9 @@
          </button>
       </span>
       
-      <div class="separator"></div>
-      
       <span class="searchBarToggle">
+         <div class="separator"></div>
+         
          <button id="${el}-searchBarToggle" disabled="disabled">
            <img src="${url.context}/res/components/images/search-16.png" align="top" height="16"/>
            ${msg("button.search")}
