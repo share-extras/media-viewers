@@ -134,6 +134,15 @@
          autoMinScale : "0.7",
 
          /**
+          * Maximum scale level to use when auto-scaling a document
+          * 
+          * @property autoMaxScale
+          * @type String
+          * @default "1.25"
+          */
+         autoMaxScale : "1.25",
+
+         /**
           * Layout to use to display pages, "single" (one page per row) or "multi" (multiple pages per row)
           * 
           * @property pageLayout
@@ -853,6 +862,7 @@
                defaultScale : this.documentConfig.scale ? this.documentConfig.scale : this.attributes.defaultScale,
                disableTextLayer : this.attributes.disableTextLayer == "true",
                autoMinScale : parseFloat(this.attributes.autoMinScale),
+               autoMaxScale : parseFloat(this.attributes.autoMaxScale),
                pdfJsPlugin : self
             });
             this.documentView.onScrollChange.subscribe(function onDocumentViewScroll() {
@@ -2269,7 +2279,8 @@
                    opf = this.parseScale("page-fit"),
                    opw = this.parseScale("page-width"),
                    tpw = this.parseScale("two-page-width"),
-                   minScale = this.config.autoMinScale;
+                   minScale = this.config.autoMinScale,
+                   maxScale = this.config.autoMaxScale;
                if (tpf > minScale && this.numPages > 1)
                {
                   scale = tpf;
@@ -2289,6 +2300,12 @@
                 else
                {
                    scale = minScale;
+               }
+               // Make sure that the page is not zoomed in *too* far. 
+               // A limit of 125% max zoom is the default for the main view.
+               if (maxScale)
+               {
+                  scale = Math.min(scale, maxScale);
                }
              }
              else
