@@ -51,6 +51,11 @@
 	font-size: 0.9em;
 }
 
+/* Hide top border in the dashlet, since this has a border of its own already */
+.body .previewer.PdfJs .controls {
+   border-top: 0px;
+}
+
 .previewer.PdfJs .controls .separator {
 	display: inline;
 	border-left: 1px solid #d3d3d3;
