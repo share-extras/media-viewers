@@ -225,51 +225,75 @@
                  {
                     fn: function VideoWidget__createFromHTML_success(p_response, p_obj)
                     {
-                       var addHeadResources = function(markup, fn) {
-                          var numloadedObj = { numLoaded: 0 };
-                          var hd = document.getElementsByTagName("head")[0];
-                          var scripts = [];
-                          var script = null;
-                          var stylesheet = null;
-                          var css = [];
-                          var csstext = null;
-                          var scriptsregexp = /<script[^>]*src="([\s\S]*?)"[^>]*><\/script>/gi;
+                       // Counter to keep track of how many scripts have loaded, since they load async
+                       var numLoaded = 0,
+                          hd = document.getElementsByTagName("head")[0],
+                          scripts = [];
+                       
+                       // We need to convert all ids used in the mark-up to ensure that these are unique, since we may well
+                       // have multiple instances of this dashlet on the page.
+                       var phtml = p_response.serverResponse.responseText.replace(/template_x002e_web-preview/g, p_response.config.object.elId),
+                          result = Alfresco.util.Ajax.sanitizeMarkup(phtml);
+
+                       // Following code borrowed from Alfresco.util.Ajax._successHandler
+                       var onloadedfn = function onloadedfn()
+                       {
+                          // result[1] contains all the JS code provided by in-line scripts as a string
+                          var scripts = result[1];
+                          if (YAHOO.lang.trim(scripts).length > 0)
+                          {
+                             Alfresco.logger.debug("Executing script payload");
+                             // Use setTimeout to execute the script, supplying the code as a string
+                             // Note scope will always be "window"
+                             window.setTimeout(scripts, 0);
+                             // Delay-call the PostExec function to continue response processing after the setTimeout above
+                             YAHOO.lang.later(0, this, function() {
+                                Alfresco.util.YUILoaderHelper.loadComponents();
+                             }, p_response.serverResponse);
+                          }
+                       };
+                       
+                       var addScript = function addScript(script, onloadfn)
+                       {
+                          var scriptEl=document.createElement('script');
+                          scriptEl.setAttribute("type", "text/javascript");
+                          scriptEl.setAttribute("src", script);
+                          Event.addListener(scriptEl, "load", onloadfn, null, this);
+                          hd.appendChild(scriptEl);
+                          if (Alfresco.logger.isDebugEnabled())
+                             Alfresco.logger.debug("Adding JS script " + script);
+                       };
+
+                       // Load handler for the scripts. This makes sure that the 'done' handler passed in as 'fn' is only executed when all dependencies have loaded
+                       var loadfn = function loadfn(e, obj)
+                       {
+                          if (Alfresco.logger.isDebugEnabled())
+                             Alfresco.logger.debug("Loaded script " + Dom.getAttribute(e.currentTarget, "src"));
+                          numLoaded ++;
+                          if (scripts.length == numLoaded) {
+                             onloadedfn.call(this);
+                          }
+                       };
+                       
+                       var addHeadResources = function addHeadResources(markup, fn)
+                       {
+                          var script = null, css = [], csstext = null,
+                             scriptsregexp = /<script[^>]*src="([\s\S]*?)"[^>]*><\/script>/gi,
+                             cssregexp = /<style[^>]*media="screen"[^>]*>([\s\S]*?)<\/style>/gi;
                           while ((script = scriptsregexp.exec(markup)))
                           {
                              scripts.push(script[1]);
                           }
-                          var cssregexp = /<style[^>]*media="screen"[^>]*>([\s\S]*?)<\/style>/gi;
                           while ((script = cssregexp.exec(markup)))
                           {
                              css.push(script[1]);
                           }
                           csstext = css.join("\n");
                           
-                          // Load handler for the scripts. This makes sure that the 'done' handler passed in as 'fn' is only executed when all dependencies have loaded
-                          var loadfn = function(e, obj) {
-                             if (Alfresco.logger.isDebugEnabled())
-                                Alfresco.logger.debug("Loaded script " + Dom.getAttribute(e.currentTarget, "src"));
-                             obj.numLoaded ++;
-                             if (scripts.length == obj.numLoaded) {
-                                fn.call(this);
-                             }
-                          };
-                          
-                          var addScript = function addScript(script)
-                          {
-                             var scriptEl=document.createElement('script');
-                             scriptEl.setAttribute("type", "text/javascript");
-                             scriptEl.setAttribute("src", script);
-                             Event.addListener(scriptEl, "load", loadfn, numloadedObj, this);
-                             hd.appendChild(scriptEl);
-                             if (Alfresco.logger.isDebugEnabled())
-                                Alfresco.logger.debug("Adding JS script " + script);
-                          };
-                          
                           // Add JS scripts to the page
                           for (var i = 0; i < scripts.length; i++)
                           {
-                             addScript(scripts[i]);
+                             addScript(scripts[i], loadfn);
                           }
                           
                           // Add CSS to the page
@@ -279,23 +303,12 @@
                           styleEl.innerHTML = csstext;
                           hd.appendChild(styleEl);
                        };
-                       var phtml = p_response.serverResponse.responseText.replace(/template_x002e_web-preview/g, p_response.config.object.elId),
-                          result = Alfresco.util.Ajax.sanitizeMarkup(phtml);
-                       // Following code borrowed from Alfresco.util.Ajax._successHandler
-                       // Use setTimeout to execute the script. Note scope will always be "window"
-                       var onloadedfn = function() {
-                          var scripts = result[1];
-                          if (YAHOO.lang.trim(scripts).length > 0)
-                          {
-                             Alfresco.logger.debug("Executing script payload");
-                             window.setTimeout(scripts, 0);
-                             // Delay-call the PostExec function to continue response processing after the setTimeout above
-                             YAHOO.lang.later(0, this, function() {
-                                Alfresco.util.YUILoaderHelper.loadComponents();
-                             }, p_response.serverResponse);
-                          }
-                       };
+                       
+                       // Add all necessary scripts to the page, then when they are loaded we can run 
+                       // the in-line scripts which will instantiate the WebPreview instance.
                        addHeadResources(phtml, onloadedfn);
+                       // result[2] contains the HTML mark-up for the page, with all <script> tags removed.
+                       // we add this to the Dom straight away, so the elements are there when needed by onloadedfn
                        p_response.config.object.previewEl.innerHTML = result[0];
                     },
                     scope: this
@@ -303,7 +316,7 @@
                  // Unfortunately we cannot set execScripts to true, as we need to first update the element ids in the html to make them unique, before the scripts are run
                  // So instead we execute the scripts manually, above
                  //execScripts: true,
-                 failureMessage: "Failed to load document details for " + this.options.nodeRef,
+                 failureMessage: this.msg("error.loadWebPreviewer"),
                  scope: this,
                  object: {
                     elId: elId,
