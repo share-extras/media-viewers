@@ -9,7 +9,7 @@ div.video-widget-msg
 	display: none;
 }
 
-div.video-preview, div.video-preview div
+div.video-preview, div.video-preview > div, div.video-preview > div > div, div.video-preview div.web-preview
 {
 	height: 100%;
 }
