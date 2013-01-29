@@ -247,20 +247,29 @@
                           
                           // Load handler for the scripts. This makes sure that the 'done' handler passed in as 'fn' is only executed when all dependencies have loaded
                           var loadfn = function(e, obj) {
+                             if (Alfresco.logger.isDebugEnabled())
+                                Alfresco.logger.debug("Loaded script " + Dom.getAttribute(e.currentTarget, "src"));
                              obj.numLoaded ++;
                              if (scripts.length == obj.numLoaded) {
                                 fn.call(this);
                              }
                           };
                           
-                          // Add JS scripts to the page
-                          for (var i = 0; i < scripts.length; i++)
+                          var addScript = function addScript(script)
                           {
                              var scriptEl=document.createElement('script');
                              scriptEl.setAttribute("type", "text/javascript");
-                             scriptEl.setAttribute("src", scripts[i]);
+                             scriptEl.setAttribute("src", script);
                              Event.addListener(scriptEl, "load", loadfn, numloadedObj, this);
                              hd.appendChild(scriptEl);
+                             if (Alfresco.logger.isDebugEnabled())
+                                Alfresco.logger.debug("Adding JS script " + script);
+                          };
+                          
+                          // Add JS scripts to the page
+                          for (var i = 0; i < scripts.length; i++)
+                          {
+                             addScript(scripts[i]);
                           }
                           
                           // Add CSS to the page
@@ -278,6 +287,7 @@
                           var scripts = result[1];
                           if (YAHOO.lang.trim(scripts).length > 0)
                           {
+                             Alfresco.logger.debug("Executing script payload");
                              window.setTimeout(scripts, 0);
                              // Delay-call the PostExec function to continue response processing after the setTimeout above
                              YAHOO.lang.later(0, this, function() {
