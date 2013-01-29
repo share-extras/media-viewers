@@ -323,7 +323,7 @@
                     previewEl: this.previewEl
                  },
                  execScripts: false,
-                 noReloadOnAuthFailure: true
+                 noReloadOnAuthFailure: false
               });
           }
           else
