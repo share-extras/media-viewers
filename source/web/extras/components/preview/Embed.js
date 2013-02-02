@@ -24,9 +24,19 @@
  * 
  * @namespace Alfresco.WebPreview.prototype.Plugins
  * @class Alfresco.WebPreview.prototype.Plugins.Embed
- * @author Peter Lšfgren Loftux AB
+ * @author Peter Lofgren Loftux AB
  */
 
+(function()
+{
+   /**
+    * YUI aliases
+    */
+   var Dom = YAHOO.util.Dom, 
+      Event = YAHOO.util.Event, 
+      Element = YAHOO.util.Element,
+      KeyListener = YAHOO.util.KeyListener;
+   
 Alfresco.WebPreview.prototype.Plugins.Embed = function(wp, attributes)
 {
 	this.wp = wp;
@@ -60,7 +70,7 @@ Alfresco.WebPreview.prototype.Plugins.Embed.prototype = {
 		 * @type String
 		 * @default "AcroPDF.PDF,PDF.PdfCtrl,FOXITREADEROCX.FoxitReaderOCXCtrl.1"
 		 */
-		ieActiveX : "AcroPDF.PDF,PDF.PdfCtrl,FOXITREADEROCX.FoxitReaderOCXCtrl.1",
+		ieActiveX : "AcroPDF.PDF,PDF.PdfCtrl,FOXITREADEROCX.FoxitReaderOCXCtrl.1,FoxitReader.FoxitReaderCtl",
 
 		/**
 		 * Test if a plugin is available. Use for mime types that need a plugin
@@ -132,13 +142,113 @@ Alfresco.WebPreview.prototype.Plugins.Embed.prototype = {
 				+ 'components/documentlibrary/actions/document-view-content-16.png)">';
 		displaysource += '<span>' + Alfresco.util.message("actions.document.view") + ' </span></a></div></div>'
 		// Set the iframe
-		displaysource += '<iframe id="Embed" name="Embed" src="' + url
+		displaysource += '<iframe id="' + this.wp.id + '-embed" name="Embed" src="' + url
 				+ '" scrolling="yes" marginwidth="0" marginheight="0" frameborder="0" vspace="0" hspace="0"  style="height:' + (previewHeight - 10).toString()
-				+ 'px;"></iframe>';
+				+ 'px; width:100%"></iframe>';
 
+      Alfresco.util.YUILoaderHelper.require([ "tabview" ], this.onComponentsLoaded, this);
+      Alfresco.util.YUILoaderHelper.loadComponents();
+      
 		return displaysource;
 
 	},
+	
+   /**
+    * Required YUI components have been loaded
+    * 
+    * @method onComponentsLoaded
+    * @public
+    */
+   onComponentsLoaded : function Embed_onComponentsLoaded()
+   {
+      
+      this.iframe = Dom.get(this.wp.id + "-embed");
+      Event.addListener(document, "click", this.onClick, this, true);
+      
+      //Attach to links to capture action events (the yui buttons swallows the above)
+      var links = document.links;
+      for (link in links)
+      {
+         if(Dom.hasClass(links[link],'action-link'))
+         {
+            Event.addListener(links[link], "click", this.onClick, this, true); 
+         }
+      }
+      
+      // Key Listener for [Escape] to cancel
+      this.keyListener = new KeyListener(document,
+      {
+         keys: [KeyListener.KEY.ESCAPE]
+      },
+      {
+         fn: this.onClick,
+         scope: this,
+         correctScope: true
+      });
+      
+      this.keyListener.enable();
+      
+   },
+   
+   /**
+    *  Listen for click events, try to detect yui panel dialogs and hide iframe if so
+    *  
+    *  @method onClick
+    *  @public
+    */
+   onClick : function Embed_onClick()
+   {
+      //Delay the check slightly, so that the panel has time to display and be detected
+      YAHOO.lang.later(100, this, this._hideShowIframe);
+      //Again, because it may be to fast. We want fast, but depends on browser and hardware.
+      //To slow and its is "blinking". So do it twice.
+      YAHOO.lang.later(300, this, this._hideShowIframe);
+   },
+   
+   /**
+    * Hide or Show the iframe depending on if a dialog (panel) is open.
+    * Fixes z-index problems with certain plugins.
+    * 
+    *  @method _hideShowIframe
+    *  @private
+    */
+   _hideShowIframe : function Embed_hideShowIframe()
+   {
+      //Get all panels, if one is not hidden, hide the iframe
+      var panels = Dom.getElementsByClassName('yui-panel-container', 'div'), displayed=false;
+      for (panel in panels)
+      {
+         if(!Dom.hasClass(panels[panel],'yui-overlay-hidden'))
+         {
+            displayed = true
+            break;
+         }
+      }
+
+      //If we do not already know a dialog is displayed, test for menus also
+      if(!displayed)
+      {
+         //Get all menu buttons
+         var menus = Dom.getElementsByClassName('yuimenu', 'div');
+         for (menu in menus)
+         {
+            if(Dom.hasClass(menus[menu],'visible'))
+            {
+               displayed = true
+               break;
+            }
+         }
+      }
+
+      
+      if(displayed)
+      {
+         Dom.setStyle(this.iframe,'visibility','hidden');
+      }else
+      {
+         Dom.setStyle(this.iframe,'visibility','visible');
+      }
+   },
 
 	/**
 	 * Detect PDF plugin in IE
@@ -177,3 +287,5 @@ Alfresco.WebPreview.prototype.Plugins.Embed.prototype = {
 		return false;
 	}
 };
+
+})();
