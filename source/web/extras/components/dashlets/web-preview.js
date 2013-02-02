@@ -452,7 +452,7 @@
       {
           // Check the event is directed towards this instance
           //if ($hasEventInterest(this.widgets.picker, args))
-          if (args && args[1].items)
+          if (args && args[1].items && this.widgets.picker)
           {
               var obj = args[1];
               //var items = this.widgets.picker.currentValueMeta;
