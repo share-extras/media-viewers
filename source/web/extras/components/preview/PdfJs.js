@@ -1092,6 +1092,10 @@
                scale : window.localStorage[base + "scale"],
                sidebarEnabled : ("true" == window.localStorage[base + "sidebar-enabled"])
             };
+            if (this.documentConfig.scale == "null")
+            {
+               this.documentConfig.scale = null;
+            }
          }
       },
 
@@ -1691,11 +1695,19 @@
       {
          if (this.attributes.useLocalStorage == "true" && this._browserSupportsHtml5Storage() && this.documentView)
          {
-            var base = "org.sharextras.media-viewers.pdfjs.document." + this.wp.options.nodeRef.replace(":/", "").replace("/", ".") + ".",
-               sbshown = this.widgets.sidebarButton.get("checked");
-            window.localStorage[base + "pageNum"] = this.pageNum;
-            window.localStorage[base + "scale"] = this.documentView.lastScale;
-            window.localStorage[base + "sidebar-enabled"] = sbshown;
+            var base = "org.sharextras.media-viewers.pdfjs.document." + this.wp.options.nodeRef.replace(":/", "").replace("/", ".") + ".";
+            if (this.pageNum)
+            {
+               window.localStorage[base + "pageNum"] = this.pageNum;
+            }
+            if (this.documentView.lastScale)
+            {
+               window.localStorage[base + "scale"] = this.documentView.lastScale;
+            }
+            if (this.widgets.sidebarButton)
+            {
+               window.localStorage[base + "sidebar-enabled"] = this.widgets.sidebarButton.get("checked");
+            }
          }
       }
    };
