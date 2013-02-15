@@ -1,0 +1,549 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Media-viewers by share-extras</title>
+
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <script src="javascripts/scale.fix.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1 class="header">Media-viewers</h1>
+        <p class="header">Enhanced document previews for a range of different document and media types</p>
+
+        <ul>
+          <li class="download"><a class="buttons" href="https://github.com/share-extras/media-viewers/zipball/master">Download ZIP</a></li>
+          <li class="download"><a class="buttons" href="https://github.com/share-extras/media-viewers/tarball/master">Download TAR</a></li>
+          <li><a class="buttons github" href="https://github.com/share-extras/media-viewers">View On GitHub</a></li>
+        </ul>
+
+        <p class="header">This project is maintained by <a class="header name" href="https://github.com/share-extras">share-extras</a></p>
+
+
+      </header>
+      <section>
+        <h1>Media Viewers for Alfresco Share</h1>
+
+<p>Authors: Will Abson (Alfresco), Peter Löfgren (Loftux AB)</p>
+
+<p>This add-on project for Alfresco Share provides a number of content viewers to 
+complement the out-of-the box set supplied with Share. It was previously named
+<em>Media Preview</em>.</p>
+
+<p>Viewers can be configured into the Web Preview component of the Document
+Details Page. In addition, the add-on supplies a custom dashlet which can be
+used to display any chosen document or content item on a site dashboard.</p>
+
+<p>The following viewers are supplied in the v2.x add-on for use on Alfresco 4</p>
+
+<ul>
+<li>
+<p><strong>PdfJs</strong> displays documents, presentations and any other file capable of being 
+transformed to PDF in-line in the web browser using the excellent <a href="http://mozilla.github.com/pdf.js/">pdf.js</a>
+viewer, which uses the power of HTML5 to remove Share's Flash dependency for 
+document viewing.</p>
+
+<p>The viewer supports a number of features not directly supported by the Flash
+document previewer, such as a sidebar with thumbnail, outline and search views, 
+bookmarking of individual pages of a document, and will remember the page 
+number and zoom level of previous documents that you have viewed.</p>
+
+<p><img src="http://sharextras.org/trunk/Media%20Preview/screenshots/pdfjs-doc.png" alt="PdfJs Viewer"></p>
+</li>
+<li>
+<p><strong>FLVPlayer</strong> and <strong>MP3Player</strong> display compatible audio and video files respectively, within the web-browser using the 
+open source <a href="http://flv-player.net/">FLV Player</a> and <a href="http://flash-mp3-player.net/">MP3 Player</a> media players by <a href="http://www.neolao.com/">neolao</a>. Based on the 
+content's MIME type, the updated component automatically chooses the appropriate 
+previewer to use.</p>
+
+<p>While similar to the Flash players provided by Share out-of-the-box, these 
+implementations allow advanced customization of the player via configuration and
+if <a href="http://ffmpeg.org/">FFmpeg</a> is installed, will fire up a transformation to allow viewing 
+of non-H264/FLV video and non-MP3 audio. The user is informed when conversion
+is in progress and the screen automatically updates when the content can
+be viewed.</p>
+</li>
+<li><p><strong>Embed</strong> uses an in-line iFrame to embed the content itself directly inside the
+web page. It is suitable for use with content types that can be viewed 
+directly within the web browser such as plain text and PDF, with the Chrome
+or Acrobat plugins installed. Again, this can be used to avoid the use of 
+the Flash previewer for some clients.</p></li>
+<li>
+<p><strong>Prettify</strong> allows formatted code, mark-up and other supported text formats
+to be displayed in directly in the document and uses the <a href="https://code.google.com/p/google-code-prettify/">google-code-prettify</a>
+project to provide an in-line browser-based view with syntax highlighting.</p>
+
+<p><img src="http://sharextras.org/trunk/Media%20Preview/screenshots/prettify-js.png" alt="Prettify Viewer"></p>
+</li>
+<li>
+<p><strong>WebODF</strong> is an EXPERIMENTAL viewer which uses the AGPL-licensed <a href="http://www.webodf.org/">WebODF</a> 
+project to display ODF content directly in the web browser.</p>
+
+<p>WebODF cannot be distributed with the add-in itself, so in order to use it you must also
+download the latest JAR file from the supporting <a href="https://github.com/wabson/webodf-share/downloads">share-webodf project</a> and
+install it in the same way as the main media-viewers JAR file.</p>
+</li>
+</ul><p>The v0.x/1.x add-on supplies only the FLVPlayer and MP3Player add-ons and works on Alfresco 3.3/3.4.</p>
+
+<p>In addition to the Share component extensions the add-on supplies repository extension configuration
+for defining 'thumbnailed' content in PDF, H264/FLV and MP3 formats, a full-size image thumbnail for 
+video files in JPEG format, and a transformer based on FFmpeg for generating the audio and video formats.</p>
+
+<h2>Download</h2>
+
+<p>For Alfresco 4.x, download the 2.0 version of Media Viewers.</p>
+
+<p><a href="http://code.google.com/p/share-extras/downloads/list?q=media-viewers">Download Media Viewers add-on</a></p>
+
+<p>For Alfresco 3.x, download the 0.x or 1.0 version of Media Preview.</p>
+
+<p><a href="http://code.google.com/p/share-extras/downloads/list?q=media-preview">Download Media Previews add-on</a></p>
+
+<h2>Installation</h2>
+
+<p>Copy the JAR file into the <code>tomcat/shared/lib</code> folder of your Alfresco installation (create the <code>lib</code> directory if it does not exist). If you are hosting
+the repository and Share in different Tomcat containers then you should install it in both.</p>
+
+<p>See <em>Configuration</em> below, for instructions on how to enable the viewers in Share.</p>
+
+<h3>FFmpeg Installation (optional)</h3>
+
+<p>The supplied Spring configuration extends the repository thumbnailing capabilities to support 
+H264/FLV thumbnails for video content and MP3 thumbnails for audio content, both
+using FFmpeg, and PDF thumbnails for content such as Microsoft Word and Powerpoint
+files. PDF thumbnails can be generated using the default repository transformers,
+but a custom transformer is supplied to enable the FFmpeg transformations.</p>
+
+<p>The previews therefore do not require FFmpeg, but it is highly recommended to
+support the widest range of formats, and for thumbnail image generation.</p>
+
+<p>To enable FFmpeg support you must</p>
+
+<ol>
+<li>
+<p>Install FFmpeg (with <a href="http://www.videolan.org/developers/x264.html">x264</a>) on the server</p>
+
+<p>It is unlikely that your standard package manager will install this for you. The 
+<a href="https://ffmpeg.org/trac/ffmpeg/wiki">FFmpeg documentation</a> does however contain detailed documentation for compiling on
+<a href="https://ffmpeg.org/trac/ffmpeg/wiki/UbuntuCompilationGuide">Ubuntu</a> and <a href="https://ffmpeg.org/trac/ffmpeg/wiki/CompilationGuide">other operating systems</a>
+and the project also makes pre-built binaries available for <a href="http://ffmpeg.org/download.html">download</a>.</p>
+</li>
+<li>
+<p>Edit your <code>alfresco-global.properties</code> file to define the location
+of the FFmpeg executable and base directory (should not contain spaces)</p>
+
+<pre><code>ffmpeg.exe=&lt;location of ffmpeg executable&gt;
+</code></pre>
+
+<p>The path should not contain spaces, and if you are on Windows you should use
+forward slashes rather than backslashes as your directory separator, or use
+double-backslashes to escape them.</p>
+</li>
+</ol><p>If you are running Alfresco and Share in the same application server then the 
+JAR file also contains the required repository configuration, but if these are
+in separate containers then you will need to install it into both.</p>
+
+<p>Check the <code>alfresco.log</code> file while the repository is starting up for any 
+warnings or errors related to FFmpeg, if you have enabled it.</p>
+
+<h2>Building from Source</h2>
+
+<p>The add-on has been developed to install on top of an existing Alfresco 4.0 or
+3.3/3.4 installation.</p>
+
+<p>An Ant build script is provided to build a JAR file containing the 
+custom files, which can then be installed into the <code>tomcat/shared/lib</code> folder 
+of your Alfresco installation.</p>
+
+<p>To build the JAR file, run the following command from the base project 
+directory.</p>
+
+<pre><code>ant -f project.xml dist-jar
+</code></pre>
+
+<p>Or, for the 0.x/1.0 release</p>
+
+<pre><code>ant dist-jar
+</code></pre>
+
+<p>The command should build a JAR file named <code>media-viewers-{version}.jar</code>
+in the <code>dist</code> directory within your project.</p>
+
+<p>To deploy the add-on files into a local Tomcat instance for testing, you can 
+use the <code>hotcopy-tomcat-jar</code> task. You will need to set the <code>tomcat.home</code>
+property in Ant.</p>
+
+<pre><code>ant -f project.xml -Dtomcat.home=C:/Alfresco/tomcat hotcopy-tomcat-jar
+</code></pre>
+
+<p>After you have deployed the JAR file you will need to restart Tomcat to ensure 
+it picks up the changes.</p>
+
+<h2>Configuration</h2>
+
+<p>You must enable the <strong>PdfJs</strong> module in Share's Module Deployment console, which
+can be accessed by navigating to <code>http://hostname:port/share/page/modules/deploy</code>
+on your Alfresco server.</p>
+
+<p><em>If you are using the <code>trunk</code> codeline from r1340 onwards on Alfresco 4.2, then you can use the 
+second module **PdfJs Configuration</em>* to automatically enable the viewer in the 
+Document Details page. Otherwise follow the instructions below.*</p>
+
+<p>After installing the add-on in Alfresco 4, you must then configure the <code>web-preview.get</code>
+component to use the particular viewers that you wish to enable. To do this, you must</p>
+
+<ol>
+<li><p>Copy the file <code>WEB-INF/classes/alfresco/site-webscripts/org/alfresco/components/preview/web-preview.get.config.xml</code> 
+from the exploded Alfresco webapp into the directory <code>alfresco/web-extension/site-webscripts/org/alfresco/components/preview</code>
+under your <code>tomcat/shared/classes</code>. You will need to create the new directories if you have not done this previously.</p></li>
+<li><p>Modify that file to add in the new viewers as needed</p></li>
+</ol><p>An in-depth discussion of the redesigned <code>web-preview</code> component in Alfresco 4 is provided on 
+<a href="http://blogs.alfresco.com/wp/wabson/2012/04/11/share-document-previews-in-alfresco-4/">Will's blog</a>,
+where the configuration mechanism is explained. 
+Or, you can re-use the example configuration below and comment out any parts that you don't want.</p>
+
+<p>No additional configuration is required for the 0.x/1.x version of the add-on in
+Alfresco 3.</p>
+
+<h3>Sample Configuration</h3>
+
+<pre><code>&lt;config&gt;
+
+   &lt;!--
+      List of rule to decide which plugin that shall be used to preview the node's content or thumbnails.
+      The list is evaluated from the top.
+      All attributes for a condition must match.
+      When a condition matches the nodes' mimeType and/or thumbails its list of plugins are tested from the top.
+      Every plugin will be created and get an opportunity to decide if it may be used in the users browser environment.
+      If the plugin can't be used it will give a report back to the user that will be displayed if neither of the
+      plugins in the list can be used.
+   --&gt;
+
+   &lt;plugin-conditions&gt;
+
+      &lt;!--
+          Enables the PdfJs viewer for all PDF documents or Embed in older browsers
+
+          The PdfJs &lt;plugin&gt; element supports the following attributes to further control the viewer
+
+            * src="value"    Name of the thumbnail to display, which should be a PDF (default null, forces the cm:content property to be used)
+            * skipbrowsertest="true|false"    Skipbrowser test, mostly for developer to force test loading (default "false")
+            * mode="iframe|block" Display mode. "block" is the normal Share view, "iframe" uses the pdf.js viewer in an iframe (deprecated, default "block")
+            * defaultScale="page-width|two-page-width|page-height|page-fit|two-page-fit|auto|value" Default zoom level for new documents, either a predefined string (for auto-calculation) or a decimal number between 0 and 1 (default "two-page-fit")
+            * scaleDelta="value"   Multipler for zooming in/out, should be a decimal &gt; 1 (default "1.1")
+            * pageLayout="single|multi"   Layout to use to display pages, "single" (one page per row) or "multi" (multiple pages per row) (default "multi")
+            * disableTextLayer="true|false"   Whether text overlays on pages should be disabled. Overlays allow users to select text content in their browser but reduce rendering performance (default "false")
+            * useLocalStorage="true|false"   Whether to use HTML5 browser storage to persist the page number and zoom level of previously-viewed documents (default "true")
+
+          The Embed &lt;plugin&gt; element supports the following attributes
+
+            * src="value"    Name of the thumbnail to display (default null, forces the cm:content property to be used)
+            * ieActiveX="true|false"   Comma separated string of Windows ActiveX id:s. Used in Internet Explorer only to test for plugin presence. (default "AcroPDF.PDF,PDF.PdfCtrl,FOXITREADEROCX.FoxitReaderOCXCtrl.1")
+            * testPluginAvailability="true|false" Test if a plugin is available. Use for mime types that need a plugin to display for example application/pdf (default "false")
+      --&gt;
+      &lt;condition mimeType="application/pdf"&gt;
+         &lt;plugin&gt;PdfJs&lt;/plugin&gt;
+         &lt;plugin&gt;Embed&lt;/plugin&gt;
+      &lt;/condition&gt;
+
+      &lt;!--
+          Enables the PdfJs viewer for other content which can be transformed to PDF or Embed 
+          in older browsers.
+
+          Note, the OpenOffice transformer must be available on the server for this to work.
+      --&gt;
+      &lt;condition thumbnail="pdf"&gt;
+         &lt;plugin src="pdf"&gt;PdfJs&lt;/plugin&gt;
+         &lt;plugin src="pdf"&gt;Embed&lt;/plugin&gt;
+      &lt;/condition&gt;
+
+      &lt;!--
+          Enables the FLVPlayer viewer for video formats natively-supported by Flash
+
+          The &lt;plugin&gt; element supports the following attributes to further control the viewer
+
+            * poster="value"    Name of the static image thumbnail to display before displaying the video (default "imgpreviewfull")
+            * queueMissingRenditions="true|false"    Whether the player should attempt to queue the generation of missing video thumbnails (default "true")
+            * autoplay="true|false" Whether to auto-play the video (default "false")
+            * autoload="true|false" Whether to auto-load the video (default "true")
+            * playercolor="value"   Color of the player in hex notation, without the initial '#' (default "e1e3e5")
+            * buttoncolor="value"   Color of the player button icons in hex notation (default "000000")
+            * buttonovercolor="value"   Hover color of the player buttons in hex notation (default "0088de")
+            * sliderovercolor="value"   Hover color of the player slider in hex notation (default "0088de")
+            * showfullscreen="true|false"   Whether to show the full screen button (default "true")
+            * showiconplay="true|false"   Whether to show the play button (default "true")
+            * showvolume="true|false"   Whether to show the volume control (default "true")
+            * showtime="true|false"   Whether to show the elapsed time in the player (default "true")
+            * playermargin="value"   Margin in pixels around the player (default "0")
+      --&gt;
+      &lt;condition mimeType="video/mp4"&gt;
+         &lt;plugin&gt;FLVPlayer&lt;/plugin&gt;
+      &lt;/condition&gt;
+      &lt;condition mimeType="video/m4v"&gt;
+         &lt;plugin&gt;FLVPlayer&lt;/plugin&gt;
+      &lt;/condition&gt;
+      &lt;condition mimeType="video/x-flv"&gt;
+         &lt;plugin&gt;FLVPlayer&lt;/plugin&gt;
+      &lt;/condition&gt;
+
+      &lt;!--
+          Enables the FLVPlayer viewer for other common video formats. This requires FFmpeg support.
+      --&gt;
+      &lt;condition mimeType="video/mpeg2" thumbnail="h264preview"&gt;
+         &lt;plugin&gt;FLVPlayer&lt;/plugin&gt;
+      &lt;/condition&gt;
+      &lt;condition mimeType="video/quicktime" thumbnail="h264preview"&gt;
+         &lt;plugin&gt;FLVPlayer&lt;/plugin&gt;
+      &lt;/condition&gt;
+      &lt;condition mimeType="video/ogg" thumbnail="h264preview"&gt;
+         &lt;plugin&gt;FLVPlayer&lt;/plugin&gt;
+      &lt;/condition&gt;
+      &lt;condition mimeType="video/x-msvideo" thumbnail="h264preview"&gt;
+         &lt;plugin&gt;FLVPlayer&lt;/plugin&gt;
+      &lt;/condition&gt;
+      &lt;condition mimeType="video/webm" thumbnail="h264preview"&gt;
+         &lt;plugin&gt;FLVPlayer&lt;/plugin&gt;
+      &lt;/condition&gt;
+
+      &lt;!--
+          Enables the MP3Player viewer for audio formats natively-supported by Flash
+      --&gt;
+      &lt;condition mimeType="audio/mpeg"&gt;
+         &lt;plugin&gt;MP3Player&lt;/plugin&gt;
+      &lt;/condition&gt;
+
+      &lt;!--
+          Enables the MP3Player viewer for other common audio formats. This requires FFmpeg support.
+
+          The &lt;plugin&gt; element supports the following attributes to further control the viewer
+
+            * mp3ThumbnailName="value"    Name of the audio thumbnail to look in for MP3 audio content for non-MP3 files (default "mp3thumbnail")
+            * queueMissingRenditions="true|false"    Whether the player should attempt to queue the generation of missing audio thumbnails (default "true")
+            * autoplay="true|false" Whether to auto-play the audio (default "false")
+            * autoload="true|false" Whether to auto-load the audio (default "true")
+      --&gt;
+      &lt;condition mimeType="audio/x-wav" thumbnail="mp3preview"&gt;
+         &lt;plugin&gt;MP3Player&lt;/plugin&gt;
+      &lt;/condition&gt;
+      &lt;condition mimeType="audio/x-flac" thumbnail="mp3preview"&gt;
+         &lt;plugin&gt;MP3Player&lt;/plugin&gt;
+      &lt;/condition&gt;
+      &lt;condition mimeType="audio/vorbis" thumbnail="mp3preview"&gt;
+         &lt;plugin&gt;MP3Player&lt;/plugin&gt;
+      &lt;/condition&gt;
+      &lt;condition mimeType="audio/ogg" thumbnail="mp3preview"&gt;
+         &lt;plugin&gt;MP3Player&lt;/plugin&gt;
+      &lt;/condition&gt;
+      &lt;condition mimeType="audio/x-ms-wma" thumbnail="mp3preview"&gt;
+         &lt;plugin&gt;MP3Player&lt;/plugin&gt;
+      &lt;/condition&gt;
+
+      &lt;!--
+          Enables the Prettify viewer for JavaScript files using language auto-detection
+          and for CSS files setting the type explictly (see list in prettify's README)
+      --&gt;
+      &lt;condition mimeType="application/x-javascript"&gt;
+         &lt;plugin&gt;Prettify&lt;/plugin&gt;
+      &lt;/condition&gt;
+      &lt;condition mimeType="text/css"&gt;
+         &lt;plugin lang="lang-css"&gt;Prettify&lt;/plugin&gt;
+      &lt;/condition&gt;
+
+      &lt;!--
+          Enables the EXPERIMENTAL WebODF viewer for Open Document text files
+      --&gt;
+      &lt;condition mimeType="application/vnd.oasis.opendocument.text"&gt;
+         &lt;plugin&gt;WebODF&lt;/plugin&gt;
+      &lt;/condition&gt;
+
+      &lt;!-- DEFAULT SHARE CONFIGURATION BELOW THIS LINE --&gt;
+
+      &lt;!-- Video with posters --&gt;
+
+      &lt;condition mimeType="video/mp4" thumbnail="imgpreview"&gt;
+         &lt;plugin poster="imgpreview" posterFileSuffix=".png"&gt;StrobeMediaPlayback&lt;/plugin&gt;
+         &lt;plugin poster="imgpreview" posterFileSuffix=".png"&gt;FlashFox&lt;/plugin&gt;
+         &lt;plugin poster="imgpreview" posterFileSuffix=".png"&gt;Video&lt;/plugin&gt;
+      &lt;/condition&gt;
+
+      &lt;condition mimeType="video/m4v" thumbnail="imgpreview"&gt;
+         &lt;plugin poster="imgpreview" posterFileSuffix=".png"&gt;StrobeMediaPlayback&lt;/plugin&gt;
+         &lt;plugin poster="imgpreview" posterFileSuffix=".png"&gt;FlashFox&lt;/plugin&gt;
+         &lt;plugin poster="imgpreview" posterFileSuffix=".png"&gt;Video&lt;/plugin&gt;
+      &lt;/condition&gt;
+
+      &lt;condition mimeType="video/x-flv" thumbnail="imgpreview"&gt;
+         &lt;plugin poster="imgpreview" posterFileSuffix=".png"&gt;StrobeMediaPlayback&lt;/plugin&gt;
+         &lt;plugin poster="imgpreview" posterFileSuffix=".png"&gt;FlashFox&lt;/plugin&gt;
+      &lt;/condition&gt;
+
+      &lt;condition mimeType="video/quicktime" thumbnail="imgpreview"&gt;
+         &lt;plugin poster="imgpreview" posterFileSuffix=".png"&gt;StrobeMediaPlayback&lt;/plugin&gt;
+      &lt;/condition&gt;
+
+      &lt;condition mimeType="video/ogg" thumbnail="imgpreview"&gt;
+         &lt;plugin poster="imgpreview" posterFileSuffix=".png"&gt;Video&lt;/plugin&gt;
+      &lt;/condition&gt;
+
+      &lt;condition mimeType="video/webm" thumbnail="imgpreview"&gt;
+         &lt;plugin poster="imgpreview" posterFileSuffix=".png"&gt;Video&lt;/plugin&gt;
+      &lt;/condition&gt;
+
+      &lt;!-- Video without posters --&gt;
+
+      &lt;condition mimeType="video/mp4"&gt;
+         &lt;plugin&gt;StrobeMediaPlayback&lt;/plugin&gt;
+         &lt;plugin&gt;FlashFox&lt;/plugin&gt;
+         &lt;plugin&gt;Video&lt;/plugin&gt;
+      &lt;/condition&gt;
+
+      &lt;condition mimeType="video/x-m4v"&gt;
+         &lt;plugin&gt;StrobeMediaPlayback&lt;/plugin&gt;
+         &lt;plugin&gt;FlashFox&lt;/plugin&gt;
+         &lt;plugin&gt;Video&lt;/plugin&gt;
+      &lt;/condition&gt;
+      &lt;condition mimeType="video/x-flv"&gt;
+         &lt;plugin&gt;StrobeMediaPlayback&lt;/plugin&gt;
+         &lt;plugin&gt;FlashFox&lt;/plugin&gt;
+      &lt;/condition&gt;
+
+      &lt;condition mimeType="video/quicktime"&gt;
+         &lt;plugin&gt;StrobeMediaPlayback&lt;/plugin&gt;
+      &lt;/condition&gt;
+
+      &lt;condition mimeType="video/ogg"&gt;
+         &lt;plugin&gt;Video&lt;/plugin&gt;
+      &lt;/condition&gt;
+
+      &lt;condition mimeType="video/webm"&gt;
+         &lt;plugin&gt;Video&lt;/plugin&gt;
+      &lt;/condition&gt;
+
+      &lt;!-- Audio --&gt;
+      &lt;condition mimeType="audio/mpeg"&gt;
+         &lt;plugin&gt;StrobeMediaPlayback&lt;/plugin&gt;
+         &lt;plugin&gt;FlashFox&lt;/plugin&gt;
+         &lt;plugin&gt;Audio&lt;/plugin&gt;
+      &lt;/condition&gt;
+
+      &lt;condition mimeType="audio/x-wav"&gt;
+         &lt;plugin&gt;Audio&lt;/plugin&gt;
+      &lt;/condition&gt;
+
+      &lt;!-- Documents that has been converted to .swf --&gt;
+
+      &lt;condition thumbnail="webpreview"&gt;
+         &lt;plugin src="webpreview" paging="true"&gt;WebPreviewer&lt;/plugin&gt;
+      &lt;/condition&gt;
+
+      &lt;!-- Content that has an image preview thumbnail --&gt;
+
+      &lt;condition thumbnail="imgpreview"&gt;
+         &lt;plugin src="imgpreview"&gt;Image&lt;/plugin&gt;
+      &lt;/condition&gt;
+
+      &lt;!-- Images in real size (if they didn't have a imgpreview) --&gt;
+
+      &lt;condition mimeType="image/jpeg"&gt;
+         &lt;plugin srcMaxSize="500000"&gt;Image&lt;/plugin&gt;
+      &lt;/condition&gt;
+
+      &lt;condition mimeType="image/png"&gt;
+         &lt;plugin srcMaxSize="500000"&gt;Image&lt;/plugin&gt;
+      &lt;/condition&gt;
+
+      &lt;condition mimeType="image/gif"&gt;
+         &lt;plugin srcMaxSize="500000"&gt;Image&lt;/plugin&gt;
+      &lt;/condition&gt;
+
+      &lt;condition mimeType="application/x-shockwave-flash"&gt;
+         &lt;plugin&gt;Flash&lt;/plugin&gt;
+      &lt;/condition&gt;
+
+      &lt;!-- To add zooming capabilities for images place the following inside a &lt;condition&gt; element --&gt;
+      &lt;!-- &lt;plugin&gt;WebPreviewer&lt;/plugin&gt; --&gt;
+
+   &lt;/plugin-conditions&gt;
+
+&lt;/config&gt;
+</code></pre>
+
+<p>Lastly you must enable the relevant modules in the Share <a href="http://code.google.com/p/share-extras/wiki/ModuleDeployment">Module Deployment console</a>, after Alfresco
+has started up. You can access this page from the main Web Scripts index page.</p>
+
+<h2>Usage</h2>
+
+<p>Upload a supported file type to Alfresco Share and navigate to the Document Details page to 
+see the preview.</p>
+
+<p>To use the Document Viewer dashlet, navigate to a site dashboard. Then, click the 
+<em>Customize Dashboard</em> button to edit the contents of the dashboard and drag 
+the dashlet into one of the columns from the list of dashlets.</p>
+
+<h2>Troubleshooting</h2>
+
+<h3>Web Previews</h3>
+
+<p>The most common problem that you may see when using the viewers is that the text <em>Preparing Previewer...</em> is shown on the screen. This is usually
+accompanied by an error in the browser JavaScript console indicating that the plugin instance could not be created.</p>
+
+<p>If you see this on your system, check that the add-on is installed correctly and that you have enabled the relevant viewers
+in the Module Deployment console.</p>
+
+<h3>FFmpeg</h3>
+
+<p>If you have problems with audio and video previews or thumbnails not working, first check your <code>alfresco.log</code> for any errors being thrown at startup, relating to FFmpeg. 
+If no errors are shown, you can force the transformers to give you a little more information by adding the 
+following lines to the file <code>webapps/alfresco/WEB-INF/classes/log4j.properties</code>.</p>
+
+<pre><code>log4j.logger.org.alfresco.util.exec.RuntimeExec=debug
+log4j.logger.org.alfresco.repo.content.transform=debug
+log4j.logger.org.alfresco.repo.thumbnail=debug
+</code></pre>
+
+<p>If no problems are obvious and you <em>still</em> find that thumbnails do not get generated or the player does not render, 
+you can make a direct request for the specific renditions to help diagnose the problem. In the URLs below you 
+will need to replace the <code>{nodeId}</code> token with the GUID of the problematic file (which you can grab from the end of 
+the Document Details page URL), and substitute in the hostname of your server in place of <code>{hostname}</code>.</p>
+
+<ul>
+<li>For thumbnail problems, hit <a href="http://%7Bhostname%7D/share/proxy/alfresco/api/node/workspace/SpacesStore/%7BnodeId%7D/content/thumbnails/doclib?c=force">http://{hostname}/share/proxy/alfresco/api/node/workspace/SpacesStore/{nodeId}/content/thumbnails/doclib?c=force</a>
+</li>
+<li>For player problems, hit <a href="http://%7Bhostname%7D/share/proxy/alfresco/api/node/workspace/SpacesStore/%7BnodeId%7D/content/thumbnails/h264preview?c=force">http://{hostname}/share/proxy/alfresco/api/node/workspace/SpacesStore/{nodeId}/content/thumbnails/h264preview?c=force</a>
+</li>
+</ul><p>This should force the thumbnails to be generated syncronously, and a stack trace will be visible in the page response or in <code>alfresco.log</code>.</p>
+
+<h2>Known Issues</h2>
+
+<ul>
+<li><p>Chrome on Windows does not correctly render PDF documents converted via OpenOffice, when using the PdfJs 
+viewer. This is due to a <a href="http://code.google.com/p/chromium/issues/detail?id=122465">Chrome bug</a>. The viewer therefore tests for this combination of browser and operating 
+system and declines to display the content. Fortunately the Embed viewer is able to render the content
+via Chrome's built-in PDF support.</p></li>
+<li><p>In versions 3.3, 3.4.a, 3.4.b and 3.4.c, the video player only supports previews of MP4 and FLV content, due to 
+a bug whereby the thumbnail service <a href="https://issues.alfresco.com/jira/browse/ALF-4214">cannot produce renditions using a RuntimeExec transformer</a>. 
+The workaround for this is to apply the fix in the JIRA issue to patch your 
+own <code>alfresco-repository.jar</code>. This is fixed in version 3.4.d.</p></li>
+<li><p>Prior to Alfresco Community 3.4.b, adding the additional thumbnail definitions to the thumbnail registry required 
+overriding the entire thumbnailRegistry bean. The supplied Spring configuration still uses this old method for now 
+in order to support the widest range of versions, but if this causes you problems you can use the new 
+<code>org.alfresco.repo.thumbnail.ThumbnailDefinitionSpringRegistrer</code> bean instead 
+(<a href="http://fisheye.alfresco.com/browse/alfresco_open_mirror/alfresco/HEAD/root/projects/repository/config/alfresco/extension/video-transformation-context.xml.sample?r=22817">example config</a>)</p></li>
+</ul>
+      </section>
+      <footer>
+        <p><small>Hosted on <a href="https://pages.github.com">GitHub Pages</a> using the Dinky theme</small></p>
+      </footer>
+    </div>
+    <!--[if !IE]><script>fixScale(document);</script><![endif]-->
+		
+  </body>
+</html>
