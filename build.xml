@@ -5,7 +5,7 @@
                             ***********************************
     
     Author: Will Abson
-    Version: 1.5.1
+    Version: 1.5.4
     
     Provides a set of targets for building extensions to Alfresco Share in ZIP, AMP and JAR archive 
     formats. Since Alfresco 3.3, JAR is the recommended package structure for all simple extensions.
@@ -34,6 +34,7 @@
     <property name="jar.name" value="share-extension.jar" />
     <property name="zip.name" value="share-extension.zip" />
     <property name="amp.name" value="share-extension.amp" />
+    <property name="src.zip.name" value="share-extension-src.zip" />
     <property name="config.includes" value="**/*.*" />
     <property name="config.excludes" value="" />
     <property name="build.res.includes" value="**/*.*" />
@@ -125,21 +126,23 @@
        <mkdir dir="${build.dir}" />
       <mkdir dir="${dist.dir}" />
    </target>
+    
+    <!-- Build a source ZIP file -->
+    <target name="dist-src" depends="" description="Build a ZIP file containing the project source code">
+        <zip destfile="${dist.dir}/${src.zip.name}">
+            <fileset dir="${basedir}">
+                <exclude name="build/**" />
+            </fileset>
+        </zip>
+    </target>
    
-    <!--
-        Assemble the configuration and resource files in a JAR file structure. This mechanism 
-        was introduced in Alfresco 3.3 and allows Share extensions containing both repository and 
-        web-tier web scripts, Spring/Surf configuration and static assets to be added to the servlet 
-        container as a single library. For more complex extensions, AMP files should be used.
-        
-        This target excludes the files custom-slingshot-application-context.xml, share-config-custom.xml
-        and similar files from being copied into the classpath as these should not generally be included 
-        within JAR files as it could lead to multiple copies of them being present. If found however,
-        alfresco/web-extension/share-config-custom.xml will be copied into the META-INF directory,
-        from where it can be loaded in 3.4.
-    -->
-    <target name="build-jar" description="Assemble configuration and resource files in a JAR file structure">
-        <mkdir dir="${build.jar.dir}" />
+	<!-- Build-jar sub-tasks - allows us to override these more easily -->
+	
+    <target name="build-jar-prepare" depends="">
+          <mkdir dir="${build.jar.dir}" />
+    </target>
+	
+    <target name="build-jar-assemble" depends="">
         <!-- Copy configuration files, web scripts, etc. directly into the JAR so they appear on the 
         classpath. -->
         <copy todir="${build.jar.dir}" includeEmptyDirs="false">
@@ -175,10 +178,29 @@
                 <filename name="share-config-custom.xml" />
             </fileset>
         </copy>
+    </target>
+   
+    <target name="build-jar-jscompress" depends="">
         <!-- Minify JS -->
         <yuicompress fromdir="${res.dir}" todir="${build.jar.dir}/META-INF" excludes="**/*-min.js" warn="${yuicompress.warn}">
             <include name="**/*.js" />
         </yuicompress>
+    </target>
+   
+    <!--
+        Assemble the configuration and resource files in a JAR file structure. This mechanism 
+        was introduced in Alfresco 3.3 and allows Share extensions containing both repository and 
+        web-tier web scripts, Spring/Surf configuration and static assets to be added to the servlet 
+        container as a single library. For more complex extensions, AMP files should be used.
+        
+        This target excludes the files custom-slingshot-application-context.xml, share-config-custom.xml
+        and similar files from being copied into the classpath as these should not generally be included 
+        within JAR files as it could lead to multiple copies of them being present. If found however,
+        alfresco/web-extension/share-config-custom.xml will be copied into the META-INF directory,
+        from where it can be loaded in 3.4.
+    -->
+    <target name="build-jar" depends="build-jar-prepare,build-jar-assemble,build-jar-jscompress" 
+	        description="Assemble configuration and resource files in a JAR file structure">
     </target>
    
    <!-- Build the JAR file -->
@@ -187,6 +209,22 @@
       <jar destfile="${dist.dir}/${jar.name}">
          <fileset dir="${build.jar.dir}" />
       </jar>
+    </target>
+	
+	<!-- build-zip-tomcat sub-tasks -->
+	
+    <target name="build-zip-tomcat-assemble">
+        <!-- Copy web assets -->
+        <copy todir="${build.zip.dir}/${build.res.dir}">
+            <fileset dir="${res.dir}" includes="${build.res.includes}" excludes="${build.res.excludes}" />
+        </copy>
+    </target>
+	
+    <target name="build-zip-tomcat-jscompress">
+        <!-- Minify JS -->
+        <yuicompress fromdir="${res.dir}" todir="${build.zip.dir}/${build.res.dir}" excludes="**/*-min.js" warn="${yuicompress.warn}">
+            <include name="**/*.js" />
+        </yuicompress>
     </target>
     
     <!--
@@ -212,16 +250,8 @@
         file structure, however the hotcopy-tomcat-zip task will err on the side of caution and 
         will not copy files such as share-config-custom.xml itself into Tomcat.
     -->
-    <target name="build-zip-tomcat" depends="build-zip-prepare,build-zip-config"
-      description="Assemble the configuration and resource files for a Tomcat deployment structure">
-      <!-- Copy web assets -->
-        <copy todir="${build.zip.dir}/${build.res.dir}">
-            <fileset dir="${res.dir}" includes="${build.res.includes}" excludes="${build.res.excludes}" />
-        </copy>
-        <!-- Minify JS -->
-        <yuicompress fromdir="${res.dir}" todir="${build.zip.dir}/${build.res.dir}" excludes="**/*-min.js" warn="${yuicompress.warn}">
-            <include name="**/*.js" />
-        </yuicompress>
+    <target name="build-zip-tomcat" depends="build-zip-prepare,build-zip-config,build-zip-tomcat-assemble,build-zip-tomcat-jscompress"
+        description="Assemble the configuration and resource files for a Tomcat deployment structure">
     </target>
 
     <target name="build-zip-prepare">
@@ -242,7 +272,34 @@
             <fileset dir="${build.zip.dir}" />
         </zip>
     </target>
+
+    <!-- build-zip-tomcat sub-tasks -->
     
+    <target name="build-amp-assemble">
+        <!-- Copy properties files -->
+        <copy todir="${build.amp.dir}" file="${amp.file.properties}" failonerror="true" />
+        <copy todir="${build.amp.dir}" file="${amp.file.mappings}" failonerror="true" />
+        
+        <!-- Copy config files -->
+        <mkdir dir="${build.amp.dir}/config" />
+        <copy todir="${build.amp.dir}/config">
+            <fileset dir="${config.dir}" includes="${config.includes}" excludes="${config.excludes}" />
+        </copy>
+        
+        <!-- Copy resource files -->
+        <mkdir dir="${build.amp.dir}/web" />
+        <copy todir="${build.amp.dir}/web">
+            <fileset dir="${res.dir}" includes="${build.res.includes}" excludes="${build.res.excludes}" />
+        </copy>
+    </target>
+    
+    <target name="build-amp-jscompress">
+    	<!-- Minify JS -->
+        <yuicompress fromdir="${res.dir}" todir="${build.amp.dir}/web" excludes="**/*-min.js" warn="${yuicompress.warn}">
+            <include name="**/*.js" />
+        </yuicompress>
+    </target>
+
     <!--
         Assemble the configuration and resource files in an AMP file structure. The files
         module.properties and file-mapping.properties must be present in the root of the 
@@ -264,28 +321,8 @@
         In version 3.3 and above the JAR file mechanism is recommended as an alternative for all
         non-complex extensions.
     -->
-    <target name="build-amp" description="Assemble the configuration and resource files in an AMP file structure">
-      
-      <!-- Copy properties files -->
-        <copy todir="${build.amp.dir}" file="${amp.file.properties}" failonerror="true" />
-        <copy todir="${build.amp.dir}" file="${amp.file.mappings}" failonerror="true" />
-      
-      <!-- Copy config files -->
-        <mkdir dir="${build.amp.dir}/config" />
-        <copy todir="${build.amp.dir}/config">
-            <fileset dir="${config.dir}" includes="${config.includes}" excludes="${config.excludes}" />
-        </copy>
-      
-      <!-- Copy resource files -->
-        <mkdir dir="${build.amp.dir}/web" />
-        <copy todir="${build.amp.dir}/web">
-            <fileset dir="${res.dir}" includes="${build.res.includes}" excludes="${build.res.excludes}" />
-        </copy>
-
-       <!-- Minify JS -->
-       <yuicompress fromdir="${res.dir}" todir="${build.amp.dir}/web" excludes="**/*-min.js" warn="${yuicompress.warn}">
-          <include name="**/*.js" />
-       </yuicompress>
+    <target name="build-amp" depends="build-amp-assemble,build-amp-jscompress" 
+    	description="Assemble the configuration and resource files in an AMP file structure">
     </target>
     
     <!-- Build the AMP file -->
