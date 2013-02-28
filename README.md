@@ -8,18 +8,20 @@ complement the out-of-the box set supplied with Share, plus a dashlet allowing
 any content item to be displayed on a site dashboard. The add-on was previously
 known as _Media Previews_.
 
+Introduction
+------------
+
 Viewers can be configured into the Web Preview component of the Document
 Details Page. In addition, the add-on supplies a custom dashlet which can be
 used to display any chosen document or content item on a site dashboard.
 
-Custom Viewers
-==============
+### Custom Viewers
 
 The following viewers are supplied in the v2.x add-on for use on Alfresco 4
 
-### PdfJs
+#### PdfJs
 
-**PdfJs** displays documents, presentations and any other file capable of being 
+PdfJs displays documents, presentations and any other file capable of being 
 transformed to PDF in-line in the web browser using the excellent [pdf.js](http://mozilla.github.com/pdf.js/)
 viewer, which uses the power of HTML5 to remove Share's Flash dependency for 
 document viewing.
@@ -33,7 +35,7 @@ number and zoom level of previous documents that you have viewed.
 
 ### FLVPlayer and MP3Player
 
-**FLVPlayer** and **MP3Player** display compatible audio and video files respectively, within the web-browser using the 
+FLVPlayer and MP3Player display compatible audio and video files respectively, within the web-browser using the 
 open source [FLV Player](http://flv-player.net/) and [MP3 Player](http://flash-mp3-player.net/) media players by [neolao](http://www.neolao.com/). Based on the 
 content's MIME type, the updated component automatically chooses the appropriate 
 previewer to use.
@@ -45,15 +47,15 @@ of non-H264/FLV video and non-MP3 audio. The user is informed when conversion
 is in progress and the screen automatically updates when the content can
 be viewed.
 
-### Embed
+#### Embed
 
-**Embed** uses an in-line iFrame to embed the content itself directly inside the
+Embed uses an in-line iFrame to embed the content itself directly inside the
 web page. It is suitable for use with content types that can be viewed 
 directly within the web browser such as plain text and PDF, with the Chrome
 or Acrobat plugins installed. Again, this can be used to avoid the use of 
 the Flash previewer for some clients.
 
-### Prettify
+#### Prettify
 
 Prettify allows formatted code, mark-up and other supported text formats
 to be displayed in directly in the document and uses the [google-code-prettify](https://code.google.com/p/google-code-prettify/)
@@ -61,7 +63,7 @@ project to provide an in-line browser-based view with syntax highlighting.
 
 ![Prettify Viewer](screenshots/prettify-js.png)
 
-### WebODF
+#### WebODF
 
 WebODF is an EXPERIMENTAL viewer which uses the AGPL-licensed [WebODF](http://www.webodf.org/) 
 project to display ODF content directly in the web browser.
@@ -70,15 +72,13 @@ WebODF cannot be distributed with the add-in itself, so in order to use it you m
 download the latest JAR file from the supporting [share-webodf project](https://github.com/wabson/webodf-share/downloads) and
 install it in the same way as the main media-viewers JAR file.
 
-Document Viewer Dashlet
------------------------
+### Document Viewer Dashlet
 
 This custom dashlet allows a site administrator to pick a content item from the site which will be displayed to
 all site members on the site dashboard. The dashlet will choose the correct viewer automatically and is 
 able to use the out-of-the-box viewers supplied plus the custom viewers provided by this add-on or other add-ons.
 
-Repository Configuration
-------------------------
+### Repository Configuration
 
 In addition to the Share component extensions the add-on supplies repository extension configuration
 for defining 'thumbnailed' content in PDF, H264/FLV and MP3 formats, a full-size image thumbnail for 
@@ -89,11 +89,11 @@ Download
 
 For Alfresco 4.x, download the latest 2.x version of Media Viewers.
 
-[Download Media Viewers add-on](http://code.google.com/p/share-extras/downloads/list?q=media-viewers)
+ * [Download Media Viewers add-on](http://code.google.com/p/share-extras/downloads/list?q=media-viewers)
 
 For Alfresco 3.x, download the latest 0.x or 1.0 version of Media Preview.
 
-[Download Media Previews add-on](http://code.google.com/p/share-extras/downloads/list?q=media-preview)
+ * [Download Media Previews add-on](http://code.google.com/p/share-extras/downloads/list?q=media-preview)
 
 Installation
 ------------
