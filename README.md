@@ -61,7 +61,7 @@ Prettify allows formatted code, mark-up and other supported text formats
 to be displayed in directly in the document and uses the [google-code-prettify](https://code.google.com/p/google-code-prettify/)
 project to provide an in-line browser-based view with syntax highlighting.
 
-![Prettify Viewer](screenshots/prettify-js.png)
+![Prettify Viewer](screenshots/prettify-js-20.png)
 
 #### WebODF
 
@@ -77,6 +77,8 @@ install it in the same way as the main media-viewers JAR file.
 This custom dashlet allows a site administrator to pick a content item from the site which will be displayed to
 all site members on the site dashboard. The dashlet will choose the correct viewer automatically and is 
 able to use the out-of-the-box viewers supplied plus the custom viewers provided by this add-on or other add-ons.
+
+![Document Viewer Dashlet](screenshots/pdfjs-dashlet-20.png)
 
 ### Repository Configuration
 
