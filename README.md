@@ -29,7 +29,7 @@ document previewer, such as a sidebar with thumbnail, outline and search views,
 bookmarking of individual pages of a document, and will remember the page 
 number and zoom level of previous documents that you have viewed.
   
-![PdfJs Viewer](screenshots/pdfjs-doc.png)
+![PdfJs Viewer](screenshots/pdfjs-pres-20.png)
 
 ### FLVPlayer and MP3Player
 
