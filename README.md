@@ -175,14 +175,22 @@ it picks up the changes.
 Configuration
 -------------
 
-If you are using Alfresco 4, you must enable the **PdfJs** module in Share's [Module Deployment console](http://code.google.com/p/share-extras/wiki/ModuleDeployment), which
+No additional configuration is required for the 0.x/1.x version of the add-on in
+Alfresco 3.
+
+If you are using Alfresco 4, you must enable the **PdfJs Viewer** module in Share's [Module Deployment console](http://code.google.com/p/share-extras/wiki/ModuleDeployment), which
 can be accessed by navigating to `http://hostname:port/share/page/modules/deploy` on your Alfresco server.
 
-*If you are using Media Viewers 2.5 or greater on Alfresco 4.2, then you can use the 
-second module **PdfJs Configuration** to automatically enable the viewer in the 
-Document Details page. Otherwise follow the instructions below.*
+The final step to configure the exact content types which the viewer should be used for varies between
+Alfresco 4.0/4.1 and 4.2.
 
-### Old instructions for Alfresco 4.0/4.1
+### Alfresco 4.2
+
+If you are using Media Viewers 2.5 or greater on Alfresco 4.2, then you can use the 
+second module **PdfJs Configuration** to automatically enable the viewer in the 
+Document Details page and the dashlet.
+
+### Alfresco 4.0/4.1
 
 After installing the add-on in Alfresco 4.0/4.1, you must then configure the `web-preview.get`
 component to use the particular viewers that you wish to enable. To do this, you must
@@ -196,12 +204,6 @@ component to use the particular viewers that you wish to enable. To do this, you
 An in-depth discussion of the redesigned `web-preview` component in Alfresco 4 is provided on 
 [Will's blog](http://blogs.alfresco.com/wp/wabson/2012/04/11/share-document-previews-in-alfresco-4/),
 where the configuration mechanism is explained. 
-Or, you can re-use the example configuration below and comment out any parts that you don't want.
-
-### Alfresco 3.3/3.4
-
-No additional configuration is required for the 0.x/1.x version of the add-on in
-Alfresco 3.
 
 Usage
 -----
