@@ -4,59 +4,81 @@ Media Viewers for Alfresco Share
 Authors: Will Abson (Alfresco), Peter Löfgren (Loftux AB)
 
 This add-on project for Alfresco Share provides a number of content viewers to 
-complement the out-of-the box set supplied with Share. It was previously named
-_Media Preview_.
+complement the out-of-the box set supplied with Share, plus a dashlet allowing
+any content item to be displayed on a site dashboard. The add-on was previously
+known as _Media Previews_.
 
 Viewers can be configured into the Web Preview component of the Document
 Details Page. In addition, the add-on supplies a custom dashlet which can be
 used to display any chosen document or content item on a site dashboard.
 
+Custom Viewers
+==============
+
 The following viewers are supplied in the v2.x add-on for use on Alfresco 4
 
-* **PdfJs** displays documents, presentations and any other file capable of being 
-  transformed to PDF in-line in the web browser using the excellent [pdf.js](http://mozilla.github.com/pdf.js/)
-  viewer, which uses the power of HTML5 to remove Share's Flash dependency for 
-  document viewing.
-  
-  The viewer supports a number of features not directly supported by the Flash
-  document previewer, such as a sidebar with thumbnail, outline and search views, 
-  bookmarking of individual pages of a document, and will remember the page 
-  number and zoom level of previous documents that you have viewed.
-  
-  ![PdfJs Viewer](http://sharextras.org/trunk/Media%20Preview/screenshots/pdfjs-doc.png)
+### PdfJs
 
-* **FLVPlayer** and **MP3Player** display compatible audio and video files respectively, within the web-browser using the 
-  open source [FLV Player](http://flv-player.net/) and [MP3 Player](http://flash-mp3-player.net/) media players by [neolao](http://www.neolao.com/). Based on the 
-  content's MIME type, the updated component automatically chooses the appropriate 
-  previewer to use.
+**PdfJs** displays documents, presentations and any other file capable of being 
+transformed to PDF in-line in the web browser using the excellent [pdf.js](http://mozilla.github.com/pdf.js/)
+viewer, which uses the power of HTML5 to remove Share's Flash dependency for 
+document viewing.
   
-  While similar to the Flash players provided by Share out-of-the-box, these 
-  implementations allow advanced customization of the player via configuration and
-  if [FFmpeg](http://ffmpeg.org/) is installed, will fire up a transformation to allow viewing 
-  of non-H264/FLV video and non-MP3 audio. The user is informed when conversion
-  is in progress and the screen automatically updates when the content can
-  be viewed.
+The viewer supports a number of features not directly supported by the Flash
+document previewer, such as a sidebar with thumbnail, outline and search views, 
+bookmarking of individual pages of a document, and will remember the page 
+number and zoom level of previous documents that you have viewed.
   
-* **Embed** uses an in-line iFrame to embed the content itself directly inside the
-  web page. It is suitable for use with content types that can be viewed 
-  directly within the web browser such as plain text and PDF, with the Chrome
-  or Acrobat plugins installed. Again, this can be used to avoid the use of 
-  the Flash previewer for some clients.
+![PdfJs Viewer](http://sharextras.org/trunk/Media%20Preview/screenshots/pdfjs-doc.png)
 
-* **Prettify** allows formatted code, mark-up and other supported text formats
-  to be displayed in directly in the document and uses the [google-code-prettify](https://code.google.com/p/google-code-prettify/)
-  project to provide an in-line browser-based view with syntax highlighting.
-  
-  ![Prettify Viewer](http://sharextras.org/trunk/Media%20Preview/screenshots/prettify-js.png)
+### FLVPlayer and MP3Player
 
-* **WebODF** is an EXPERIMENTAL viewer which uses the AGPL-licensed [WebODF](http://www.webodf.org/) 
-  project to display ODF content directly in the web browser.
-  
-  WebODF cannot be distributed with the add-in itself, so in order to use it you must also
-  download the latest JAR file from the supporting [share-webodf project](https://github.com/wabson/webodf-share/downloads) and
-  install it in the same way as the main media-viewers JAR file.
-  
-The v0.x/1.x add-on supplies only the FLVPlayer and MP3Player add-ons and works on Alfresco 3.3/3.4.
+**FLVPlayer** and **MP3Player** display compatible audio and video files respectively, within the web-browser using the 
+open source [FLV Player](http://flv-player.net/) and [MP3 Player](http://flash-mp3-player.net/) media players by [neolao](http://www.neolao.com/). Based on the 
+content's MIME type, the updated component automatically chooses the appropriate 
+previewer to use.
+
+While similar to the Flash players provided by Share out-of-the-box, these 
+implementations allow advanced customization of the player via configuration and
+if [FFmpeg](http://ffmpeg.org/) is installed, will fire up a transformation to allow viewing 
+of non-H264/FLV video and non-MP3 audio. The user is informed when conversion
+is in progress and the screen automatically updates when the content can
+be viewed.
+
+### Embed
+
+**Embed** uses an in-line iFrame to embed the content itself directly inside the
+web page. It is suitable for use with content types that can be viewed 
+directly within the web browser such as plain text and PDF, with the Chrome
+or Acrobat plugins installed. Again, this can be used to avoid the use of 
+the Flash previewer for some clients.
+
+### Prettify
+
+Prettify allows formatted code, mark-up and other supported text formats
+to be displayed in directly in the document and uses the [google-code-prettify](https://code.google.com/p/google-code-prettify/)
+project to provide an in-line browser-based view with syntax highlighting.
+
+![Prettify Viewer](http://sharextras.org/trunk/Media%20Preview/screenshots/prettify-js.png)
+
+### WebODF
+
+WebODF is an EXPERIMENTAL viewer which uses the AGPL-licensed [WebODF](http://www.webodf.org/) 
+project to display ODF content directly in the web browser.
+
+WebODF cannot be distributed with the add-in itself, so in order to use it you must also
+download the latest JAR file from the supporting [share-webodf project](https://github.com/wabson/webodf-share/downloads) and
+install it in the same way as the main media-viewers JAR file.
+
+Document Viewer Dashlet
+-----------------------
+
+This custom dashlet allows a site administrator to pick a content item from the site which will be displayed to
+all site members on the site dashboard. The dashlet will choose the correct viewer automatically and is 
+able to use the out-of-the-box viewers supplied plus the custom viewers provided by this add-on or other add-ons.
+
+Repository Configuration
+------------------------
 
 In addition to the Share component extensions the add-on supplies repository extension configuration
 for defining 'thumbnailed' content in PDF, H264/FLV and MP3 formats, a full-size image thumbnail for 
