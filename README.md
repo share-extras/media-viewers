@@ -65,11 +65,11 @@ video files in JPEG format, and a transformer based on FFmpeg for generating the
 Download
 --------
 
-For Alfresco 4.x, download the 2.0 version of Media Viewers.
+For Alfresco 4.x, download the latest 2.x version of Media Viewers.
 
 [Download Media Viewers add-on](http://code.google.com/p/share-extras/downloads/list?q=media-viewers)
 
-For Alfresco 3.x, download the 0.x or 1.0 version of Media Preview.
+For Alfresco 3.x, download the latest 0.x or 1.0 version of Media Preview.
 
 [Download Media Previews add-on](http://code.google.com/p/share-extras/downloads/list?q=media-preview)
 
@@ -79,9 +79,9 @@ Installation
 Copy the JAR file into the `tomcat/shared/lib` folder of your Alfresco installation (create the `lib` directory if it does not exist). If you are hosting
 the repository and Share in different Tomcat containers then you should install it in both.
 
-See _Configuration_ below, for instructions on how to enable the viewers in Share.
+See [Configuration](#Configuration) below, for instructions on how to enable the viewers in Share.
 
-### FFmpeg Installation (optional)
+### FFmpeg Installation (optional; only required for custom audio/video players)
 
 The supplied Spring configuration extends the repository thumbnailing capabilities to support 
 H264/FLV thumbnails for video content and MP3 thumbnails for audio content, both
@@ -120,7 +120,7 @@ warnings or errors related to FFmpeg, if you have enabled it.
 Building from Source
 --------------------
 
-The add-on has been developed to install on top of an existing Alfresco 4.0 or
+The add-on has been developed to install on top of an existing Alfresco 4.x or
 3.3/3.4 installation.
 
 An Ant build script is provided to build a JAR file containing the 
@@ -151,15 +151,17 @@ it picks up the changes.
 Configuration
 -------------
 
-You must enable the **PdfJs** module in Share's Module Deployment console, which
+If you are using Alfresco 4, you must enable the **PdfJs** module in Share's Module Deployment console, which
 can be accessed by navigating to `http://hostname:port/share/page/modules/deploy`
 on your Alfresco server.
 
-*If you are using the `trunk` codeline from r1340 onwards on Alfresco 4.2, then you can use the 
+*If you are using Media Viewers 2.5 or greater on Alfresco 4.2, then you can use the 
 second module **PdfJs Configuration** to automatically enable the viewer in the 
 Document Details page. Otherwise follow the instructions below.*
 
-After installing the add-on in Alfresco 4, you must then configure the `web-preview.get`
+### Old instructions for Alfresco 4.0/4.1
+
+After installing the add-on in Alfresco 4.0/4.1, you must then configure the `web-preview.get`
 component to use the particular viewers that you wish to enable. To do this, you must
 
 1. Copy the file `WEB-INF/classes/alfresco/site-webscripts/org/alfresco/components/preview/web-preview.get.config.xml` 
@@ -462,6 +464,9 @@ accompanied by an error in the browser JavaScript console indicating that the pl
 If you see this on your system, check that the add-on is installed correctly and that you have enabled the relevant viewers
 in the Module Deployment console.
 
+ * If your content does not load using the viewers, check that you have enabled the viewer and configuration modules in Share's Module Deployment console, and (for Alfresco 4.0/4.1) that you have configured your `web-preview.config.xml` as documented above
+ * If PDF content loads using the PdfJs or Embed viewers but other document types do not (e.g. Word, PowerPoint), check that you have added the JAR file to the repository or at least added the <a href="config/alfresco/extension/org_sharextras_pdfviewer-context.xml">repository Spring configuration</a> in your `<TOMAT_HOME>/shared/classes/alfresco/web-extension` folder.
+
 ###FFmpeg
 
 If you have problems with audio and video previews or thumbnails not working, first check your `alfresco.log` for any errors being thrown at startup, relating to FFmpeg. 
@@ -485,10 +490,7 @@ This should force the thumbnails to be generated syncronously, and a stack trace
 Known Issues
 ------------
 
-* Chrome on Windows does not correctly render PDF documents converted via OpenOffice, when using the PdfJs 
-  viewer. This is due to a [Chrome bug](http://code.google.com/p/chromium/issues/detail?id=122465). The viewer therefore tests for this combination of browser and operating 
-  system and declines to display the content. Fortunately the Embed viewer is able to render the content
-  via Chrome's built-in PDF support.
+* Internet Explorer is only supported in version 10 and greater due to performance problems in that browser. The Embed viewer can be used instead, otherwise rendering will fall back to the out-of-the-box Flash viewer.
 
 * In versions 3.3, 3.4.a, 3.4.b and 3.4.c, the video player only supports previews of MP4 and FLV content, due to 
   a bug whereby the thumbnail service [cannot produce renditions using a RuntimeExec transformer](https://issues.alfresco.com/jira/browse/ALF-4214). 
