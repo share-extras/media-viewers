@@ -29,7 +29,7 @@ document previewer, such as a sidebar with thumbnail, outline and search views,
 bookmarking of individual pages of a document, and will remember the page 
 number and zoom level of previous documents that you have viewed.
   
-![PdfJs Viewer](http://sharextras.org/trunk/Media%20Preview/screenshots/pdfjs-doc.png)
+![PdfJs Viewer](screenshots/pdfjs-doc.png)
 
 ### FLVPlayer and MP3Player
 
@@ -59,7 +59,7 @@ Prettify allows formatted code, mark-up and other supported text formats
 to be displayed in directly in the document and uses the [google-code-prettify](https://code.google.com/p/google-code-prettify/)
 project to provide an in-line browser-based view with syntax highlighting.
 
-![Prettify Viewer](http://sharextras.org/trunk/Media%20Preview/screenshots/prettify-js.png)
+![Prettify Viewer](screenshots/prettify-js.png)
 
 ### WebODF
 
