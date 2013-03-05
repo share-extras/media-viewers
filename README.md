@@ -3,17 +3,12 @@ Media Viewers for Alfresco Share
 
 Authors: Will Abson (Alfresco), Peter Löfgren (Loftux AB)
 
-This add-on project for Alfresco Share provides a number of content viewers to 
-complement the out-of-the box set supplied with Share, plus a dashlet allowing
-any content item to be displayed on a site dashboard. The add-on was previously
-known as _Media Previews_.
+This add-on project for Alfresco Share provides a number of content viewers to complement the out-of-the box set supplied with Share, plus a dashlet allowing any content item to be displayed on a site dashboard. The add-on was previously known as _Media Previews_.
 
 Introduction
 ------------
 
-Viewers can be configured into the Web Preview component of the Document
-Details Page. In addition, the add-on supplies a custom dashlet which can be
-used to display any chosen document or content item on a site dashboard.
+Viewers can be configured into the Web Preview component of the Document Details Page. In addition, the add-on supplies a custom dashlet which can be used to display any chosen document or content item on a site dashboard.
 
 ### Custom Viewers
 
@@ -21,38 +16,22 @@ The following viewers are supplied in the v2.x add-on for use on Alfresco 4
 
 #### PdfJs
 
-PdfJs displays documents, presentations and any other file capable of being 
-transformed to PDF in-line in the web browser using the excellent [pdf.js](http://mozilla.github.com/pdf.js/)
-viewer, which uses the power of HTML5 to remove Share's Flash dependency for 
-document viewing.
+PdfJs displays documents, presentations and any other file capable of being transformed to PDF in-line in the web browser using the excellent [pdf.js](http://mozilla.github.com/pdf.js/) viewer, which uses the power of HTML5 to remove Share's Flash dependency for document viewing.
   
-The viewer supports a number of features not directly supported by the Flash
-document previewer, such as a sidebar with thumbnail, outline and search views, 
-bookmarking of individual pages of a document, and will remember the page 
-number and zoom level of previous documents that you have viewed.
+The viewer supports a number of features not directly supported by the Flash document previewer, such as a sidebar with thumbnail, outline and search views, bookmarking of individual pages of a document, and will remember the page number and zoom level of previous documents that you have viewed.
   
 ![PdfJs Viewer](screenshots/pdfjs-pres-20.png)
 
 ### FLVPlayer and MP3Player
 
-FLVPlayer and MP3Player display compatible audio and video files respectively, within the web-browser using the 
-open source [FLV Player](http://flv-player.net/) and [MP3 Player](http://flash-mp3-player.net/) media players by [neolao](http://www.neolao.com/). Based on the 
-content's MIME type, the updated component automatically chooses the appropriate 
-previewer to use.
+FLVPlayer and MP3Player display compatible audio and video files respectively, within the web-browser using the open source [FLV Player](http://flv-player.net/) and [MP3 Player](http://flash-mp3-player.net/) media players by [neolao](http://www.neolao.com/). Based on the content's MIME type, the updated component automatically chooses the appropriate previewer to use.
 
-While similar to the Flash players provided by Share out-of-the-box, these 
-implementations allow advanced customization of the player via configuration and
-if [FFmpeg](http://ffmpeg.org/) is installed, will fire up a transformation to allow viewing 
-of non-H264/FLV video and non-MP3 audio. The user is informed when conversion
-is in progress and the screen automatically updates when the content can
+While similar to the Flash players provided by Share out-of-the-box, these implementations allow advanced customization of the player via configuration and if [FFmpeg](http://ffmpeg.org/) is installed, will fire up a transformation to allow viewing of non-H264/FLV video and non-MP3 audio. The user is informed when conversion is in progress and the screen automatically updates when the content can
 be viewed.
 
 #### Embed
 
-Embed uses an in-line iFrame to embed the content itself directly inside the
-web page. It is suitable for use with content types that can be viewed 
-directly within the web browser such as plain text and PDF, with the Chrome
-or Acrobat plugins installed. Again, this can be used to avoid the use of 
+Embed uses an in-line iFrame to embed the content itself directly inside the web page. It is suitable for use with content types that can be viewed directly within the web browser such as plain text and PDF, with the Chrome or Acrobat plugins installed. Again, this can be used to avoid the use of 
 the Flash previewer for some clients.
 
 #### Prettify
@@ -100,59 +79,41 @@ For Alfresco 3.x, download the latest 0.x or 1.0 version of Media Preview.
 Installation
 ------------
 
-Copy the JAR file into the `tomcat/shared/lib` folder of your Alfresco installation (create the `lib` directory if it does not exist). If you are hosting
-the repository and Share in different Tomcat containers then you should install it in both.
+Copy the JAR file into the `tomcat/shared/lib` folder of your Alfresco installation (create the `lib` directory if it does not exist). If you are hosting the repository and Share in different Tomcat containers then you should install it in both.
 
 See [Configuration](#Configuration) below, for instructions on how to enable the viewers in Share.
 
 ### FFmpeg Installation (optional; only required for custom audio/video players)
 
-The supplied Spring configuration extends the repository thumbnailing capabilities to support 
-H264/FLV thumbnails for video content and MP3 thumbnails for audio content, both
-using FFmpeg, and PDF thumbnails for content such as Microsoft Word and Powerpoint
-files. PDF thumbnails can be generated using the default repository transformers,
+The supplied Spring configuration extends the repository thumbnailing capabilities to support H264/FLV thumbnails for video content and MP3 thumbnails for audio content, both using FFmpeg, and PDF thumbnails for content such as Microsoft Word and Powerpoint files. PDF thumbnails can be generated using the default repository transformers,
 but a custom transformer is supplied to enable the FFmpeg transformations.
 
-The previews therefore do not require FFmpeg, but it is highly recommended to
-support the widest range of formats, and for thumbnail image generation.
+The previews therefore do not require FFmpeg, but it is highly recommended to support the widest range of formats, and for thumbnail image generation.
 
 To enable FFmpeg support you must
 
 1. Install FFmpeg (with [x264](http://www.videolan.org/developers/x264.html)) on the server
    
-   It is unlikely that your standard package manager will install this for you. The 
-   [FFmpeg documentation](https://ffmpeg.org/trac/ffmpeg/wiki) does however contain detailed documentation for compiling on
-   [Ubuntu](https://ffmpeg.org/trac/ffmpeg/wiki/UbuntuCompilationGuide) and [other operating systems](https://ffmpeg.org/trac/ffmpeg/wiki/CompilationGuide)
-   and the project also makes pre-built binaries available for [download](http://ffmpeg.org/download.html).
+   It is unlikely that your standard package manager will install this for you. The [FFmpeg documentation](https://ffmpeg.org/trac/ffmpeg/wiki) does however contain detailed documentation for compiling on [Ubuntu](https://ffmpeg.org/trac/ffmpeg/wiki/UbuntuCompilationGuide) and [other operating systems](https://ffmpeg.org/trac/ffmpeg/wiki/CompilationGuide) and the project also makes pre-built binaries available for [download](http://ffmpeg.org/download.html).
    
-2. Edit your `alfresco-global.properties` file to define the location
-   of the FFmpeg executable and base directory (should not contain spaces)
+2. Edit your `alfresco-global.properties` file to define the location of the FFmpeg executable and base directory (should not contain spaces)
 
         ffmpeg.exe=<location of ffmpeg executable>
    
-   The path should not contain spaces, and if you are on Windows you should use
-   forward slashes rather than backslashes as your directory separator, or use
-   double-backslashes to escape them.
+   The path should not contain spaces, and if you are on Windows you should use forward slashes rather than backslashes as your directory separator, or use double-backslashes to escape them.
 
-If you are running Alfresco and Share in the same application server then the 
-JAR file also contains the required repository configuration, but if these are
-in separate containers then you will need to install it into both.
+If you are running Alfresco and Share in the same application server then the JAR file also contains the required repository configuration, but if these are in separate containers then you will need to install it into both.
 
-Check the `alfresco.log` file while the repository is starting up for any 
-warnings or errors related to FFmpeg, if you have enabled it.
+Check the `alfresco.log` file while the repository is starting up for any warnings or errors related to FFmpeg, if you have enabled it.
 
 Building from Source
 --------------------
 
-The add-on has been developed to install on top of an existing Alfresco 4.x or
-3.3/3.4 installation.
+The dashlet is packaged as a single JAR file for easy installation into Alfresco Share.
 
-An Ant build script is provided to build a JAR file containing the 
-custom files, which can then be installed into the `tomcat/shared/lib` folder 
-of your Alfresco installation.
+An Ant build script is provided to build a JAR file containing the custom files, which can then be installed into the `tomcat/shared/lib` folder of your Alfresco installation.
 
-To build the JAR file, run the following command from the base project 
-directory.
+To build the JAR file, run the Ant from the base project directory.
 
     ant -f project.xml dist-jar
 
@@ -160,17 +121,13 @@ Or, for the 0.x/1.0 release
 
     ant dist-jar
 
-The command should build a JAR file named `media-viewers-{version}.jar`
-in the `dist` directory within your project.
+The command should build a JAR file named `media-viewers-<version>.jar` in the `build/dist` directory within your project.
 
-To deploy the add-on files into a local Tomcat instance for testing, you can 
-use the `hotcopy-tomcat-jar` task. You will need to set the `tomcat.home`
-property in Ant.
+To deploy the add-on files into a local Tomcat instance for testing, you can use the `hotcopy-tomcat-jar` task. You will need to set the `tomcat.home` property in Ant.
 
     ant -f project.xml -Dtomcat.home=C:/Alfresco/tomcat hotcopy-tomcat-jar
 
-After you have deployed the JAR file you will need to restart Tomcat to ensure 
-it picks up the changes.
+After you have deployed the JAR file you will need to restart Tomcat to ensure it picks up the changes.
 
 Configuration
 -------------
@@ -178,26 +135,19 @@ Configuration
 No additional configuration is required for the 0.x/1.x version of the add-on in
 Alfresco 3.
 
-If you are using Alfresco 4, you must enable the **PdfJs Viewer** module in Share's [Module Deployment console](http://code.google.com/p/share-extras/wiki/ModuleDeployment), which
-can be accessed by navigating to `http://hostname:port/share/page/modules/deploy` on your Alfresco server.
+If you are using Alfresco 4, you must enable the **PdfJs Viewer** module in Share's [Module Deployment console](http://code.google.com/p/share-extras/wiki/ModuleDeployment), which can be accessed by navigating to `http://hostname:port/share/page/modules/deploy` on your Alfresco server.
 
-The final step to configure the exact content types which the viewer should be used for varies between
-Alfresco 4.0/4.1 and 4.2.
+The final step to configure the exact content types which the viewer should be used for varies between Alfresco 4.0/4.1 and 4.2.
 
 ### Alfresco 4.2
 
-If you are using Media Viewers 2.5 or greater on Alfresco 4.2, then you can use the 
-second module **PdfJs Configuration** to automatically enable the viewer in the 
-Document Details page and the dashlet.
+If you are using Media Viewers 2.5 or greater on Alfresco 4.2, then you can use the second module **PdfJs Configuration** to automatically enable the viewer in the Document Details page and the dashlet.
 
 ### Alfresco 4.0/4.1
 
-After installing the add-on in Alfresco 4.0/4.1, you must then configure the `web-preview.get`
-component to use the particular viewers that you wish to enable. To do this, you must
+After installing the add-on in Alfresco 4.0/4.1, you must then configure the `web-preview.get` component to use the particular viewers that you wish to enable. To do this, you must 
 
-1. Copy the file `WEB-INF/classes/alfresco/site-webscripts/org/alfresco/components/preview/web-preview.get.config.xml` 
-   from the exploded Alfresco webapp into the directory `alfresco/web-extension/site-webscripts/org/alfresco/components/preview`
-   under your `tomcat/shared/classes`. You will need to create the new directories if you have not done this previously.
+1. Copy the file `WEB-INF/classes/alfresco/site-webscripts/org/alfresco/components/preview/web-preview.get.config.xml` from the exploded Alfresco webapp into the directory `alfresco/web-extension/site-webscripts/org/alfresco/components/preview` under your `tomcat/shared/classes`. You will need to create the new directories if you have not done this previously.
 
 2. Modify that file to add in the new viewers as needed, or replace the content with the [suggested sample configuration](https://gist.github.com/wabson/5057107)
 
@@ -208,23 +158,18 @@ where the configuration mechanism is explained.
 Usage
 -----
 
-Upload a supported file type to Alfresco Share and navigate to the Document Details page to 
-see the preview.
+Upload a supported file type to Alfresco Share and navigate to the Document Details page to see the preview.
 
-To use the Document Viewer dashlet, navigate to a site dashboard. Then, click the 
-_Customize Dashboard_ button to edit the contents of the dashboard and drag 
-the dashlet into one of the columns from the list of dashlets.
+To use the Document Viewer dashlet, navigate to a site dashboard. Then, click the _Customize Dashboard_ button to edit the contents of the dashboard and drag the dashlet into one of the columns from the list of dashlets.
 
 Troubleshooting
 ---------------
 
 ###Web Previews
 
-The most common problem that you may see when using the viewers is that the text _Preparing Previewer..._ is shown on the screen. This is usually
-accompanied by an error in the browser JavaScript console indicating that the plugin instance could not be created.
+The most common problem that you may see when using the viewers is that the text _Preparing Previewer..._ is shown on the screen. This is usually accompanied by an error in the browser JavaScript console indicating that the plugin instance could not be created.
 
-If you see this on your system, check that the add-on is installed correctly and that you have enabled the relevant viewers
-in the Module Deployment console.
+If you see this on your system, check that the add-on is installed correctly and that you have enabled the relevant viewers in the Module Deployment console.
 
  * If your content does not load using the viewers, check that you have enabled the viewer and configuration modules in Share's Module Deployment console, and (for Alfresco 4.0/4.1) that you have configured your `web-preview.config.xml` as documented above
  * If PDF content loads using the PdfJs or Embed viewers but other document types do not (e.g. Word, PowerPoint), check that you have added the JAR file to the repository or at least added the <a href="config/alfresco/extension/org_sharextras_pdfviewer-context.xml">repository Spring configuration</a> in your `<TOMAT_HOME>/shared/classes/alfresco/web-extension` folder.
