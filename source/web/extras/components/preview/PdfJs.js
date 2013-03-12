@@ -743,6 +743,10 @@
       {
          this.pdfDoc = pdf;
          this.numPages = this.pdfDoc.numPages;
+         if (Alfresco.logger.isDebugEnabled())
+         {
+            Alfresco.logger.debug("Rendering PDF with fingerprint " + pdf.fingerprint + " for " + this.wp.options.name);
+         }
          this._renderPdf();
          this._updatePageControls();
          this.onPdfLoaded.fire(pdf);
