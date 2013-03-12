@@ -61,6 +61,10 @@
     */
    Alfresco.WebPreview.prototype.Plugins.PdfJs = function(wp, attributes)
    {
+      this.pages = [];
+      this.pageText = [];
+      this.widgets = {};
+      this.documentConfig = {};
       this.wp = wp;
       this.id = wp.id; // needed by Alfresco.util.createYUIButton
       this.attributes = YAHOO.lang.merge(Alfresco.util.deepCopy(this.attributes), attributes);
