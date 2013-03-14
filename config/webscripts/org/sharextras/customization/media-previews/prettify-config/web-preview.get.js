@@ -38,6 +38,50 @@ if (model.widgets)
                }
             }]
          });
+         conditions.push({
+            attributes: {
+               mimeType: "application/x-sh"
+            },
+            plugins: [{
+               name: "Prettify",
+               attributes: {
+                  lang: "lang-bash"
+               }
+            }]
+         });
+         conditions.push({
+            attributes: {
+               mimeType: "text/html"
+            },
+            plugins: [{
+               name: "Prettify",
+               attributes: {
+                  lang: "lang-html"
+               }
+            }]
+         });
+         conditions.push({
+            attributes: {
+               mimeType: "application/xhtml+xml"
+            },
+            plugins: [{
+               name: "Prettify",
+               attributes: {
+                  lang: "lang-html"
+               }
+            }]
+         });
+         conditions.push({
+            attributes: {
+               mimeType: "text/xml"
+            },
+            plugins: [{
+               name: "Prettify",
+               attributes: {
+                  lang: "lang-xml"
+               }
+            }]
+         });
          var oldConditions = eval("(" + widget.options.pluginConditions + ")");
          // Add the other conditions back in
          for (var j = 0; j < oldConditions.length; j++)
