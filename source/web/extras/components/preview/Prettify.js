@@ -46,6 +46,8 @@
           * 
           * If not specified (or empty) will use the normal prettify auto-detection
           * 
+          * If set to 'none' no pretty-printing will be carried out
+          * 
           * @property lang
           * @type String
           * @default ""
@@ -99,9 +101,16 @@
        */
       onContentLoaded: function Prettify_onContentLoaded(p_obj)
       {
-         var classes = 'prettyprint' + $html(this.attributes.lang ? ' ' + this.attributes.lang : '');
-         this.wp.getPreviewerElement().innerHTML = '<pre class="' + classes + '">' + (p_obj.serverResponse.responseText).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>';
-         prettyPrint();
+         if ('none' != this.attributes.lang)
+         {
+            var classes = 'prettyprint' + $html(this.attributes.lang ? ' ' + this.attributes.lang : '');
+            this.wp.getPreviewerElement().innerHTML = '<pre class="' + classes + '">' + (p_obj.serverResponse.responseText).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>';
+            prettyPrint();
+         }
+         else
+         {
+            this.wp.getPreviewerElement().innerHTML = '<pre>' + (p_obj.serverResponse.responseText).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>';
+         }
       }
    };
 })();

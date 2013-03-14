@@ -27,6 +27,17 @@ if (model.widgets)
                }
             }]
          });
+         conditions.push({
+            attributes: {
+               mimeType: "text/plain"
+            },
+            plugins: [{
+               name: "Prettify",
+               attributes: {
+                  lang: "none"
+               }
+            }]
+         });
          var oldConditions = eval("(" + widget.options.pluginConditions + ")");
          // Add the other conditions back in
          for (var j = 0; j < oldConditions.length; j++)

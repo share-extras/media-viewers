@@ -5,10 +5,7 @@
     border: 1px solid #CCCCCC;
 }
 
-.web-preview .previewer.Prettify pre {
-}
-
-.web-preview .previewer.Prettify pre.prettyprint {
+.web-preview .previewer.Prettify > pre {
     padding: 1em;
     border: 0px;
 }
