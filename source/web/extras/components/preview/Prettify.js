@@ -52,7 +52,17 @@
           * @type String
           * @default ""
           */
-         lang: ""
+         lang: "",
+         
+         /**
+          * Maximum size to display given in bytes if the node's content is used.
+          * If the node content is larger than this value the text won't be displayed at all.
+          *
+          * @property srcMaxSize
+          * @type String
+          * @default "2000000"
+          */
+         srcMaxSize: "2000000"
       },
    
       /**
@@ -65,6 +75,11 @@
        */
       report: function Prettify_report()
       {
+         var srcMaxSize = this.attributes.srcMaxSize;
+         if (srcMaxSize.match(/^\d+$/) && this.wp.options.size > parseInt(srcMaxSize))
+         {
+            return "Text content is too large to be previewed";
+         }
          return (typeof(prettyPrint) == "function") ? null : "prettyPrint() not found!";
       },
    
