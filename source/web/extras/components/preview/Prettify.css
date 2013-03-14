@@ -9,3 +9,8 @@
     padding: 1em;
     border: 0px;
 }
+
+.web-preview .previewer.Prettify pre ol.linenums li {
+	list-style-type: decimal;
+	background: transparent;
+}
