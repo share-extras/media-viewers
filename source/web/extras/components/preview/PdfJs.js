@@ -275,6 +275,15 @@
       inDashlet : false,
 
       /**
+       * Store the pdf.js url for use with PDFJS.workerSrc (4.2 Specific).
+       *
+       * @property workerSrc
+       * @type string
+       * @default empty string
+       */
+      workerSrc : "",
+
+      /**
        * Tests if the plugin can be used in the users browser.
        * 
        * @method report
@@ -357,6 +366,18 @@
        */
       onComponentsLoaded : function PdfJs_onComponentsLoaded()
       {
+         this.workerSrc = Alfresco.constants.URL_CONTEXT + 'res/extras/components/preview/pdfjs/pdf' +  (Alfresco.constants.DEBUG ? '.js' : '-min.js');
+         // Find the name of pdf.js resource file (4.2 specific)
+         var scriptElements = document.getElementsByTagName('script');
+         for(i = 0, il = scriptElements.length; i < il; i++)
+         {
+            if(scriptElements[i].src.indexOf('extras/components/preview/pdfjs/pdf_') > -1)
+            {
+               this.workerSrc =  scriptElements[i].src;
+               break;
+            }
+         }
+
          if (!this.inWikiPage && !this.inDashlet)
          {
             this._loadDocumentConfig();
@@ -718,8 +739,8 @@
          }, this, true);
 
          // Set the worker source
-         PDFJS.workerSrc = Alfresco.constants.URL_CONTEXT + 'res/extras/components/preview/pdfjs/pdf' +  (Alfresco.constants.DEBUG ? '.js' : '-min.js');
-         
+         PDFJS.workerSrc = this.workerSrc;
+
          if (Alfresco.logger.isDebugEnabled())
          {
             Alfresco.logger.debug("Loading PDF file from " + fileurl);
