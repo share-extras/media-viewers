@@ -741,6 +741,11 @@
          // Set the worker source
          PDFJS.workerSrc = this.workerSrc;
 
+         // PDFJS Disable new range feature if not loading from first page
+         PDFJS.disableRange = true;
+         // disable autofetch - retrieve just the ranges needed to display
+         PDFJS.disableAutoFetch = false;
+
          if (Alfresco.logger.isDebugEnabled())
          {
             Alfresco.logger.debug("Loading PDF file from " + fileurl);
