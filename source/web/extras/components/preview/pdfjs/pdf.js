@@ -22,8 +22,8 @@
  */
 
 var PDFJS = {};
-PDFJS.version = '0.8.129';
-PDFJS.build = 'a081c2d';
+PDFJS.version = '0.8.174';
+PDFJS.build = '59d0ccf';
 
 (function pdfjsWrapper() {
    // Use strict in our context only - users might not want it
@@ -733,6 +733,13 @@ PDFJS.build = 'a081c2d';
 
          requestLoadedStream: function BasePdfManager_requestLoadedStream() {
             return new NotImplementedException();
+         },
+
+         updatePassword: function BasePdfManager_updatePassword(password) {
+            this.pdfModel.xref.password = this.password = password;
+            if (this.passwordChangedPromise) {
+               this.passwordChangedPromise.resolve();
+            }
          }
       };
 
@@ -886,25 +893,6 @@ PDFJS.build = 'a081c2d';
 
    var Page = (function PageClosure() {
 
-      function getDefaultAnnotationAppearance(annotationDict) {
-         var appearanceState = annotationDict.get('AP');
-         if (!isDict(appearanceState)) {
-            return;
-         }
-
-         var appearance;
-         var appearances = appearanceState.get('N');
-         if (isDict(appearances)) {
-            var as = annotationDict.get('AS');
-            if (as && appearances.has(as.name)) {
-               appearance = appearances.get(as.name);
-            }
-         } else {
-            appearance = appearances;
-         }
-         return appearance;
-      }
-
       function Page(pdfManager, xref, pageIndex, pageDict, ref) {
          this.pdfManager = pdfManager;
          this.pageIndex = pageIndex;
@@ -961,8 +949,8 @@ PDFJS.build = 'a081c2d';
 
             return shadow(this, 'view', cropBox);
          },
-         get annotations() {
-            return shadow(this, 'annotations', this.inheritPageProp('Annots'));
+         get annotationRefs() {
+            return shadow(this, 'annotationRefs', this.inheritPageProp('Annots'));
          },
          get rotate() {
             var rotate = this.inheritPageProp('Rotate') || 0;
@@ -1001,8 +989,11 @@ PDFJS.build = 'a081c2d';
             var self = this;
             var promise = new Promise();
 
+            function reject(e) {
+               promise.reject(e);
+            }
+
             var pageListPromise = new Promise();
-            var annotationListPromise = new Promise();
 
             var pdfManager = this.pdfManager;
             var contentStreamPromise = pdfManager.ensure(this, 'getContentStream',
@@ -1015,7 +1006,7 @@ PDFJS.build = 'a081c2d';
                this.idCounters);
 
             var dataPromises = Promise.all(
-               [contentStreamPromise, resourcesPromise]);
+               [contentStreamPromise, resourcesPromise], reject);
             dataPromises.then(function(data) {
                var contentStream = data[0];
                var resources = data[1];
@@ -1026,41 +1017,46 @@ PDFJS.build = 'a081c2d';
                      opListPromise.then(function(data) {
                         pageListPromise.resolve(data);
                      });
-                  }
+                  },
+                  reject
                );
             });
 
-            pdfManager.ensure(this, 'getAnnotationsForDraw', []).then(
-               function(annotations) {
-                  pdfManager.ensure(partialEvaluator, 'getAnnotationsOperatorList',
-                        [annotations]).then(
-                     function(opListPromise) {
-                        opListPromise.then(function(data) {
-                           annotationListPromise.resolve(data);
-                        });
+            var annotationsPromise = pdfManager.ensure(this, 'annotations');
+            Promise.all([pageListPromise, annotationsPromise]).then(function(datas) {
+               var pageData = datas[0];
+               var pageQueue = pageData.queue;
+               var annotations = datas[1];
+
+               var ensurePromises = [];
+               for (var i = 0, n = annotations.length; i < n; ++i) {
+                  var ensurePromise = pdfManager.ensure(annotations[i],
+                     'getOperatorList',
+                     [partialEvaluator]);
+                  ensurePromises.push(ensurePromise);
+               }
+
+               Promise.all(ensurePromises).then(function(listPromises) {
+                  Promise.all(listPromises).then(function(datas) {
+                     for (var i = 0, n = datas.length; i < n; ++i) {
+                        var annotationData = datas[i];
+                        var annotationQueue = annotationData.queue;
+                        Util.concatenateToArray(pageQueue.fnArray,
+                           annotationQueue.fnArray);
+                        Util.concatenateToArray(pageQueue.argsArray,
+                           annotationQueue.argsArray);
+                        Util.extendObj(pageData.dependencies,
+                           annotationData.dependencies);
                      }
-                  );
-               }
-            );
 
-            Promise.all([pageListPromise, annotationListPromise]).then(
-               function(datas) {
-                  var pageData = datas[0];
-                  var pageQueue = pageData.queue;
-                  var annotationData = datas[1];
-                  var annotationQueue = annotationData.queue;
-                  Util.concatenateToArray(pageQueue.fnArray, annotationQueue.fnArray);
-                  Util.concatenateToArray(pageQueue.argsArray,
-                     annotationQueue.argsArray);
-                  PartialEvaluator.optimizeQueue(pageQueue);
-                  Util.extendObj(pageData.dependencies, annotationData.dependencies);
+                     PartialEvaluator.optimizeQueue(pageQueue);
 
-                  promise.resolve(pageData);
-               }
-            );
+                     promise.resolve(pageData);
+                  }, reject);
+               }, reject);
+            }, reject);
 
             return promise;
-
          },
          extractTextContent: function Page_extractTextContent() {
             var handler = {
@@ -1104,230 +1100,27 @@ PDFJS.build = 'a081c2d';
 
             return textContentPromise;
          },
-         getLinks: function Page_getLinks() {
-            var links = [];
-            var annotations = this.getAnnotations();
-            var i, n = annotations.length;
-            for (i = 0; i < n; ++i) {
-               if (annotations[i].type != 'Link')
-                  continue;
-               links.push(annotations[i]);
+
+         getAnnotationsData: function Page_getAnnotationsData() {
+            var annotations = this.annotations;
+            var annotationsData = [];
+            for (var i = 0, n = annotations.length; i < n; ++i) {
+               annotationsData.push(annotations[i].getData());
             }
-            return links;
+            return annotationsData;
          },
 
-         getAnnotations: function Page_getAnnotations() {
-            var annotations = this.getAnnotationsBase();
-            var items = [];
-            for (var i = 0, length = annotations.length; i < length; ++i) {
-               items.push(annotations[i].item);
-            }
-            return items;
-         },
-
-         getAnnotationsForDraw: function Page_getAnnotationsForDraw() {
-            var annotations = this.getAnnotationsBase();
-            var items = [];
-            for (var i = 0, length = annotations.length; i < length; ++i) {
-               var item = annotations[i].item;
-               var annotationDict = annotations[i].dict;
-
-               item.annotationFlags = annotationDict.get('F');
-
-               var appearance = getDefaultAnnotationAppearance(annotationDict);
-               if (appearance &&
-                  // TODO(mack): The proper implementation requires that the
-                  // appearance stream overrides Name, but we're currently
-                  // doing it the other way around for 'Text' annotations since we
-                  // have special rendering for it
-                  item.type !== 'Text') {
-
-                  item.appearance = appearance;
-                  var appearanceDict = appearance.dict;
-                  item.resources = appearanceDict.get('Resources');
-                  item.bbox = appearanceDict.get('BBox') || [0, 0, 1, 1];
-                  item.matrix = appearanceDict.get('Matrix') || [1, 0, 0, 1, 0 ,0];
-               }
-
-               var border = annotationDict.get('BS');
-               if (isDict(border) && !item.appearance) {
-                  var borderWidth = border.has('W') ? border.get('W') : 1;
-                  if (borderWidth !== 0) {
-                     item.border = {
-                        width: borderWidth,
-                        type: border.get('S') || 'S',
-                        rgb: annotationDict.get('C') || [0, 0, 1]
-                     };
-                  }
-               }
-
-               items.push(item);
-            }
-
-            return items;
-         },
-
-         getAnnotationsBase: function Page_getAnnotationsBase() {
-            var xref = this.xref;
-            function getInheritableProperty(annotation, name) {
-               var item = annotation;
-               while (item && !item.has(name)) {
-                  item = item.get('Parent');
-               }
-               if (!item)
-                  return null;
-               return item.get(name);
-            }
-            function isValidUrl(url) {
-               if (!url)
-                  return false;
-               var colon = url.indexOf(':');
-               if (colon < 0)
-                  return false;
-               var protocol = url.substr(0, colon);
-               switch (protocol) {
-                  case 'http':
-                  case 'https':
-                  case 'ftp':
-                  case 'mailto':
-                     return true;
-                  default:
-                     return false;
+         get annotations() {
+            var annotations = [];
+            var annotationRefs = this.annotationRefs || [];
+            for (var i = 0, n = annotationRefs.length; i < n; ++i) {
+               var annotationRef = annotationRefs[i];
+               var annotation = Annotation.fromRef(this.xref, annotationRef);
+               if (annotation) {
+                  annotations.push(annotation);
                }
             }
-
-            var annotations = this.annotations || [];
-            var i, n = annotations.length;
-            var items = [];
-            for (i = 0; i < n; ++i) {
-               var annotationRef = annotations[i];
-               var annotation = xref.fetchIfRef(annotationRef);
-               if (!isDict(annotation))
-                  continue;
-               var subtype = annotation.get('Subtype');
-               if (!isName(subtype))
-                  continue;
-
-               var item = {};
-               item.type = subtype.name;
-               var rect = annotation.get('Rect');
-               item.rect = Util.normalizeRect(rect);
-
-               var includeAnnotation = true;
-               switch (subtype.name) {
-                  case 'Link':
-                     var a = annotation.get('A');
-                     if (a) {
-                        switch (a.get('S').name) {
-                           case 'URI':
-                              var url = a.get('URI');
-                              // TODO: pdf spec mentions urls can be relative to a Base
-                              // entry in the dictionary.
-                              if (!isValidUrl(url))
-                                 url = '';
-                              item.url = url;
-                              break;
-                           case 'GoTo':
-                              item.dest = a.get('D');
-                              break;
-                           case 'GoToR':
-                              var url = a.get('F');
-                              if (isDict(url)) {
-                                 // We assume that the 'url' is a Filspec dictionary
-                                 // and fetch the url without checking any further
-                                 url = url.get('F') || '';
-                              }
-
-                              // TODO: pdf reference says that GoToR
-                              // can also have 'NewWindow' attribute
-                              if (!isValidUrl(url))
-                                 url = '';
-                              item.url = url;
-                              item.dest = a.get('D');
-                              break;
-                           default:
-                              TODO('unrecognized link type: ' + a.get('S').name);
-                        }
-                     } else if (annotation.has('Dest')) {
-                        // simple destination link
-                        var dest = annotation.get('Dest');
-                        item.dest = isName(dest) ? dest.name : dest;
-                     }
-                     break;
-                  case 'Widget':
-                     var fieldType = getInheritableProperty(annotation, 'FT');
-                     if (!isName(fieldType))
-                        break;
-
-                     // Do not display digital signatures since we do not currently
-                     // validate them.
-                     if (fieldType.name === 'Sig') {
-                        includeAnnotation = false;
-                        break;
-                     }
-
-                     item.fieldType = fieldType.name;
-                     // Building the full field name by collecting the field and
-                     // its ancestors 'T' properties and joining them using '.'.
-                     var fieldName = [];
-                     var namedItem = annotation, ref = annotationRef;
-                     while (namedItem) {
-                        var parent = namedItem.get('Parent');
-                        var parentRef = namedItem.getRaw('Parent');
-                        var name = namedItem.get('T');
-                        if (name) {
-                           fieldName.unshift(stringToPDFString(name));
-                        } else {
-                           // The field name is absent, that means more than one field
-                           // with the same name may exist. Replacing the empty name
-                           // with the '`' plus index in the parent's 'Kids' array.
-                           // This is not in the PDF spec but necessary to id the
-                           // the input controls.
-                           var kids = parent.get('Kids');
-                           var j, jj;
-                           for (j = 0, jj = kids.length; j < jj; j++) {
-                              var kidRef = kids[j];
-                              if (kidRef.num == ref.num && kidRef.gen == ref.gen)
-                                 break;
-                           }
-                           fieldName.unshift('`' + j);
-                        }
-                        namedItem = parent;
-                        ref = parentRef;
-                     }
-                     item.fullName = fieldName.join('.');
-                     var alternativeText = stringToPDFString(annotation.get('TU') || '');
-                     item.alternativeText = alternativeText;
-                     var da = getInheritableProperty(annotation, 'DA') || '';
-                     var m = /([\d\.]+)\sTf/.exec(da);
-                     if (m)
-                        item.fontSize = parseFloat(m[1]);
-                     item.textAlignment = getInheritableProperty(annotation, 'Q');
-                     item.flags = getInheritableProperty(annotation, 'Ff') || 0;
-                     break;
-                  case 'Text':
-                     var content = annotation.get('Contents');
-                     var title = annotation.get('T');
-                     item.content = stringToPDFString(content || '');
-                     item.title = stringToPDFString(title || '');
-                     item.name = !annotation.has('Name') ? 'Note' :
-                        annotation.get('Name').name;
-                     break;
-                  default:
-                     var appearance = getDefaultAnnotationAppearance(annotation);
-                     if (!appearance) {
-                        TODO('unimplemented annotation type: ' + subtype.name);
-                     }
-                     break;
-               }
-               if (includeAnnotation) {
-                  items.push({
-                     item: item,
-                     dict: annotation
-                  });
-               }
-            }
-            return items;
+            return shadow(this, 'annotations', annotations);
          }
       };
 
@@ -1686,6 +1479,11 @@ PDFJS.build = 'a081c2d';
       return value;
    }
 
+   var PasswordResponses = PDFJS.PasswordResponses = {
+      NEED_PASSWORD: 1,
+      INCORRECT_PASSWORD: 2
+   };
+
    var PasswordException = (function PasswordExceptionClosure() {
       function PasswordException(msg, code) {
          this.name = 'PasswordException';
@@ -1971,11 +1769,30 @@ PDFJS.build = 'a081c2d';
          }
       };
 
+      Util.getInheritableProperty = function Util_getInheritableProperty(dict,
+                                                                         name) {
+         while (dict && !dict.has(name)) {
+            dict = dict.get('Parent');
+         }
+         if (!dict) {
+            return null;
+         }
+         return dict.get(name);
+      };
+
+      Util.inherit = function Util_inherit(sub, base, prototype) {
+         sub.prototype = Object.create(base.prototype);
+         sub.prototype.constructor = sub;
+         for (var prop in prototype) {
+            sub.prototype[prop] = prototype[prop];
+         }
+      };
+
       return Util;
    })();
 
    var PageViewport = PDFJS.PageViewport = (function PageViewportClosure() {
-      function PageViewport(viewBox, scale, rotation, offsetX, offsetY) {
+      function PageViewport(viewBox, scale, rotation, offsetX, offsetY, dontFlip) {
          this.viewBox = viewBox;
          this.scale = scale;
          this.rotation = rotation;
@@ -1987,25 +1804,28 @@ PDFJS.build = 'a081c2d';
          var centerX = (viewBox[2] + viewBox[0]) / 2;
          var centerY = (viewBox[3] + viewBox[1]) / 2;
          var rotateA, rotateB, rotateC, rotateD;
-         switch (rotation % 360) {
-            case -180:
+         rotation = rotation % 360;
+         rotation = rotation < 0 ? rotation + 360 : rotation;
+         switch (rotation) {
             case 180:
                rotateA = -1; rotateB = 0; rotateC = 0; rotateD = 1;
                break;
-            case -270:
             case 90:
                rotateA = 0; rotateB = 1; rotateC = 1; rotateD = 0;
                break;
-            case -90:
             case 270:
                rotateA = 0; rotateB = -1; rotateC = -1; rotateD = 0;
                break;
-            //case 360:
             //case 0:
             default:
                rotateA = 1; rotateB = 0; rotateC = 0; rotateD = -1;
                break;
          }
+
+         if (dontFlip) {
+            rotateC = -rotateC; rotateD = -rotateD;
+         }
+
          var offsetCanvasX, offsetCanvasY;
          var width, height;
          if (rotateA === 0) {
@@ -2041,7 +1861,7 @@ PDFJS.build = 'a081c2d';
             var scale = 'scale' in args ? args.scale : this.scale;
             var rotation = 'rotation' in args ? args.rotation : this.rotation;
             return new PageViewport(this.viewBox.slice(), scale, rotation,
-               this.offsetX, this.offsetY);
+               this.offsetX, this.offsetY, args.dontFlip);
          },
          convertToViewportPoint: function PageViewport_convertToViewportPoint(x, y) {
             return Util.applyTransform([x, y], this.transform);
@@ -2219,16 +2039,26 @@ PDFJS.build = 'a081c2d';
             deferred.resolve(results);
             return deferred;
          }
+         function reject(reason) {
+            if (deferred.isRejected) {
+               return;
+            }
+            results = [];
+            deferred.reject(reason);
+         }
          for (var i = 0, ii = promises.length; i < ii; ++i) {
             var promise = promises[i];
             promise.then((function(i) {
                return function(value) {
+                  if (deferred.isRejected) {
+                     return;
+                  }
                   results[i] = value;
                   unresolved--;
                   if (unresolved === 0)
                      deferred.resolve(results);
                };
-            })(i));
+            })(i), reject);
          }
          return deferred;
       };
@@ -2309,12 +2139,8 @@ PDFJS.build = 'a081c2d';
          },
 
          then: function Promise_then(callback, errback, progressback) {
-            if (!callback) {
-               error('Requiring callback' + this.name);
-            }
-
             // If the promise is already resolved, call the callback directly.
-            if (this.isResolved) {
+            if (this.isResolved && callback) {
                var data = this.data;
                callback.call(null, data);
             } else if (this.isRejected && errback) {
@@ -2322,9 +2148,12 @@ PDFJS.build = 'a081c2d';
                var exception = this.exception;
                errback.call(null, error, exception);
             } else {
-               this.callbacks.push(callback);
-               if (errback)
+               if (callback) {
+                  this.callbacks.push(callback);
+               }
+               if (errback) {
                   this.errbacks.push(errback);
+               }
             }
 
             if (progressback)
@@ -2416,9 +2245,16 @@ PDFJS.build = 'a081c2d';
     * to manually serve range requests for data in the PDF. See viewer.js for
     * an example of pdfDataRangeTransport's interface.
     *
+    * @param {function} passwordCallback is optional. It is used to request a
+    * password if wrong or no password was provided. The callback receives two
+    * parameters: function that needs to be called with new password and reason
+    * (see {PasswordResponses}).
+    *
     * @return {Promise} A promise that is resolved with {PDFDocumentProxy} object.
     */
-   PDFJS.getDocument = function getDocument(source, pdfDataRangeTransport) {
+   PDFJS.getDocument = function getDocument(source,
+                                            pdfDataRangeTransport,
+                                            passwordCallback) {
       var workerInitializedPromise, workerReadyPromise, transport;
 
       if (typeof source === 'string') {
@@ -2448,6 +2284,7 @@ PDFJS.build = 'a081c2d';
       transport = new WorkerTransport(workerInitializedPromise,
          workerReadyPromise, pdfDataRangeTransport);
       workerInitializedPromise.then(function transportInitialized() {
+         transport.passwordCallback = passwordCallback;
          transport.fetchDocument(params);
       });
       return workerReadyPromise;
@@ -2859,6 +2696,8 @@ PDFJS.build = 'a081c2d';
          this.pagePromises = [];
          this.embeddedFontsUsed = false;
 
+         this.passwordCallback = null;
+
          // If worker support isn't disabled explicit and the browser has worker
          // support, create a new web worker and test if it/the browser fullfills
          // all requirements to run parts of pdf.js in a web worker.
@@ -2936,6 +2775,10 @@ PDFJS.build = 'a081c2d';
             function WorkerTransport_setupMessageHandler(messageHandler) {
                this.messageHandler = messageHandler;
 
+               function updatePassword(password) {
+                  messageHandler.send('UpdatePassword', password);
+               }
+
                var pdfDataRangeTransport = this.pdfDataRangeTransport;
                if (pdfDataRangeTransport) {
                   pdfDataRangeTransport.addRangeListener(function(begin, chunk) {
@@ -2965,10 +2808,18 @@ PDFJS.build = 'a081c2d';
                }, this);
 
                messageHandler.on('NeedPassword', function transportPassword(data) {
+                  if (this.passwordCallback) {
+                     return this.passwordCallback(updatePassword,
+                        PasswordResponses.NEED_PASSWORD);
+                  }
                   this.workerReadyPromise.reject(data.exception.message, data.exception);
                }, this);
 
                messageHandler.on('IncorrectPassword', function transportBadPass(data) {
+                  if (this.passwordCallback) {
+                     return this.passwordCallback(updatePassword,
+                        PasswordResponses.INCORRECT_PASSWORD);
+                  }
                   this.workerReadyPromise.reject(data.exception.message, data.exception);
                }, this);
 
@@ -3377,6 +3228,7 @@ PDFJS.build = 'a081c2d';
          this.current = new CanvasExtraState();
          this.stateStack = [];
          this.pendingClip = null;
+         this.pendingEOFill = false;
          this.res = null;
          this.xobjs = null;
          this.commonObjs = commonObjs;
@@ -3857,23 +3709,43 @@ PDFJS.build = 'a081c2d';
             consumePath = typeof consumePath !== 'undefined' ? consumePath : true;
             var ctx = this.ctx;
             var fillColor = this.current.fillColor;
+            var needRestore = false;
 
             if (fillColor && fillColor.hasOwnProperty('type') &&
                fillColor.type === 'Pattern') {
                ctx.save();
                ctx.fillStyle = fillColor.getPattern(ctx);
-               ctx.fill();
-               ctx.restore();
-            } else {
-               ctx.fill();
+               needRestore = true;
             }
-            if (consumePath)
+
+            if (this.pendingEOFill) {
+               if ('mozFillRule' in this.ctx) {
+                  this.ctx.mozFillRule = 'evenodd';
+                  this.ctx.fill();
+                  this.ctx.mozFillRule = 'nonzero';
+               } else {
+                  try {
+                     this.ctx.fill('evenodd');
+                  } catch (ex) {
+                     // shouldn't really happen, but browsers might think differently
+                     this.ctx.fill();
+                  }
+               }
+               this.pendingEOFill = false;
+            } else {
+               this.ctx.fill();
+            }
+
+            if (needRestore) {
+               ctx.restore();
+            }
+            if (consumePath) {
                this.consumePath();
+            }
          },
          eoFill: function CanvasGraphics_eoFill() {
-            var savedFillRule = this.setEOFillRule();
+            this.pendingEOFill = true;
             this.fill();
-            this.restoreFillRule(savedFillRule);
          },
          fillStroke: function CanvasGraphics_fillStroke() {
             this.fill(false);
@@ -3882,19 +3754,17 @@ PDFJS.build = 'a081c2d';
             this.consumePath();
          },
          eoFillStroke: function CanvasGraphics_eoFillStroke() {
-            var savedFillRule = this.setEOFillRule();
+            this.pendingEOFill = true;
             this.fillStroke();
-            this.restoreFillRule(savedFillRule);
          },
          closeFillStroke: function CanvasGraphics_closeFillStroke() {
             this.closePath();
             this.fillStroke();
          },
          closeEOFillStroke: function CanvasGraphics_closeEOFillStroke() {
-            var savedFillRule = this.setEOFillRule();
+            this.pendingEOFill = true;
             this.closePath();
             this.fillStroke();
-            this.restoreFillRule(savedFillRule);
          },
          endPath: function CanvasGraphics_endPath() {
             this.consumePath();
@@ -4181,6 +4051,7 @@ PDFJS.build = 'a081c2d';
                      continue;
                   }
 
+                  var restoreNeeded = false;
                   var character = glyph.fontChar;
                   var vmetric = glyph.vmetric || defaultVMetrics;
                   if (vertical) {
@@ -4206,6 +4077,22 @@ PDFJS.build = 'a081c2d';
                         scaledAccentX = scaledX + accent.offset.x / fontSizeScale;
                         scaledAccentY = scaledY - accent.offset.y / fontSizeScale;
                      }
+
+                     if (font.remeasure && width > 0) {
+                        // some standard fonts may not have the exact width, trying to
+                        // rescale per character
+                        var measuredWidth = ctx.measureText(character).width * 1000 /
+                           current.fontSize * current.fontSizeScale;
+                        var characterScaleX = width / measuredWidth;
+                        restoreNeeded = true;
+                        ctx.save();
+                        ctx.scale(characterScaleX, 1);
+                        scaledX /= characterScaleX;
+                        if (accent) {
+                           scaledAccentX /= characterScaleX;
+                        }
+                     }
+
                      switch (textRenderingMode) {
                         default: // other unsupported rendering modes
                         case TextRenderingMode.FILL:
@@ -4247,6 +4134,10 @@ PDFJS.build = 'a081c2d';
                   x += charWidth;
 
                   canvasWidth += charWidth;
+
+                  if (restoreNeeded) {
+                     ctx.restore();
+                  }
                }
                if (vertical) {
                   current.y -= x * textHScale;
@@ -4627,24 +4518,12 @@ PDFJS.build = 'a081c2d';
          },
 
          beginAnnotation: function CanvasGraphics_beginAnnotation(rect, transform,
-                                                                  matrix, border) {
+                                                                  matrix) {
             this.save();
 
             if (rect && isArray(rect) && 4 == rect.length) {
                var width = rect[2] - rect[0];
                var height = rect[3] - rect[1];
-
-               if (border) {
-                  // TODO(mack): Support different border styles
-                  this.save();
-                  var rgb = border.rgb;
-                  this.setStrokeRGBColor(rgb[0], rgb[1], rgb[2]);
-                  this.setLineWidth(border.width);
-                  this.rectangle(rect[0], rect[1], width, height);
-                  this.stroke();
-                  this.restore();
-               }
-
                this.rectangle(rect[0], rect[1], width, height);
                this.clip();
                this.endPath();
@@ -4858,28 +4737,25 @@ PDFJS.build = 'a081c2d';
 
          consumePath: function CanvasGraphics_consumePath() {
             if (this.pendingClip) {
-               var savedFillRule = null;
-               if (this.pendingClip == EO_CLIP)
-                  savedFillRule = this.setEOFillRule();
-
-               this.ctx.clip();
-
+               if (this.pendingClip == EO_CLIP) {
+                  if ('mozFillRule' in this.ctx) {
+                     this.ctx.mozFillRule = 'evenodd';
+                     this.ctx.clip();
+                     this.ctx.mozFillRule = 'nonzero';
+                  } else {
+                     try {
+                        this.ctx.clip('evenodd');
+                     } catch (ex) {
+                        // shouldn't really happen, but browsers might think differently
+                        this.ctx.clip();
+                     }
+                  }
+               } else {
+                  this.ctx.clip();
+               }
                this.pendingClip = null;
-               if (savedFillRule !== null)
-                  this.restoreFillRule(savedFillRule);
             }
             this.ctx.beginPath();
-         },
-         // We generally keep the canvas context set for
-         // nonzero-winding, and just set evenodd for the operations
-         // that need them.
-         setEOFillRule: function CanvasGraphics_setEOFillRule() {
-            var savedFillRule = this.ctx.mozFillRule;
-            this.ctx.mozFillRule = 'evenodd';
-            return savedFillRule;
-         },
-         restoreFillRule: function CanvasGraphics_restoreFillRule(rule) {
-            this.ctx.mozFillRule = rule;
          },
          getSinglePixelWidth: function CanvasGraphics_getSinglePixelWidth(scale) {
             var inverse = this.ctx.mozCurrentTransformInverse;
@@ -5430,7 +5306,7 @@ PDFJS.build = 'a081c2d';
             if (!('streamState' in this)) {
                // Stores state of the stream as we process it so we can resume
                // from middle of stream in case of missing data error
-               var streamParameters = stream.parameters;
+               var streamParameters = stream.dict;
                var byteWidths = streamParameters.get('W');
                var range = streamParameters.get('Index');
                if (!range) {
@@ -5447,7 +5323,7 @@ PDFJS.build = 'a081c2d';
             this.readXRefStream(stream);
             delete this.streamState;
 
-            return stream.parameters;
+            return stream.dict;
          },
 
          readXRefStream: function XRef_readXRefStream(stream) {
@@ -5783,8 +5659,8 @@ PDFJS.build = 'a081c2d';
             stream = this.fetch(new Ref(tableOffset, 0));
             if (!isStream(stream))
                error('bad ObjStm stream');
-            var first = stream.parameters.get('First');
-            var n = stream.parameters.get('N');
+            var first = stream.dict.get('First');
+            var n = stream.dict.get('N');
             if (!isInt(first) || !isInt(n)) {
                error('invalid first and n parameters for ObjStm stream');
             }
@@ -5994,6 +5870,494 @@ PDFJS.build = 'a081c2d';
       return PDFObjects;
    })();
 
+
+
+   var Annotation = (function AnnotationClosure() {
+      // 12.5.5: Algorithm: Appearance streams
+      function getTransformMatrix(rect, bbox, matrix) {
+         var bounds = Util.getAxialAlignedBoundingBox(bbox, matrix);
+         var minX = bounds[0];
+         var minY = bounds[1];
+         var maxX = bounds[2];
+         var maxY = bounds[3];
+
+         if (minX === maxX || minY === maxY) {
+            // From real-life file, bbox was [0, 0, 0, 0]. In this case,
+            // just apply the transform for rect
+            return [1, 0, 0, 1, rect[0], rect[1]];
+         }
+
+         var xRatio = (rect[2] - rect[0]) / (maxX - minX);
+         var yRatio = (rect[3] - rect[1]) / (maxY - minY);
+         return [
+            xRatio,
+            0,
+            0,
+            yRatio,
+            rect[0] - minX * xRatio,
+            rect[1] - minY * yRatio
+         ];
+      }
+
+      function getDefaultAppearance(dict) {
+         var appearanceState = dict.get('AP');
+         if (!isDict(appearanceState)) {
+            return;
+         }
+
+         var appearance;
+         var appearances = appearanceState.get('N');
+         if (isDict(appearances)) {
+            var as = dict.get('AS');
+            if (as && appearances.has(as.name)) {
+               appearance = appearances.get(as.name);
+            }
+         } else {
+            appearance = appearances;
+         }
+         return appearance;
+      }
+
+      function Annotation(params) {
+         if (params.data) {
+            this.data = params.data;
+            return;
+         }
+
+         var dict = params.dict;
+         var data = this.data = {};
+
+         data.subtype = dict.get('Subtype').name;
+         var rect = dict.get('Rect');
+         data.rect = Util.normalizeRect(rect);
+         data.annotationFlags = dict.get('F');
+
+         var border = dict.get('BS');
+         if (isDict(border)) {
+            var borderWidth = border.has('W') ? border.get('W') : 1;
+            data.border = {
+               width: borderWidth,
+               type: border.get('S') || 'S',
+               rgb: dict.get('C') || [0, 0, 1]
+            };
+         }
+
+         this.appearance = getDefaultAppearance(dict);
+      }
+
+      Annotation.prototype = {
+
+         getData: function Annotation_getData() {
+            return this.data;
+         },
+
+         hasHtml: function Annotation_hasHtml() {
+            return false;
+         },
+
+         getHtmlElement: function Annotation_getHtmlElement(commonObjs) {
+            throw new NotImplementedException(
+               'getHtmlElement() should be implemented in subclass');
+         },
+
+         getEmptyContainer: function Annotaiton_getEmptyContainer(tagName, rect) {
+            assert(!isWorker,
+               'getEmptyContainer() should be called from main thread');
+
+            rect = rect || this.data.rect;
+            var element = document.createElement(tagName);
+            element.style.width = Math.ceil(rect[2] - rect[0]) + 'px';
+            element.style.height = Math.ceil(rect[3] - rect[1]) + 'px';
+            return element;
+         },
+
+         isViewable: function Annotation_isViewable() {
+            var data = this.data;
+            return !!(
+               data &&
+                  (!data.annotationFlags ||
+                     !(data.annotationFlags & 0x22)) && // Hidden or NoView
+                  data.rect                            // rectangle is nessessary
+               );
+         },
+
+         getOperatorList: function Annotation_appendToOperatorList(evaluator) {
+
+            var promise = new Promise();
+
+            if (!this.appearance) {
+               promise.resolve({
+                  queue: {
+                     fnArray: [],
+                     argsArray: []
+                  },
+                  dependency: {}
+               });
+               return promise;
+            }
+
+            var data = this.data;
+
+            var appearanceDict = this.appearance.dict;
+            var resources = appearanceDict.get('Resources');
+            var bbox = appearanceDict.get('BBox') || [0, 0, 1, 1];
+            var matrix = appearanceDict.get('Matrix') || [1, 0, 0, 1, 0 ,0];
+            var transform = getTransformMatrix(data.rect, bbox, matrix);
+
+            var border = data.border;
+
+            var listPromise = evaluator.getOperatorList(this.appearance, resources);
+            listPromise.then(function(appearanceStreamData) {
+               var fnArray = appearanceStreamData.queue.fnArray;
+               var argsArray = appearanceStreamData.queue.argsArray;
+
+               fnArray.unshift('beginAnnotation');
+               argsArray.unshift([data.rect, transform, matrix]);
+
+               fnArray.push('endAnnotation');
+               argsArray.push([]);
+
+               promise.resolve(appearanceStreamData);
+            });
+
+            return promise;
+         }
+      };
+
+      Annotation.getConstructor =
+         function Annotation_getConstructor(subtype, fieldType) {
+
+            if (!subtype) {
+               return;
+            }
+
+            // TODO(mack): Implement FreeText annotations
+            if (subtype === 'Link') {
+               return LinkAnnotation;
+            } else if (subtype === 'Text') {
+               return TextAnnotation;
+            } else if (subtype === 'Widget') {
+               if (!fieldType) {
+                  return;
+               }
+
+               return WidgetAnnotation;
+            } else {
+               return Annotation;
+            }
+         };
+
+      // TODO(mack): Support loading annotation from data
+      Annotation.fromData = function Annotation_fromData(data) {
+         var subtype = data.subtype;
+         var fieldType = data.fieldType;
+         var Constructor = Annotation.getConstructor(subtype, fieldType);
+         if (Constructor) {
+            return new Constructor({ data: data });
+         }
+      };
+
+      Annotation.fromRef = function Annotation_fromRef(xref, ref) {
+
+         var dict = xref.fetchIfRef(ref);
+         if (!isDict(dict)) {
+            return;
+         }
+
+         var subtype = dict.get('Subtype');
+         subtype = isName(subtype) ? subtype.name : '';
+         if (!subtype) {
+            return;
+         }
+
+         var fieldType = Util.getInheritableProperty(dict, 'FT');
+         fieldType = isName(fieldType) ? fieldType.name : '';
+
+         var Constructor = Annotation.getConstructor(subtype, fieldType);
+         if (!Constructor) {
+            return;
+         }
+
+         var params = {
+            dict: dict,
+            ref: ref,
+         };
+
+         var annotation = new Constructor(params);
+
+         if (annotation.isViewable()) {
+            return annotation;
+         } else {
+            TODO('unimplemented annotation type: ' + subtype);
+         }
+      };
+
+      return Annotation;
+   })();
+   PDFJS.Annotation = Annotation;
+
+
+   var WidgetAnnotation = (function WidgetAnnotationClosure() {
+
+      function WidgetAnnotation(params) {
+         Annotation.call(this, params);
+
+         if (params.data) {
+            return;
+         }
+
+         var dict = params.dict;
+         var data = this.data;
+
+         data.fieldValue = stringToPDFString(
+            Util.getInheritableProperty(dict, 'V') || '');
+         data.alternativeText = stringToPDFString(dict.get('TU') || '');
+         data.defaultAppearance = Util.getInheritableProperty(dict, 'DA') || '';
+         var fieldType = Util.getInheritableProperty(dict, 'FT');
+         data.fieldType = isName(fieldType) ? fieldType.name : '';
+         data.fieldFlags = Util.getInheritableProperty(dict, 'Ff') || 0;
+         this.fieldResources = Util.getInheritableProperty(dict, 'DR') || new Dict();
+
+         // Building the full field name by collecting the field and
+         // its ancestors 'T' data and joining them using '.'.
+         var fieldName = [];
+         var namedItem = dict;
+         var ref = params.ref;
+         while (namedItem) {
+            var parent = namedItem.get('Parent');
+            var parentRef = namedItem.getRaw('Parent');
+            var name = namedItem.get('T');
+            if (name) {
+               fieldName.unshift(stringToPDFString(name));
+            } else {
+               // The field name is absent, that means more than one field
+               // with the same name may exist. Replacing the empty name
+               // with the '`' plus index in the parent's 'Kids' array.
+               // This is not in the PDF spec but necessary to id the
+               // the input controls.
+               var kids = parent.get('Kids');
+               var j, jj;
+               for (j = 0, jj = kids.length; j < jj; j++) {
+                  var kidRef = kids[j];
+                  if (kidRef.num == ref.num && kidRef.gen == ref.gen)
+                     break;
+               }
+               fieldName.unshift('`' + j);
+            }
+            namedItem = parent;
+            ref = parentRef;
+         }
+         data.fullName = fieldName.join('.');
+      }
+
+      var parent = Annotation.prototype;
+      Util.inherit(WidgetAnnotation, Annotation, {
+         isViewable: function WidgetAnnotation_isViewable() {
+            if (this.data.fieldType === 'Sig') {
+               TODO('unimplemented annotation type: Widget signature');
+               return false;
+            }
+
+            return parent.isViewable.call(this);
+         }
+      });
+
+      return WidgetAnnotation;
+   })();
+
+   var TextAnnotation = (function TextAnnotationClosure() {
+      function TextAnnotation(params) {
+         Annotation.call(this, params);
+
+         if (params.data) {
+            return;
+         }
+
+         var dict = params.dict;
+         var data = this.data;
+
+         var content = dict.get('Contents');
+         var title = dict.get('T');
+         data.content = stringToPDFString(content || '');
+         data.title = stringToPDFString(title || '');
+         data.name = !dict.has('Name') ? 'Note' : dict.get('Name').name;
+      }
+
+      var ANNOT_MIN_SIZE = 10;
+      var IMAGE_DIR = './images/';
+
+      Util.inherit(TextAnnotation, Annotation, {
+
+         getOperatorList: function TextAnnotation_getOperatorList(evaluator) {
+            var promise = new Promise();
+            promise.resolve({
+               queue: {
+                  fnArray: [],
+                  argsArray: []
+               },
+               dependency: {}
+            });
+            return promise;
+         },
+
+         hasHtml: function TextAnnotation_hasHtml() {
+            return true;
+         },
+
+         getHtmlElement: function TextAnnotation_getHtmlElement(commonObjs) {
+            assert(!isWorker, 'getHtmlElement() shall be called from main thread');
+
+            var item = this.data;
+            var rect = item.rect;
+
+            // sanity check because of OOo-generated PDFs
+            if ((rect[3] - rect[1]) < ANNOT_MIN_SIZE) {
+               rect[3] = rect[1] + ANNOT_MIN_SIZE;
+            }
+            if ((rect[2] - rect[0]) < ANNOT_MIN_SIZE) {
+               rect[2] = rect[0] + (rect[3] - rect[1]); // make it square
+            }
+
+            var container = this.getEmptyContainer('section', rect);
+            container.className = 'annotText';
+
+            var image = document.createElement('img');
+            image.style.width = container.style.width;
+            image.style.height = container.style.height;
+            var iconName = item.name;
+            image.src = IMAGE_DIR + 'annotation-' +
+               iconName.toLowerCase() + '.svg';
+            image.alt = '[{{type}} Annotation]';
+            image.dataset.l10nId = 'text_annotation_type';
+            image.dataset.l10nArgs = JSON.stringify({type: iconName});
+            var content = document.createElement('div');
+            content.setAttribute('hidden', true);
+            var title = document.createElement('h1');
+            var text = document.createElement('p');
+            content.style.left = Math.floor(rect[2] - rect[0]) + 'px';
+            content.style.top = '0px';
+            title.textContent = item.title;
+
+            if (!item.content && !item.title) {
+               content.setAttribute('hidden', true);
+            } else {
+               var e = document.createElement('span');
+               var lines = item.content.split(/(?:\r\n?|\n)/);
+               for (var i = 0, ii = lines.length; i < ii; ++i) {
+                  var line = lines[i];
+                  e.appendChild(document.createTextNode(line));
+                  if (i < (ii - 1))
+                     e.appendChild(document.createElement('br'));
+               }
+               text.appendChild(e);
+               image.addEventListener('mouseover', function annotationImageOver() {
+                  container.style.zIndex += 1;
+                  content.removeAttribute('hidden');
+               }, false);
+
+               image.addEventListener('mouseout', function annotationImageOut() {
+                  container.style.zIndex -= 1;
+                  content.setAttribute('hidden', true);
+               }, false);
+            }
+
+            content.appendChild(title);
+            content.appendChild(text);
+            container.appendChild(image);
+            container.appendChild(content);
+
+            return container;
+         }
+      });
+
+      return TextAnnotation;
+   })();
+
+   var LinkAnnotation = (function LinkAnnotationClosure() {
+      function isValidUrl(url) {
+         if (!url)
+            return false;
+         var colon = url.indexOf(':');
+         if (colon < 0)
+            return false;
+         var protocol = url.substr(0, colon);
+         switch (protocol) {
+            case 'http':
+            case 'https':
+            case 'ftp':
+            case 'mailto':
+               return true;
+            default:
+               return false;
+         }
+      }
+
+      function LinkAnnotation(params) {
+         Annotation.call(this, params);
+
+         if (params.data) {
+            return;
+         }
+
+         var dict = params.dict;
+         var data = this.data;
+
+         var action = dict.get('A');
+         if (action) {
+            var linkType = action.get('S').name;
+            if (linkType === 'URI') {
+               var url = action.get('URI');
+               // TODO: pdf spec mentions urls can be relative to a Base
+               // entry in the dictionary.
+               if (!isValidUrl(url)) {
+                  url = '';
+               }
+               data.url = url;
+            } else if (linkType === 'GoTo') {
+               data.dest = action.get('D');
+            } else if (linkType === 'GoToR') {
+               var urlDict = action.get('F');
+               if (isDict(urlDict)) {
+                  // We assume that the 'url' is a Filspec dictionary
+                  // and fetch the url without checking any further
+                  url = urlDict.get('F') || '';
+               }
+
+               // TODO: pdf reference says that GoToR
+               // can also have 'NewWindow' attribute
+               if (!isValidUrl(url)) {
+                  url = '';
+               }
+               data.url = url;
+               data.dest = action.get('D');
+            } else {
+               TODO('unrecognized link type: ' + linkType);
+            }
+         } else if (dict.has('Dest')) {
+            // simple destination link
+            var dest = dict.get('Dest');
+            data.dest = isName(dest) ? dest.name : dest;
+         }
+      }
+
+      Util.inherit(LinkAnnotation, Annotation, {
+         hasOperatorList: function LinkAnnotation_hasOperatorList() {
+            return false;
+         },
+
+         hasHtml: function LinkAnnotation_hasHtml() {
+            return true;
+         },
+
+         getHtmlElement: function LinkAnnotation_getHtmlElement(commonObjs) {
+            var element = this.getEmptyContainer('a');
+            element.href = this.data.url || '';
+            return element;
+         }
+      });
+
+      return LinkAnnotation;
+   })();
 
 
    var PDFFunction = (function PDFFunctionClosure() {
@@ -15198,7 +15562,8 @@ PDFJS.build = 'a081c2d';
             ownerPassword, userPassword, flags,
             revision, keyLength, encryptMetadata);
          if (!encryptionKey && !password) {
-            throw new PasswordException('No password given', 'needpassword');
+            throw new PasswordException('No password given',
+               PasswordResponses.NEED_PASSWORD);
          } else if (!encryptionKey && password) {
             // Attempting use the password as an owner password
             var decodedPassword = decodeUserPassword(passwordBytes, ownerPassword,
@@ -15209,7 +15574,8 @@ PDFJS.build = 'a081c2d';
          }
 
          if (!encryptionKey)
-            throw new PasswordException('Incorrect Password', 'incorrectpassword');
+            throw new PasswordException('Incorrect Password',
+               PasswordResponses.INCORRECT_PASSWORD);
 
          this.encryptionKey = encryptionKey;
 
@@ -15770,10 +16136,11 @@ PDFJS.build = 'a081c2d';
             var promise = new Promise();
 
             var fontRes = resources.get('Font');
+            if (!fontRes) {
+               warn('fontRes not available');
+            }
 
-            assert(fontRes, 'fontRes not available');
-
-            font = xref.fetchIfRef(font) || fontRes.get(fontName);
+            font = xref.fetchIfRef(font) || (fontRes && fontRes.get(fontName));
             if (!isDict(font)) {
                ++this.idCounters.font;
                promise.resolve({
@@ -16094,93 +16461,6 @@ PDFJS.build = 'a081c2d';
             return promise;
          },
 
-         getAnnotationsOperatorList:
-            function PartialEvaluator_getAnnotationsOperatorList(annotations,
-                                                                 dependency) {
-               var promise = new Promise();
-
-               // 12.5.5: Algorithm: Appearance streams
-               function getTransformMatrix(rect, bbox, matrix) {
-                  var bounds = Util.getAxialAlignedBoundingBox(bbox, matrix);
-                  var minX = bounds[0];
-                  var minY = bounds[1];
-                  var maxX = bounds[2];
-                  var maxY = bounds[3];
-                  var width = rect[2] - rect[0];
-                  var height = rect[3] - rect[1];
-                  var xRatio = width / (maxX - minX);
-                  var yRatio = height / (maxY - minY);
-                  return [
-                     xRatio,
-                     0,
-                     0,
-                     yRatio,
-                     rect[0] - minX * xRatio,
-                     rect[1] - minY * yRatio
-                  ];
-               }
-
-               var opListPromises = [];
-               var includedAnnotations = [];
-
-               // deal with annotations
-               for (var i = 0, length = annotations.length; i < length; ++i) {
-                  var annotation = annotations[i];
-
-                  // check whether we can visualize annotation
-                  if (!annotation ||
-                     !annotation.annotationFlags ||
-                     (annotation.annotationFlags & 0x0022) || // Hidden or NoView
-                     !annotation.rect ||                      // rectangle is nessessary
-                     !annotation.appearance) {                // appearance is nessessary
-                     continue;
-                  }
-
-                  includedAnnotations.push(annotation);
-
-                  if (annotation.appearance) {
-                     var opListPromise = this.getOperatorList(annotation.appearance,
-                        annotation.resources);
-                     opListPromises.push(opListPromise);
-                  } else {
-                     var opListPromise = new Promise();
-                     opListPromise.resolve(createOperatorList());
-                     opListPromises.push(opListPromise);
-                  }
-               }
-
-               Promise.all(opListPromises).then(function(datas) {
-                  var fnArray = [];
-                  var argsArray = [];
-                  var dependencies = {};
-                  for (var i = 0, n = datas.length; i < n; ++i) {
-                     var annotation = includedAnnotations[i];
-                     var data = datas[i];
-
-                     // apply rectangle
-                     var rect = annotation.rect;
-                     var bbox = annotation.bbox;
-                     var matrix = annotation.matrix;
-                     var transform = getTransformMatrix(rect, bbox, matrix);
-                     var border = annotation.border;
-
-                     fnArray.push('beginAnnotation');
-                     argsArray.push([rect, transform, matrix, border]);
-
-                     Util.concatenateToArray(fnArray, data.queue.fnArray);
-                     Util.concatenateToArray(argsArray, data.queue.argsArray);
-                     Util.extendObj(dependencies, data.dependencies);
-
-                     fnArray.push('endAnnotation');
-                     argsArray.push([]);
-                  }
-
-                  promise.resolve(createOperatorList(fnArray, argsArray, dependencies));
-               });
-
-               return promise;
-            },
-
          getTextContent: function PartialEvaluator_getTextContent(
             stream, resources) {
 
@@ -16236,7 +16516,7 @@ PDFJS.build = 'a081c2d';
                            case 'TJ':
                               var chunkPromise = new Promise();
                               chunkPromises.push(chunkPromise);
-                              fontPromise.then(function(items, font) {
+                              fontPromise.then(function(items, chunkPromise, font) {
                                  var chunk = '';
                                  for (var j = 0, jj = items.length; j < jj; j++) {
                                     if (typeof items[j] === 'string') {
@@ -16253,19 +16533,18 @@ PDFJS.build = 'a081c2d';
                                        }
                                     }
                                  }
-
                                  chunkPromise.resolve(
                                     getBidiText(chunk, -1, font.vertical));
-                              }.bind(null, args[0]));
+                              }.bind(null, args[0], chunkPromise));
                               break;
                            case 'Tj':
                               var chunkPromise = new Promise();
                               chunkPromises.push(chunkPromise);
-                              fontPromise.then(function(charCodes, font) {
+                              fontPromise.then(function(charCodes, chunkPromise, font) {
                                  var chunk = fontCharsToUnicode(charCodes, font);
                                  chunkPromise.resolve(
                                     getBidiText(chunk, -1, font.vertical));
-                              }.bind(null, args[0]));
+                              }.bind(null, args[0], chunkPromise));
                               break;
                            case '\'':
                               // For search, adding a extra white space for line breaks
@@ -16273,21 +16552,21 @@ PDFJS.build = 'a081c2d';
                               // the text-selection divs.
                               var chunkPromise = new Promise();
                               chunkPromises.push(chunkPromise);
-                              fontPromise.then(function(charCodes, font) {
+                              fontPromise.then(function(charCodes, chunkPromise, font) {
                                  var chunk = fontCharsToUnicode(charCodes, font);
                                  chunkPromise.resolve(
                                     getBidiText(chunk, -1, font.vertical));
-                              }.bind(null, args[0]));
+                              }.bind(null, args[0], chunkPromise));
                               break;
                            case '"':
                               // Note comment in "'"
                               var chunkPromise = new Promise();
                               chunkPromises.push(chunkPromise);
-                              fontPromise.then(function(charCodes, font) {
+                              fontPromise.then(function(charCodes, chunkPromise, font) {
                                  var chunk = fontCharsToUnicode(charCodes, font);
                                  chunkPromise.resolve(
                                     getBidiText(chunk, -1, font.vertical));
-                              }.bind(null, args[2]));
+                              }.bind(null, args[2], chunkPromise));
                               break;
                            case 'Do':
                               if (args[0].code) {
@@ -19448,6 +19727,9 @@ PDFJS.build = 'a081c2d';
             // name ArialBlack for example will be replaced by Helvetica.
             this.black = (name.search(/Black/g) != -1);
 
+            // if at least one width is present, remeasure all chars when exists
+            this.remeasure = Object.keys(this.widths).length > 0;
+
             this.encoding = properties.baseEncoding;
             this.noUnicodeAdaptation = true;
             this.loadedName = fontName.split('-')[0];
@@ -20872,6 +21154,9 @@ PDFJS.build = 'a081c2d';
                }
             }
 
+            // The following steps modify the original font data, making copy
+            font = new Stream(new Uint8Array(font.getBytes()));
+
             // Check that required tables are present
             var requiredTables = ['OS/2', 'cmap', 'head', 'hhea',
                'hmtx', 'maxp', 'name', 'post'];
@@ -21661,6 +21946,7 @@ PDFJS.build = 'a081c2d';
                   }
                   fontCharCode = this.toFontChar[charcode] || charcode;
                   break;
+               case 'MMType1': // XXX at the moment only "standard" fonts are supported
                case 'Type1':
                   var glyphName = this.differences[charcode] || this.encoding[charcode];
                   if (!isNum(width))
@@ -31972,7 +32258,7 @@ PDFJS.build = 'a081c2d';
             if (cipherTransform)
                imageStream = cipherTransform.createStream(imageStream);
             imageStream = this.filter(imageStream, dict, length);
-            imageStream.parameters = dict;
+            imageStream.dict = dict;
 
             this.buf2 = Cmd.get('EI');
             this.shift();
@@ -32008,7 +32294,7 @@ PDFJS.build = 'a081c2d';
             if (cipherTransform)
                stream = cipherTransform.createStream(stream);
             stream = this.filter(stream, dict, length);
-            stream.parameters = dict;
+            stream.dict = dict;
             return stream;
          },
          filter: function Parser_filter(stream, dict, length) {
@@ -32912,7 +33198,7 @@ PDFJS.build = 'a081c2d';
          this.start = start || 0;
          this.pos = this.start;
          this.end = (start + length) || this.bytes.length;
-         this.parameters = this.dict = dict;
+         this.dict = dict;
       }
 
       // required methods for a stream. if a particular stream does not
@@ -35376,7 +35662,8 @@ PDFJS.build = 'a081c2d';
                         javaScript: results[6]
                      };
                      loadDocumentPromise.resolve(doc);
-                  });
+                  },
+                  parseFailure);
             };
 
             var parseFailure = function parseFailure(e) {
@@ -35387,8 +35674,8 @@ PDFJS.build = 'a081c2d';
                pdfManager.ensureModel('parseStartXRef', []).then(function() {
                   pdfManager.ensureModel('parse', [recoveryMode]).then(
                      parseSuccess, parseFailure);
-               });
-            });
+               }, parseFailure);
+            }, parseFailure);
 
             return loadDocumentPromise;
          }
@@ -35500,16 +35787,16 @@ PDFJS.build = 'a081c2d';
 
             var onSuccess = function(doc) {
                handler.send('GetDoc', { pdfInfo: doc });
-               pdfManager.ensureModel('traversePages', []);
+               pdfManager.ensureModel('traversePages', []).then(null, onFailure);
             };
 
             var onFailure = function(e) {
                if (e instanceof PasswordException) {
-                  if (e.code === 'needpassword') {
+                  if (e.code === PasswordResponses.NEED_PASSWORD) {
                      handler.send('NeedPassword', {
                         exception: e
                      });
-                  } else if (e.code === 'incorrectpassword') {
+                  } else if (e.code === PasswordResponses.INCORRECT_PASSWORD) {
                      handler.send('IncorrectPassword', {
                         exception: e
                      });
@@ -35529,10 +35816,17 @@ PDFJS.build = 'a081c2d';
                }
             };
 
-            getPdfManager(data).then(function() {
-               loadDocument(false).then(onSuccess, function(ex) {
+            getPdfManager(data).then(function pdfManagerReady() {
+               loadDocument(false).then(onSuccess, function loadFailure(ex) {
                   // Try again with recoveryMode == true
                   if (!(ex instanceof XRefParseException)) {
+                     if (ex instanceof PasswordException) {
+                        // after password exception prepare to receive a new password
+                        // to repeat loading
+                        pdfManager.passwordChangedPromise = new Promise();
+                        pdfManager.passwordChangedPromise.then(pdfManagerReady);
+                     }
+
                      onFailure(ex);
                      return;
                   }
@@ -35587,13 +35881,17 @@ PDFJS.build = 'a081c2d';
             });
          });
 
+         handler.on('UpdatePassword', function wphSetupUpdatePassword(data) {
+            pdfManager.updatePassword(data);
+         });
+
          handler.on('GetAnnotationsRequest', function wphSetupGetAnnotations(data) {
             pdfManager.getPage(data.pageIndex).then(function(page) {
-               pdfManager.ensure(page, 'getAnnotations',[]).then(
-                  function(annotations) {
+               pdfManager.ensure(page, 'getAnnotationsData', []).then(
+                  function(annotationsData) {
                      handler.send('GetAnnotations', {
                         pageIndex: data.pageIndex,
-                        annotations: annotations
+                        annotations: annotationsData
                      });
                   }
                );
