@@ -715,28 +715,36 @@
          params = params || {};
          params.url = fileurl;
 
-         // Add the loading spinner to the viewer area
-         this.spinner = new Spinner({
-            lines: 13, // The number of lines to draw
-            length: 7, // The length of each line
-            width: 4, // The line thickness
-            radius: 10, // The radius of the inner circle
-            corners: 1, // Corner roundness (0..1)
-            rotate: 0, // The rotation offset
-            color: '#fff', // #rgb or #rrggbb
-            speed: 1, // Rounds per second
-            trail: 60, // Afterglow percentage
-            shadow: false, // Whether to render a shadow
-            hwaccel: false, // Whether to use hardware acceleration
-            className: 'spinner', // The CSS class to assign to the spinner
-            zIndex: 2e9, // The z-index (defaults to 2000000000)
-            top: 'auto', // Top position relative to parent in px
-            left: 'auto' // Left position relative to parent in px
-         }).spin(this.viewer);
-         
-         this.onPdfLoaded.subscribe(function onPdfLoadStopSpinner(p_type, p_args) {
-            this.spinner.stop();
-         }, this, true);
+         // Protect against Spinner not being loaded
+         if (typeof window.Spinner === "function")
+         {
+            // Add the loading spinner to the viewer area
+            this.spinner = new Spinner({
+               lines: 13, // The number of lines to draw
+               length: 7, // The length of each line
+               width: 4, // The line thickness
+               radius: 10, // The radius of the inner circle
+               corners: 1, // Corner roundness (0..1)
+               rotate: 0, // The rotation offset
+               color: '#fff', // #rgb or #rrggbb
+               speed: 1, // Rounds per second
+               trail: 60, // Afterglow percentage
+               shadow: false, // Whether to render a shadow
+               hwaccel: false, // Whether to use hardware acceleration
+               className: 'spinner', // The CSS class to assign to the spinner
+               zIndex: 2e9, // The z-index (defaults to 2000000000)
+               top: 'auto', // Top position relative to parent in px
+               left: 'auto' // Left position relative to parent in px
+            }).spin(this.viewer);
+            
+            this.onPdfLoaded.subscribe(function onPdfLoadStopSpinner(p_type, p_args) {
+               this.spinner.stop();
+            }, this, true);
+         }
+         else
+         {
+            Alfresco.logger.error("spinner.js is not loaded!");
+         }
 
          // Set the worker source
          PDFJS.workerSrc = this.workerSrc;
@@ -781,7 +789,10 @@
        */
       _onGetDocumentFailure: function PdfJs__onGetDocumentFailure(message, exception)
       {
-         this.spinner.stop();
+         if (this.spinner)
+         {
+            this.spinner.stop();
+         }
          if (exception && exception.name === 'PasswordException') {
             var textMsgId = 'prompt.password.text';
             if (exception.code === 'incorrectpassword') {
