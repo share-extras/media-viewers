@@ -76,6 +76,9 @@
 
    <!-- Generic FFmpeg transformation worker -->
    <bean id="transformer.worker.ffmpeg.flv" class="org.alfresco.repo.content.transform.RuntimeExecutableContentTransformerWorker">
+      <property name="mimetypeService">
+         <ref bean="mimetypeService" />
+      </property>
       <property name="checkCommand" ref="ffmpeg.present" />
       <property name="transformCommand">
          <bean parent="ffmpeg.transform">
@@ -141,13 +144,13 @@
             </bean>
          </list>
       </property>
-      <property name="mimetypeService">
-          <ref bean="mimetypeService" />
-      </property>
    </bean>
 
    <!-- Generic FFmpeg transformation worker -->
    <bean id="transformer.worker.ffmpeg.mp4" class="org.alfresco.repo.content.transform.RuntimeExecutableContentTransformerWorker">
+      <property name="mimetypeService">
+         <ref bean="mimetypeService" />
+      </property>
       <property name="checkCommand" ref="ffmpeg.present" />
       <property name="transformCommand">
          <bean parent="ffmpeg.transform">
@@ -210,13 +213,13 @@
             </bean>
          </list>
       </property>
-      <property name="mimetypeService">
-          <ref bean="mimetypeService" />
-      </property>
    </bean>
 
    <!-- Video Thumbnails FFmpeg transformation worker -->
    <bean id="transformer.worker.ffmpeg.thumbnail" class="org.alfresco.repo.content.transform.RuntimeExecutableContentTransformerWorker">
+      <property name="mimetypeService">
+         <ref bean="mimetypeService" />
+      </property>
       <property name="checkCommand" ref="ffmpeg.present" />
       <property name="transformCommand">
          <bean parent="ffmpeg.transform">
@@ -285,13 +288,13 @@
             </bean>
          </list>
       </property>
-      <property name="mimetypeService">
-          <ref bean="mimetypeService" />
-      </property>
    </bean>
 
    <!-- Generic MP3 transformation worker -->
    <bean id="transformer.worker.ffmpeg.mp3" class="org.alfresco.repo.content.transform.RuntimeExecutableContentTransformerWorker">
+      <property name="mimetypeService">
+         <ref bean="mimetypeService" />
+      </property>
       <property name="checkCommand" ref="ffmpeg.present" />
       <property name="transformCommand">
          <bean parent="ffmpeg.transform">
@@ -336,9 +339,6 @@
                 <property name="targetMimetype"><value>audio/mpeg</value></property>
             </bean>
          </list>
-      </property>
-      <property name="mimetypeService">
-          <ref bean="mimetypeService" />
       </property>
    </bean>
    
