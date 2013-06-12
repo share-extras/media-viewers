@@ -62,7 +62,16 @@
           * @type String
           * @default "2000000"
           */
-         srcMaxSize: "2000000"
+         srcMaxSize: "2000000",
+         
+         /**
+          * Whether to display line numbers for source code
+          *
+          * @property lineNums
+          * @type String
+          * @default "false"
+          */
+         lineNums: "false"
       },
    
       /**
@@ -116,16 +125,21 @@
        */
       onContentLoaded: function Prettify_onContentLoaded(p_obj)
       {
+         var classNames = [];
          if ('none' != this.attributes.lang)
          {
-            var classes = 'prettyprint' + $html(this.attributes.lang ? ' ' + this.attributes.lang : '');
-            this.wp.getPreviewerElement().innerHTML = '<pre class="' + classes + '">' + (p_obj.serverResponse.responseText).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>';
-            prettyPrint();
+            classNames.push('prettyprint');
+            if (this.attributes.lang)
+            {
+               classNames.push($html(this.attributes.lang));
+            }
+            if ('true' == this.attributes.lineNums)
+            {
+               classNames.push('linenums');
+            }
          }
-         else
-         {
-            this.wp.getPreviewerElement().innerHTML = '<pre>' + (p_obj.serverResponse.responseText).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>';
-         }
+         this.wp.getPreviewerElement().innerHTML = '<pre class="' + classNames.join(' ') + '">' + (p_obj.serverResponse.responseText).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>';
+         prettyPrint();
       }
    };
 })();
