@@ -20,7 +20,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/* globals VBArray */
+/* globals VBArray, PDFJS */
 
 'use strict';
 
@@ -443,4 +443,19 @@
       },
       enumerable: true
    });
+})();
+
+(function checkRangeRequests() {
+   // Safari has issues with cached range requests see:
+   // https://github.com/mozilla/pdf.js/issues/3260
+   // Last tested with version 6.0.4.
+   var isSafari = Object.prototype.toString.call(
+      window.HTMLElement).indexOf('Constructor') > 0;
+   if (!isSafari) {
+      return;
+   }
+   document.addEventListener('DOMContentLoaded', function (e) {
+      console.warn('Range requests are disabled for safari.');
+      PDFJS.disableRange = true;
+   }, true);
 })();
