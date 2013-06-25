@@ -132,20 +132,28 @@ After you have deployed the JAR file you will need to restart Tomcat to ensure i
 Configuration
 -------------
 
-No additional configuration is required for the 0.x/1.x version of the add-on in
-Alfresco 3.
+No additional configuration is required for the 0.x/1.x version of the add-on in Alfresco 3, beyond the optional FFmpeg installation documented in _[Installation](#installation)_, above (required if you wish to use audio/video renditions with the FLVPlayer and MP3Player plugins).
 
-If you are using Alfresco 4, you must enable the **PdfJs Viewer** module in Share's [Module Deployment console](http://code.google.com/p/share-extras/wiki/ModuleDeployment), which can be accessed by navigating to `http://hostname:port/share/page/modules/deploy` on your Alfresco server.
+If you are using Alfresco 4, you must enable the correct module in Share's [Module Deployment console](http://code.google.com/p/share-extras/wiki/ModuleDeployment), which can be accessed by navigating to `http://hostname:port/share/page/modules/deploy` on your Alfresco server.
 
-The final step to configure the exact content types which the viewer should be used for varies between Alfresco 4.0/4.1 and 4.2.
+The following modules will import the dependencies for the different viewers. You may enable as many as you need.
+
+ * PdfJs Viewer
+ * Embed Viewer
+ * FLVPlayer Viewer
+ * MP3Player Viewer
+ * Prettify Viewer
+ * WebODF Viewer (Experimental)
+
+The final step to configure the exact content types which the viewer should be used for varies between Alfresco 4.0/4.1 and 4.2, so please follow the correct instructions for your Alfresco version.
 
 ### Alfresco 4.2
 
-If you are using Media Viewers 2.5 or greater on Alfresco 4.2, then you can use the second module **PdfJs Configuration** to automatically enable the viewer in the Document Details page and the dashlet.
+If you are using Media Viewers 2.5 or greater on Alfresco 4.2, then you can use the additional configuration modules, e.g. **PdfJs Configuration**, to automatically enable the viewers in the Document Details page and the dashlet. No overriding of `web-preview.get.config.xml` is required.
 
 ### Alfresco 4.0/4.1
 
-After installing the add-on in Alfresco 4.0/4.1, you must then configure the `web-preview.get` component to use the particular viewers that you wish to enable. To do this, you must 
+If installing the add-on in Alfresco 4.0/4.1, you must configure the `web-preview.get` component to use the particular viewers that you wish to enable. To do this, you must 
 
 1. Copy the file `WEB-INF/classes/alfresco/site-webscripts/org/alfresco/components/preview/web-preview.get.config.xml` from the exploded Alfresco webapp into the directory `alfresco/web-extension/site-webscripts/org/alfresco/components/preview` under your `tomcat/shared/classes`. You will need to create the new directories if you have not done this previously.
 
