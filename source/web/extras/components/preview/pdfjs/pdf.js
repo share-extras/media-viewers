@@ -21,9 +21,13 @@
  * limitations under the License.
  */
 
-var PDFJS = {};
-PDFJS.version = '0.8.248';
-PDFJS.build = 'ce218d0';
+// Initializing PDFJS global object (if still undefined)
+if (typeof PDFJS === 'undefined') {
+   (typeof window !== 'undefined' ? window : this).PDFJS = {};
+}
+
+PDFJS.version = '0.8.265';
+PDFJS.build = '8561d26';
 
 (function pdfjsWrapper() {
    // Use strict in our context only - users might not want it
@@ -2126,7 +2130,7 @@ PDFJS.build = 'ce218d0';
                var now = Date.now();
                for (var i = 0; i < this.unhandledRejections.length; i++) {
                   if (now - this.unhandledRejections[i].time > REJECTION_TIMEOUT) {
-                     console.error('Unhandled rejection: ' +
+                     warn('Unhandled rejection: ' +
                         this.unhandledRejections[i].promise._value);
                      this.unhandledRejections.splice(i);
                      i--;
@@ -6341,6 +6345,10 @@ PDFJS.build = 'ce218d0';
          loadResources: function(keys) {
             var promise = new Promise();
             this.appearance.dict.getAsync('Resources').then(function(resources) {
+               if (!resources) {
+                  promise.resolve();
+                  return;
+               }
                var objectLoader = new ObjectLoader(resources.map,
                   keys,
                   resources.xref);
@@ -15919,7 +15927,7 @@ PDFJS.build = 'ce218d0';
          this.bufferPosition = 0;
       }
 
-      function decryptBlock2(data) {
+      function decryptBlock2(data, finalize) {
          var i, j, ii, sourceLength = data.length,
             buffer = this.buffer, bufferLength = this.bufferPosition,
             result = [], iv = this.iv;
@@ -15942,19 +15950,25 @@ PDFJS.build = 'ce218d0';
          this.buffer = buffer;
          this.bufferLength = bufferLength;
          this.iv = iv;
-         if (result.length === 0)
+         if (result.length === 0) {
             return new Uint8Array([]);
-         if (result.length == 1)
-            return result[0];
+         }
          // combining plain text blocks into one
-         var output = new Uint8Array(16 * result.length);
+         var outputLength = 16 * result.length;
+         if (finalize) {
+            // undo a padding that is described in RFC 2898
+            var lastBlock = result[result.length - 1];
+            outputLength -= lastBlock[15];
+            result[result.length - 1] = lastBlock.subarray(0, 16 - lastBlock[15]);
+         }
+         var output = new Uint8Array(outputLength);
          for (i = 0, j = 0, ii = result.length; i < ii; ++i, j += 16)
             output.set(result[i], j);
          return output;
       }
 
       AES128Cipher.prototype = {
-         decryptBlock: function AES128Cipher_decryptBlock(data) {
+         decryptBlock: function AES128Cipher_decryptBlock(data, finalize) {
             var i, sourceLength = data.length;
             var buffer = this.buffer, bufferLength = this.bufferPosition;
             // waiting for IV values -- they are at the start of the stream
@@ -15970,7 +15984,7 @@ PDFJS.build = 'ce218d0';
             this.bufferLength = 0;
             // starting decryption
             this.decryptBlock = decryptBlock2;
-            return this.decryptBlock(data.subarray(16));
+            return this.decryptBlock(data.subarray(16), finalize);
          }
       };
 
@@ -15986,15 +16000,15 @@ PDFJS.build = 'ce218d0';
          createStream: function CipherTransform_createStream(stream) {
             var cipher = new this.streamCipherConstructor();
             return new DecryptStream(stream,
-               function cipherTransformDecryptStream(data) {
-                  return cipher.decryptBlock(data);
+               function cipherTransformDecryptStream(data, finalize) {
+                  return cipher.decryptBlock(data, finalize);
                }
             );
          },
          decryptString: function CipherTransform_decryptString(s) {
             var cipher = new this.stringCipherConstructor();
             var data = stringToBytes(s);
-            data = cipher.decryptBlock(data);
+            data = cipher.decryptBlock(data, true);
             return bytesToString(data);
          }
       };
@@ -17812,7 +17826,7 @@ PDFJS.build = 'ce218d0';
                   var images = [];
                   for (var q = 0; q < count; q++) {
                      var transform = argsArray[j + (q << 2) + 1];
-                     var maskParams = argsArray[j + (q << 2) + 2];
+                     var maskParams = argsArray[j + (q << 2) + 2][0];
                      images.push({data: maskParams.data, width: maskParams.width,
                         height: maskParams.height, transform: transform});
                   }
@@ -21184,7 +21198,8 @@ PDFJS.build = 'ce218d0';
                }
             }
 
-            function sanitizeGlyph(source, sourceStart, sourceEnd, dest, destStart) {
+            function sanitizeGlyph(source, sourceStart, sourceEnd, dest, destStart,
+                                   hintsValid) {
                if (sourceEnd - sourceStart <= 12) {
                   // glyph with data less than 12 is invalid one
                   return 0;
@@ -21204,8 +21219,10 @@ PDFJS.build = 'ce218d0';
                   j += 2;
                }
                // skipping instructions
+               var instructionsStart = j;
                var instructionsLength = (glyf[j] << 8) | glyf[j + 1];
                j += 2 + instructionsLength;
+               var instructionsEnd = j;
                // validating flags
                var coordinatesLength = 0;
                for (var i = 0; i < flagsCount; i++) {
@@ -21227,6 +21244,17 @@ PDFJS.build = 'ce218d0';
                if (glyphDataLength > glyf.length) {
                   // not enough data for coordinates
                   return 0;
+               }
+               if (!hintsValid && instructionsLength > 0) {
+                  dest.set(glyf.subarray(0, instructionsStart), destStart);
+                  dest.set([0, 0], destStart + instructionsStart);
+                  dest.set(glyf.subarray(instructionsEnd, glyphDataLength),
+                     destStart + instructionsStart + 2);
+                  glyphDataLength -= instructionsLength;
+                  if (glyf.length - glyphDataLength > 3) {
+                     glyphDataLength = (glyphDataLength + 3) & ~3;
+                  }
+                  return glyphDataLength;
                }
                if (glyf.length - glyphDataLength > 3) {
                   // truncating and aligning to 4 bytes the long glyph data
@@ -21284,7 +21312,7 @@ PDFJS.build = 'ce218d0';
             }
 
             function sanitizeGlyphLocations(loca, glyf, numGlyphs,
-                                            isGlyphLocationsLong) {
+                                            isGlyphLocationsLong, hintsValid) {
                var itemSize, itemDecode, itemEncode;
                if (isGlyphLocationsLong) {
                   itemSize = 4;
@@ -21326,7 +21354,7 @@ PDFJS.build = 'ce218d0';
                   }
 
                   var newLength = sanitizeGlyph(oldGlyfData, startOffset, endOffset,
-                     newGlyfData, writeOffset);
+                     newGlyfData, writeOffset, hintsValid);
                   writeOffset += newLength;
                   itemEncode(locaData, j, writeOffset);
                   startOffset = endOffset;
@@ -21491,7 +21519,7 @@ PDFJS.build = 'ce218d0';
                0, 0, 0, 0, 0, 0, 0, 0, -2, -2, -2, -2, 0, 0, -2, -5,
                -1, -1, -1, -1, -1, -1, -1, -1, 0, 0, -1, 0, -1, -1, -1, -1,
                1, -1, -999, 0, 1, 0, -1, -2, 0, -1, -2, -1, -1, 0, -1, -1,
-               0, 0, -999, -999, -1, -1, -1, -1, -2, -999, -2, -2, -2, 0, -2, -2,
+               0, 0, -999, -999, -1, -1, -1, -1, -2, -999, -2, -2, -999, 0, -2, -2,
                0, 0, -2, 0, -2, 0, 0, 0, -2, -1, -1, 1, 1, 0, 0, -1,
                -1, -1, -1, -1, -1, -1, 0, 0, -1, 0, -1, -1, 0, -999, -1, -1,
                -1, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -21644,33 +21672,22 @@ PDFJS.build = 'ce218d0';
                foldTTTable(table, content);
             }
 
-            function addTTDummyFunctions(table, ttContext, maxFunctionDefs) {
-               var content = [table.data];
-               if (!ttContext.tooComplexToFollowFunctions) {
-                  var undefinedFunctions = [];
-                  for (var j = 0, jj = ttContext.functionsUsed.length; j < jj; j++) {
-                     if (!ttContext.functionsUsed[j] || ttContext.functionsDefined[j]) {
-                        continue;
-                     }
-                     undefinedFunctions.push(j);
-                     if (j >= maxFunctionDefs) {
-                        continue;
-                     }
-                     // function is used, but not defined
-                     if (j < 256) {
-                        // creating empty one [PUSHB, function-id, FDEF, ENDF]
-                        content.push(new Uint8Array([0xB0, j, 0x2C, 0x2D]));
-                     } else {
-                        // creating empty one [PUSHW, function-id, FDEF, ENDF]
-                        content.push(
-                           new Uint8Array([0xB8, j >> 8, j & 255, 0x2C, 0x2D]));
-                     }
+            function checkInvalidFunctions(ttContext, maxFunctionDefs) {
+               if (ttContext.tooComplexToFollowFunctions) {
+                  return;
+               }
+               for (var j = 0, jj = ttContext.functionsUsed.length; j < jj; j++) {
+                  if (j > maxFunctionDefs) {
+                     warn('TT: invalid function id: ' + j);
+                     ttContext.hintsValid = false;
+                     return;
                   }
-                  if (undefinedFunctions.length > 0) {
-                     warn('TT: undefined functions: ' + undefinedFunctions);
+                  if (ttContext.functionsUsed[j] && !ttContext.functionsDefined[j]) {
+                     warn('TT: undefined function: ' + j);
+                     ttContext.hintsValid = false;
+                     return;
                   }
                }
-               foldTTTable(table, content);
             }
 
             function foldTTTable(table, content) {
@@ -21697,7 +21714,8 @@ PDFJS.build = 'ce218d0';
                   functionsDefined: [],
                   functionsUsed: [],
                   functionsStackDeltas: [],
-                  tooComplexToFollowFunctions: false
+                  tooComplexToFollowFunctions: false,
+                  hintsValid: true
                };
                if (fpgm) {
                   sanitizeTTProgram(fpgm, ttContext);
@@ -21706,8 +21724,9 @@ PDFJS.build = 'ce218d0';
                   sanitizeTTProgram(prep, ttContext);
                }
                if (fpgm) {
-                  addTTDummyFunctions(fpgm, ttContext, maxFunctionDefs);
+                  checkInvalidFunctions(ttContext, maxFunctionDefs);
                }
+               return ttContext.hintsValid;
             }
 
             // The following steps modify the original font data, making copy
@@ -21762,6 +21781,25 @@ PDFJS.build = 'ce218d0';
                tables.push(table);
             }
 
+            // Ensure the hmtx table contains the advance width and
+            // sidebearings information for numGlyphs in the maxp table
+            font.pos = (font.start || 0) + maxp.offset;
+            var version = int32(font.getBytes(4));
+            var numGlyphs = int16(font.getBytes(2));
+            var maxFunctionDefs = 0;
+            if (version >= 0x00010000 && maxp.length >= 22) {
+               font.pos += 14;
+               var maxFunctionDefs = int16(font.getBytes(2));
+            }
+
+            var hintsValid = sanitizeTTPrograms(fpgm, prep, maxFunctionDefs);
+            if (!hintsValid) {
+               tables.splice(tables.indexOf(fpgm), 1);
+               fpgm = null;
+               tables.splice(tables.indexOf(prep), 1);
+               prep = null;
+            }
+
             var numTables = tables.length + requiredTables.length;
 
             // header and new offsets. Table entry information is appended to the
@@ -21776,20 +21814,7 @@ PDFJS.build = 'ce218d0';
             // of missing tables
             createOpenTypeHeader(header.version, ttf, numTables);
 
-            // Ensure the hmtx table contains the advance width and
-            // sidebearings information for numGlyphs in the maxp table
-            font.pos = (font.start || 0) + maxp.offset;
-            var version = int32(font.getBytes(4));
-            var numGlyphs = int16(font.getBytes(2));
-            var maxFunctionDefs = 0;
-            if (version >= 0x00010000 && maxp.length >= 22) {
-               font.pos += 14;
-               var maxFunctionDefs = int16(font.getBytes(2));
-            }
-
             sanitizeMetrics(font, hhea, hmtx, numGlyphs);
-
-            sanitizeTTPrograms(fpgm, prep, maxFunctionDefs);
 
             if (head) {
                sanitizeHead(head, numGlyphs, loca.length);
@@ -21797,7 +21822,8 @@ PDFJS.build = 'ce218d0';
 
             var isGlyphLocationsLong = int16([head.data[50], head.data[51]]);
             if (head && loca && glyf) {
-               sanitizeGlyphLocations(loca, glyf, numGlyphs, isGlyphLocationsLong);
+               sanitizeGlyphLocations(loca, glyf, numGlyphs, isGlyphLocationsLong,
+                  hintsValid);
             }
 
             var emptyGlyphIds = [];
@@ -33483,13 +33509,22 @@ PDFJS.build = 'ce218d0';
             var startPos = stream.pos;
 
             // searching for the /EI\s/
-            var state = 0, ch;
+            var state = 0, ch, i, ii;
             while (state != 4 &&
                (ch = stream.getByte()) !== null && ch !== undefined) {
                switch (ch) {
                   case 0x20:
                   case 0x0D:
                   case 0x0A:
+                     // let's check next five bytes to be ASCII... just be sure
+                     var followingBytes = stream.peekBytes(5);
+                     for (i = 0, ii = followingBytes.length; i < ii; i++) {
+                        ch = followingBytes[i];
+                        if (ch !== 0x0A && ch != 0x0D && (ch < 0x20 || ch > 0x7F)) {
+                           state = 0;
+                           break; // some binary stuff found, resetting the state
+                        }
+                     }
                      state = state === 3 ? 4 : 0;
                      break;
                   case 0x45:
@@ -34469,6 +34504,11 @@ PDFJS.build = 'ce218d0';
             this.pos = end;
             return bytes.subarray(pos, end);
          },
+         peekBytes: function Stream_peekBytes(length) {
+            var bytes = this.getBytes(length);
+            this.pos -= bytes.length;
+            return bytes;
+         },
          lookChar: function Stream_lookChar() {
             if (this.pos >= this.end)
                return null;
@@ -34572,6 +34612,11 @@ PDFJS.build = 'ce218d0';
 
             this.pos = end;
             return this.buffer.subarray(pos, end);
+         },
+         peekBytes: function DecodeStream_peekBytes(length) {
+            var bytes = this.getBytes(length);
+            this.pos -= bytes.length;
+            return bytes;
          },
          lookChar: function DecodeStream_lookChar() {
             var pos = this.pos;
@@ -35468,6 +35513,8 @@ PDFJS.build = 'ce218d0';
          this.str = str;
          this.dict = str.dict;
          this.decrypt = decrypt;
+         this.nextChunk = null;
+         this.initialized = false;
 
          DecodeStream.call(this);
       }
@@ -35477,13 +35524,22 @@ PDFJS.build = 'ce218d0';
       DecryptStream.prototype = Object.create(DecodeStream.prototype);
 
       DecryptStream.prototype.readBlock = function DecryptStream_readBlock() {
-         var chunk = this.str.getBytes(chunkSize);
+         var chunk;
+         if (this.initialized) {
+            chunk = this.nextChunk;
+         } else {
+            chunk = this.str.getBytes(chunkSize);
+            this.initialized = true;
+         }
          if (!chunk || chunk.length === 0) {
             this.eof = true;
             return;
          }
+         this.nextChunk = this.str.getBytes(chunkSize);
+         var hasMoreData = this.nextChunk && this.nextChunk.length > 0;
+
          var decrypt = this.decrypt;
-         chunk = decrypt(chunk);
+         chunk = decrypt(chunk, !hasMoreData);
 
          var bufferLength = this.bufferLength;
          var i, n = chunk.length;
