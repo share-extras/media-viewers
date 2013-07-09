@@ -83,7 +83,7 @@
         </module>
         
         <module>
-            <id>WebODF Viewer</id>
+            <id>WebODF Viewer (Experimental)</id>
             <customizations>
                 <customization>
                     <targetPackageRoot>org.alfresco.components.preview</targetPackageRoot>
@@ -94,7 +94,7 @@
         </module>
         
         <module>
-            <id>WebODF Configuration</id>
+            <id>WebODF Configuration (Experimental)</id>
             <customizations>
                 <customization>
                     <targetPackageRoot>org.alfresco.components.preview</targetPackageRoot>
