@@ -169,7 +169,6 @@
          </bean>
       </property>
       <!-- Transform to MP4 -->
-      <!--
       <property name="explicitTransformations">
          <list>
             <bean class="org.alfresco.repo.content.transform.ExplictTransformationDetails" >
@@ -214,7 +213,6 @@
             </bean>
          </list>
       </property>
-      -->
       <property name="transformerConfig">
          <ref bean="transformerConfig" />
       </property>
@@ -237,7 +235,6 @@
             </property>
          </bean>
       </property>
-      <!--
       <property name="explicitTransformations">
          <list>
             <bean class="org.alfresco.repo.content.transform.ExplictTransformationDetails" >
@@ -294,7 +291,6 @@
             </bean>
          </list>
       </property>
-      -->
       <property name="transformerConfig">
          <ref bean="transformerConfig" />
       </property>
@@ -318,7 +314,6 @@
          </bean>
       </property>
       <!-- Transform to MP3 -->
-      <!--
       <property name="explicitTransformations">
          <list>
             <bean class="org.alfresco.repo.content.transform.ExplictTransformationDetails" >
@@ -351,7 +346,6 @@
             </bean>
          </list>
       </property>
-      -->
       <property name="transformerConfig">
          <ref bean="transformerConfig" />
       </property>
