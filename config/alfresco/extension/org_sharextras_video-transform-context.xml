@@ -168,9 +168,9 @@
             </property>
          </bean>
       </property>
+      <!-- Transform to MP4 -->
       <property name="explicitTransformations">
          <list>
-            <!-- Transform to MP4 -->
             <bean class="org.alfresco.repo.content.transform.ExplictTransformationDetails" >
                 <property name="sourceMimetype"><value>video/mpeg</value></property>
                 <property name="targetMimetype"><value>video/mp4</value></property>
@@ -212,6 +212,9 @@
                 <property name="targetMimetype"><value>video/mp4</value></property>
             </bean>
          </list>
+      </property>
+      <property name="transformerConfig">
+         <ref bean="transformerConfig" />
       </property>
    </bean>
 
@@ -288,6 +291,9 @@
             </bean>
          </list>
       </property>
+      <property name="transformerConfig">
+         <ref bean="transformerConfig" />
+      </property>
    </bean>
 
    <!-- Generic MP3 transformation worker -->
@@ -307,9 +313,9 @@
             </property>
          </bean>
       </property>
+      <!-- Transform to MP3 -->
       <property name="explicitTransformations">
          <list>
-            <!-- Transform to MP3 -->
             <bean class="org.alfresco.repo.content.transform.ExplictTransformationDetails" >
                 <property name="sourceMimetype"><value>audio/x-aiff</value></property>
                 <property name="targetMimetype"><value>audio/mpeg</value></property>
@@ -339,6 +345,9 @@
                 <property name="targetMimetype"><value>audio/mpeg</value></property>
             </bean>
          </list>
+      </property>
+      <property name="transformerConfig">
+         <ref bean="transformerConfig" />
       </property>
    </bean>
    
