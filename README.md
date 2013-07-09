@@ -96,7 +96,7 @@ To enable FFmpeg support you must
    
    It is unlikely that your standard package manager will install this for you. The [FFmpeg documentation](https://ffmpeg.org/trac/ffmpeg/wiki) does however contain detailed documentation for compiling on [Ubuntu](https://ffmpeg.org/trac/ffmpeg/wiki/UbuntuCompilationGuide) and [other operating systems](https://ffmpeg.org/trac/ffmpeg/wiki/CompilationGuide) and the project also makes pre-built binaries available for [download](http://ffmpeg.org/download.html).
    
-2. Edit your `alfresco-global.properties` file to define the location of the FFmpeg executable and base directory (should not contain spaces)
+2. If the `ffmpeg` executable is not on your system's PATH (i.e. typing `ffmpeg -version` indicates that `ffmpeg` could not be found), you must edit your `alfresco-global.properties` file to define the correct location
 
         ffmpeg.exe=<location of ffmpeg executable>
    
