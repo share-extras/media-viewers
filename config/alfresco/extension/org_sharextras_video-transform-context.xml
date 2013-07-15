@@ -213,9 +213,6 @@
             </bean>
          </list>
       </property>
-      <property name="transformerConfig">
-         <ref bean="transformerConfig" />
-      </property>
    </bean>
 
    <!-- Video Thumbnails FFmpeg transformation worker -->
@@ -291,9 +288,6 @@
             </bean>
          </list>
       </property>
-      <property name="transformerConfig">
-         <ref bean="transformerConfig" />
-      </property>
    </bean>
 
    <!-- Generic MP3 transformation worker -->
@@ -345,9 +339,6 @@
                 <property name="targetMimetype"><value>audio/mpeg</value></property>
             </bean>
          </list>
-      </property>
-      <property name="transformerConfig">
-         <ref bean="transformerConfig" />
       </property>
    </bean>
    
