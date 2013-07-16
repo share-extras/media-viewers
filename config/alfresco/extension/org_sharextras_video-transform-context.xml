@@ -24,6 +24,12 @@
                 <value>-version</value>
              </list>
           </entry>
+          <entry key="SunOS">
+             <list>
+                <value>${ffmpeg.exe}</value>
+                <value>-version</value>
+             </list>
+          </entry>
        </map>
     </property>
  </bean>
@@ -55,6 +61,17 @@
              </list>
           </entry>
           <entry key="Mac OS X">
+             <list>
+                <value>${ffmpeg.exe}</value>
+                <value>SPLIT:${opts}</value>
+                <value>SPLIT:${infile_opts}</value>
+                <value>-i</value>
+                <value>${source}</value>
+                <value>SPLIT:${outfile_opts}</value>
+                <value>${target}</value>
+             </list>
+          </entry>
+          <entry key="SunOS">
              <list>
                 <value>${ffmpeg.exe}</value>
                 <value>SPLIT:${opts}</value>
