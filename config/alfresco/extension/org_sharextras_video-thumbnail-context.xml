@@ -4,7 +4,7 @@
 <beans>
 
     <!-- FLV thumbnail options -->
-    <bean id="thumbnail.register.flvpreview" class="org.alfresco.repo.thumbnail.ThumbnailDefinitionSpringRegisterer">
+    <bean id="org_sharextras_media-viewers_thumbnail.register.flvpreview" class="org.alfresco.repo.thumbnail.ThumbnailDefinitionSpringRegisterer">
         <property name="thumbnailRegistry" ref="thumbnailRegistry" />
         <property name="thumbnailDefinition">
             <!-- FLV preview thumbnail options -->
@@ -26,7 +26,7 @@
     </bean>
 
     <!-- H264 thumbnail options -->
-    <bean id="thumbnail.register.h264preview" class="org.alfresco.repo.thumbnail.ThumbnailDefinitionSpringRegisterer">
+    <bean id="org_sharextras_media-viewers_thumbnail.register.h264preview" class="org.alfresco.repo.thumbnail.ThumbnailDefinitionSpringRegisterer">
         <property name="thumbnailRegistry" ref="thumbnailRegistry" />
         <property name="thumbnailDefinition">
             <!-- H264 preview thumbnail options -->
@@ -53,7 +53,7 @@
     </bean>
 
     <!-- MP3 thumbnail options -->
-    <bean id="thumbnail.register.mp3preview" class="org.alfresco.repo.thumbnail.ThumbnailDefinitionSpringRegisterer">
+    <bean id="org_sharextras_media-viewers_thumbnail.register.mp3preview" class="org.alfresco.repo.thumbnail.ThumbnailDefinitionSpringRegisterer">
         <property name="thumbnailRegistry" ref="thumbnailRegistry" />
         <property name="thumbnailDefinition">
             <!-- MP3 preview thumbnail options -->
@@ -75,7 +75,7 @@
     </bean>
 
     <!-- Full size image thumbnail options -->
-    <bean id="thumbnail.register.imgpreviewfull" class="org.alfresco.repo.thumbnail.ThumbnailDefinitionSpringRegisterer">
+    <bean id="org_sharextras_media-viewers_thumbnail.register.imgpreviewfull" class="org.alfresco.repo.thumbnail.ThumbnailDefinitionSpringRegisterer">
         <property name="thumbnailRegistry" ref="thumbnailRegistry" />
         <property name="thumbnailDefinition">
             <!-- Image preview thumbnail options -->
