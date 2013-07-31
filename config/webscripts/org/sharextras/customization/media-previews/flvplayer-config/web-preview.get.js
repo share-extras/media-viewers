@@ -18,6 +18,15 @@ if (model.widgets)
          });
          conditions.push({
             attributes: {
+               mimeType: "video/x-m4v"
+            },
+            plugins: [{
+               name: "FLVPlayer",
+               attributes: {}
+            }]
+         });
+         conditions.push({
+            attributes: {
                mimeType: "video/m4v"
             },
             plugins: [{
