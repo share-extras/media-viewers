@@ -26,8 +26,8 @@ if (typeof PDFJS === 'undefined') {
    (typeof window !== 'undefined' ? window : this).PDFJS = {};
 }
 
-PDFJS.version = '0.8.265';
-PDFJS.build = '8561d26';
+PDFJS.version = '0.8.390';
+PDFJS.build = 'f7d2a09';
 
 (function pdfjsWrapper() {
    // Use strict in our context only - users might not want it
@@ -81,7 +81,11 @@ PDFJS.build = '8561d26';
          this.httpHeaders = args.httpHeaders || {};
          this.getXhr = args.getXhr ||
             function NetworkManager_getXhr() {
+//#if B2G
+//      return new XMLHttpRequest({ mozSystem: true });
+//#else
                return new XMLHttpRequest();
+//#endif
             };
 
          this.currXhrId = 0;
@@ -295,6 +299,10 @@ PDFJS.build = '8561d26';
             return chunks;
          },
 
+         getBaseStreams: function ChunkedStream_getBaseStreams() {
+            return [this];
+         },
+
          allChunksLoaded: function ChunkedStream_allChunksLoaded() {
             return this.numChunksLoaded === this.numChunks;
          },
@@ -363,7 +371,7 @@ PDFJS.build = '8561d26';
          getByte: function ChunkedStream_getByte() {
             var pos = this.pos;
             if (pos >= this.end) {
-               return null;
+               return -1;
             }
             this.ensureRange(pos, pos + 1);
             return this.bytes[this.pos++];
@@ -390,25 +398,15 @@ PDFJS.build = '8561d26';
             return bytes.subarray(pos, end);
          },
 
+         peekBytes: function ChunkedStream_peekBytes(length) {
+            var bytes = this.getBytes(length);
+            this.pos -= bytes.length;
+            return bytes;
+         },
+
          getByteRange: function ChunkedStream_getBytes(begin, end) {
             this.ensureRange(begin, end);
             return this.bytes.subarray(begin, end);
-         },
-
-         lookChar: function ChunkedStream_lookChar() {
-            var pos = this.pos;
-            if (pos >= this.end)
-               return null;
-            this.ensureRange(pos, pos + 1);
-            return String.fromCharCode(this.bytes[pos]);
-         },
-
-         getChar: function ChunkedStream_getChar() {
-            var pos = this.pos;
-            if (pos >= this.end)
-               return null;
-            this.ensureRange(pos, pos + 1);
-            return String.fromCharCode(this.bytes[this.pos++]);
          },
 
          skip: function ChunkedStream_skip(n) {
@@ -935,7 +933,6 @@ PDFJS.build = '8561d26';
          this.xref = xref;
          this.ref = ref;
          this.idCounters = {
-            font: 0,
             obj: 0
          };
          this.resourcesPromise = null;
@@ -1201,7 +1198,7 @@ PDFJS.build = '8561d26';
          if (pos + limit > end)
             limit = end - pos;
          for (var n = 0; n < limit; ++n)
-            str += stream.getChar();
+            str += String.fromCharCode(stream.getByte());
          stream.pos = pos;
          var index = backwards ? str.lastIndexOf(needle) : str.indexOf(needle);
          if (index == -1)
@@ -1280,12 +1277,12 @@ PDFJS.build = '8561d26';
                   stream.skip(9);
                   var ch;
                   do {
-                     ch = stream.getChar();
+                     ch = stream.getByte();
                   } while (Lexer.isSpace(ch));
                   var str = '';
-                  while ((ch - '0') <= 9) {
-                     str += ch;
-                     ch = stream.getChar();
+                  while (ch >= 0x20 && ch <= 0x39) { // < '9'
+                     str += String.fromCharCode(ch);
+                     ch = stream.getByte();
                   }
                   startXRef = parseInt(str, 10);
                   if (isNaN(startXRef))
@@ -1314,11 +1311,11 @@ PDFJS.build = '8561d26';
                // Reading file format version
                var MAX_VERSION_LENGTH = 12;
                var version = '', ch;
-               while ((ch = stream.getChar()) > ' ') {
+               while ((ch = stream.getByte()) > 0x20) { // SPACE
                   if (version.length >= MAX_VERSION_LENGTH) {
                      break;
                   }
-                  version += ch;
+                  version += String.fromCharCode(ch);
                }
                // removing "%PDF-"-prefix
                this.pdfFormatVersion = version.substring(5);
@@ -1489,6 +1486,28 @@ PDFJS.build = '8561d26';
          return baseUrl.substring(0, prefixLength + 1) + url;
       }
    }
+
+// Validates if URL is safe and allowed, e.g. to avoid XSS.
+   function isValidUrl(url, allowRelative) {
+      if (!url) {
+         return false;
+      }
+      var colon = url.indexOf(':');
+      if (colon < 0) {
+         return allowRelative;
+      }
+      var protocol = url.substr(0, colon);
+      switch (protocol) {
+         case 'http':
+         case 'https':
+         case 'ftp':
+         case 'mailto':
+            return true;
+         default:
+            return false;
+      }
+   }
+   PDFJS.isValidUrl = isValidUrl;
 
 // In a well-formed PDF, |cond| holds.  If it doesn't, subsequent
 // behavior is undefined.
@@ -2005,7 +2024,7 @@ PDFJS.build = '8561d26';
 
    function isStream(v) {
       return typeof v == 'object' && v !== null && v !== undefined &&
-         ('getChar' in v);
+         ('getBytes' in v);
    }
 
    function isArrayBuffer(v) {
@@ -2309,6 +2328,13 @@ PDFJS.build = '8561d26';
       return bb.getBlob(contentType);
    };
 
+
+   /**
+    * The maximum allowed image size in total pixels e.g. width * height. Images
+    * above this value will not be drawn. Use -1 for no limit.
+    * @var {Number}
+    */
+   PDFJS.maxImageSize = PDFJS.maxImageSize === undefined ? -1 : PDFJS.maxImageSize;
 
    /**
     * This is the main entry point for loading a PDF and interacting with it.
@@ -3049,7 +3075,8 @@ PDFJS.build = '8561d26';
             source.chunkedViewerLoading = !!this.pdfDataRangeTransport;
             this.messageHandler.send('GetDocRequest', {
                source: source,
-               disableRange: PDFJS.disableRange
+               disableRange: PDFJS.disableRange,
+               maxImageSize: PDFJS.maxImageSize
             });
          },
 
@@ -3484,6 +3511,10 @@ PDFJS.build = '8561d26';
          this.imageLayer = imageLayer;
          this.groupStack = [];
          this.processingType3 = null;
+         // Patterns are painted relative to the initial page/form transform, see pdf
+         // spec 8.7.2 NOTE 1.
+         this.baseTransform = null;
+         this.baseTransformStack = [];
          if (canvasCtx) {
             addContextCurrentTransform(canvasCtx);
          }
@@ -3586,6 +3617,7 @@ PDFJS.build = '8561d26';
             }
 
             var transform = viewport.transform;
+            this.baseTransform = transform.slice();
             this.ctx.save();
             this.ctx.transform.apply(this.ctx, transform);
 
@@ -4045,14 +4077,20 @@ PDFJS.build = '8561d26';
             var ctx = this.ctx;
             var font = this.current.font;
             var ctxMatrix = ctx.mozCurrentTransform;
-            if (ctxMatrix) {
-               var bl = Util.applyTransform([0, 0], ctxMatrix);
-               var tr = Util.applyTransform([1, 1], ctxMatrix);
-               geometry.x = bl[0];
-               geometry.y = bl[1];
-               geometry.hScale = tr[0] - bl[0];
-               geometry.vScale = tr[1] - bl[1];
-            }
+            var a = ctxMatrix[0], b = ctxMatrix[1], c = ctxMatrix[2];
+            var d = ctxMatrix[3], e = ctxMatrix[4], f = ctxMatrix[5];
+            var sx = (a >= 0) ?
+               Math.sqrt((a * a) + (b * b)) : -Math.sqrt((a * a) + (b * b));
+            var sy = (d >= 0) ?
+               Math.sqrt((c * c) + (d * d)) : -Math.sqrt((c * c) + (d * d));
+            var angle = Math.atan2(b, a);
+            var x = e;
+            var y = f;
+            geometry.x = x;
+            geometry.y = y;
+            geometry.hScale = sx;
+            geometry.vScale = sy;
+            geometry.angle = angle;
             geometry.spaceWidth = font.spaceWidth;
             geometry.fontName = font.loadedName;
             geometry.fontFamily = font.fallbackName;
@@ -4270,11 +4308,8 @@ PDFJS.build = '8561d26';
             if (textSelection) {
                geom.canvasWidth = canvasWidth;
                if (vertical) {
-                  var vmetric = font.defaultVMetrics;
-                  geom.x += vmetric[1] * fontSize * current.fontMatrix[0] /
-                     fontSizeScale * geom.hScale;
-                  geom.y += vmetric[2] * fontSize * current.fontMatrix[0] /
-                     fontSizeScale * geom.vScale;
+                  var VERTICAL_TEXT_ROTATION = Math.PI / 2;
+                  geom.angle += VERTICAL_TEXT_ROTATION;
                }
                this.textLayer.appendText(geom);
             }
@@ -4330,12 +4365,8 @@ PDFJS.build = '8561d26';
             if (textSelection) {
                geom.canvasWidth = canvasWidth;
                if (vertical) {
-                  var fontSizeScale = current.fontSizeScale;
-                  var vmetric = font.defaultVMetrics;
-                  geom.x += vmetric[1] * fontSize * current.fontMatrix[0] /
-                     fontSizeScale * geom.hScale;
-                  geom.y += vmetric[2] * fontSize * current.fontMatrix[0] /
-                     fontSizeScale * geom.vScale;
+                  var VERTICAL_TEXT_ROTATION = Math.PI / 2;
+                  geom.angle += VERTICAL_TEXT_ROTATION;
                }
                this.textLayer.appendText(geom);
             }
@@ -4396,7 +4427,7 @@ PDFJS.build = '8561d26';
                   color = base.getRgb(args, 0);
                }
                var pattern = new TilingPattern(IR, color, this.ctx, this.objs,
-                  this.commonObjs);
+                  this.commonObjs, this.baseTransform);
             } else if (IR[0] == 'RadialAxial' || IR[0] == 'Dummy') {
                var pattern = Pattern.shadingFromIR(IR);
             } else {
@@ -4531,9 +4562,12 @@ PDFJS.build = '8561d26';
                                                                               bbox) {
             this.save();
             this.current.paintFormXObjectDepth++;
+            this.baseTransformStack.push(this.baseTransform);
 
             if (matrix && isArray(matrix) && 6 == matrix.length)
                this.transform.apply(this, matrix);
+
+            this.baseTransform = this.ctx.mozCurrentTransform;
 
             if (bbox && isArray(bbox) && 4 == bbox.length) {
                var width = bbox[2] - bbox[0];
@@ -4551,6 +4585,7 @@ PDFJS.build = '8561d26';
                // some pdf don't close all restores inside object
                // closing those for them
             } while (this.current.paintFormXObjectDepth >= depth);
+            this.baseTransform = this.baseTransformStack.pop();
          },
 
          beginGroup: function CanvasGraphics_beginGroup(group) {
@@ -5112,6 +5147,28 @@ PDFJS.build = '8561d26';
       return RefSet;
    })();
 
+   var RefSetCache = (function RefSetCacheClosure() {
+      function RefSetCache() {
+         this.dict = {};
+      }
+
+      RefSetCache.prototype = {
+         get: function RefSetCache_get(ref) {
+            return this.dict['R' + ref.num + '.' + ref.gen];
+         },
+
+         has: function RefSetCache_has(ref) {
+            return ('R' + ref.num + '.' + ref.gen) in this.dict;
+         },
+
+         put: function RefSetCache_put(ref, obj) {
+            this.dict['R' + ref.num + '.' + ref.gen] = obj;
+         }
+      };
+
+      return RefSetCache;
+   })();
+
    var Catalog = (function CatalogClosure() {
       function Catalog(pdfManager, xref) {
          this.pdfManager = pdfManager;
@@ -5169,6 +5226,18 @@ PDFJS.build = '8561d26';
             return shadow(this, 'toplevelPagesDict', pagesObj);
          },
          get documentOutline() {
+            var obj = null;
+            try {
+               obj = this.readDocumentOutline();
+            } catch (ex) {
+               if (ex instanceof MissingDataException) {
+                  throw ex;
+               }
+               warn('Unable to read document outline');
+            }
+            return shadow(this, 'documentOutline', obj);
+         },
+         readDocumentOutline: function Catalog_readDocumentOutline() {
             var xref = this.xref;
             var obj = this.catDict.get('Outlines');
             var root = { items: [] };
@@ -5219,8 +5288,7 @@ PDFJS.build = '8561d26';
                   }
                }
             }
-            obj = root.items.length > 0 ? root.items : null;
-            return shadow(this, 'documentOutline', obj);
+            return root.items.length > 0 ? root.items : null;
          },
          get numPages() {
             var obj = this.toplevelPagesDict.get('Count');
@@ -5499,6 +5567,12 @@ PDFJS.build = '8561d26';
                tableState.parserBuf2 = parser.buf2;
                delete tableState.firstEntryNum;
                delete tableState.entryCount;
+            }
+
+            // Per issue 3248: hp scanners generate bad XRef
+            if (first === 1 && this.entries[1] && this.entries[1].free) {
+               // shifting the entries
+               this.entries.shift();
             }
 
             // Sanity check: as per spec, first object must be free
@@ -5846,14 +5920,7 @@ PDFJS.build = '8561d26';
                } else {
                   e = parser.getObj();
                }
-               if (!isStream(e) || e instanceof JpegStream) {
-                  this.cache[num] = e;
-               } else if (e instanceof Stream) {
-                  e = e.makeSubStream(e.start, e.length, e.dict);
-                  this.cache[num] = e;
-               } else if ('readBlock' in e) {
-                  e.getBytes();
-                  e = e.makeSubStream(0, e.bufferLength, e.dict);
+               if (!isStream(e)) {
                   this.cache[num] = e;
                }
                return e;
@@ -5894,7 +5961,7 @@ PDFJS.build = '8561d26';
                }
             }
             e = entries[e.gen];
-            if (!e) {
+            if (e === undefined) {
                error('bad XRef entry for compressed object');
             }
             return e;
@@ -6182,13 +6249,22 @@ PDFJS.build = '8561d26';
                      pendingRequests.push({ begin: e.begin, end: e.end });
                   }
                }
-               if (currentNode instanceof ChunkedStream &&
-                  currentNode.getMissingChunks().length) {
-                  nodesToRevisit.push(currentNode);
-                  pendingRequests.push({
-                     begin: currentNode.start,
-                     end: currentNode.end
-                  });
+               if (currentNode && currentNode.getBaseStreams) {
+                  var baseStreams = currentNode.getBaseStreams();
+                  var foundMissingData = false;
+                  for (var i = 0; i < baseStreams.length; i++) {
+                     var stream = baseStreams[i];
+                     if (stream.getMissingChunks && stream.getMissingChunks().length) {
+                        foundMissingData = true;
+                        pendingRequests.push({
+                           begin: stream.start,
+                           end: stream.end
+                        });
+                     }
+                  }
+                  if (foundMissingData) {
+                     nodesToRevisit.push(currentNode);
+                  }
                }
 
                addChildren(currentNode, nodesToVisit);
@@ -6755,7 +6831,6 @@ PDFJS.build = '8561d26';
       }
 
       var ANNOT_MIN_SIZE = 10;
-      var IMAGE_DIR = './images/';
 
       Util.inherit(TextAnnotation, Annotation, {
 
@@ -6796,7 +6871,7 @@ PDFJS.build = '8561d26';
             image.style.width = container.style.width;
             image.style.height = container.style.height;
             var iconName = item.name;
-            image.src = IMAGE_DIR + 'annotation-' +
+            image.src = PDFJS.imageResourcesPath + 'annotation-' +
                iconName.toLowerCase() + '.svg';
             image.alt = '[{{type}} Annotation]';
             image.dataset.l10nId = 'text_annotation_type';
@@ -6845,24 +6920,6 @@ PDFJS.build = '8561d26';
    })();
 
    var LinkAnnotation = (function LinkAnnotationClosure() {
-      function isValidUrl(url) {
-         if (!url)
-            return false;
-         var colon = url.indexOf(':');
-         if (colon < 0)
-            return false;
-         var protocol = url.substr(0, colon);
-         switch (protocol) {
-            case 'http':
-            case 'https':
-            case 'ftp':
-            case 'mailto':
-               return true;
-            default:
-               return false;
-         }
-      }
-
       function LinkAnnotation(params) {
          Annotation.call(this, params);
 
@@ -6880,7 +6937,7 @@ PDFJS.build = '8561d26';
                var url = action.get('URI');
                // TODO: pdf spec mentions urls can be relative to a Base
                // entry in the dictionary.
-               if (!isValidUrl(url)) {
+               if (!isValidUrl(url, false)) {
                   url = '';
                }
                data.url = url;
@@ -6896,7 +6953,7 @@ PDFJS.build = '8561d26';
 
                // TODO: pdf reference says that GoToR
                // can also have 'NewWindow' attribute
-               if (!isValidUrl(url)) {
+               if (!isValidUrl(url, false)) {
                   url = '';
                }
                data.url = url;
@@ -7746,53 +7803,54 @@ PDFJS.build = '8561d26';
    var PostScriptLexer = (function PostScriptLexerClosure() {
       function PostScriptLexer(stream) {
          this.stream = stream;
+         this.nextChar();
       }
       PostScriptLexer.prototype = {
+         nextChar: function PostScriptLexer_nextChar() {
+            return (this.currentChar = this.stream.getByte());
+         },
          getToken: function PostScriptLexer_getToken() {
             var s = '';
-            var ch;
             var comment = false;
-            var stream = this.stream;
+            var ch = this.currentChar;
 
             // skip comments
             while (true) {
-               if (!(ch = stream.getChar()))
+               if (ch < 0) {
                   return EOF;
+               }
 
                if (comment) {
-                  if (ch == '\x0a' || ch == '\x0d')
+                  if (ch === 0x0A || ch === 0x0D) {
                      comment = false;
-               } else if (ch == '%') {
+                  }
+               } else if (ch == 0x25) { // '%'
                   comment = true;
                } else if (!Lexer.isSpace(ch)) {
                   break;
                }
+               ch = this.nextChar();
             }
-            switch (ch) {
-               case '0': case '1': case '2': case '3': case '4':
-               case '5': case '6': case '7': case '8': case '9':
-               case '+': case '-': case '.':
+            switch (ch | 0) {
+               case 0x30: case 0x31: case 0x32: case 0x33: case 0x34: // '0'-'4'
+               case 0x35: case 0x36: case 0x37: case 0x38: case 0x39: // '5'-'9'
+               case 0x2B: case 0x2D: case 0x2E: // '+', '-', '.'
                return new PostScriptToken(PostScriptTokenTypes.NUMBER,
-                  this.getNumber(ch));
-               case '{':
+                  this.getNumber());
+               case 0x7B: // '{'
+                  this.nextChar();
                   return PostScriptToken.LBRACE;
-               case '}':
+               case 0x7D: // '}'
+                  this.nextChar();
                   return PostScriptToken.RBRACE;
             }
             // operator
-            var str = ch.toLowerCase();
-            while (true) {
-               ch = stream.lookChar();
-               if (ch === null)
-                  break;
-               ch = ch.toLowerCase();
-               if (ch >= 'a' && ch <= 'z')
-                  str += ch;
-               else
-                  break;
-               stream.skip();
+            var str = String.fromCharCode(ch);
+            while ((ch = this.nextChar()) >= 0 && // and 'A'-'Z', 'a'-'z'
+               ((ch >= 0x41 && ch <= 0x5A) || (ch >= 0x61 && ch <= 0x7A))) {
+               str += String.fromCharCode(ch);
             }
-            switch (str) {
+            switch (str.toLowerCase()) {
                case 'if':
                   return PostScriptToken.IF;
                case 'ifelse':
@@ -7801,16 +7859,16 @@ PDFJS.build = '8561d26';
                   return PostScriptToken.getOperator(str);
             }
          },
-         getNumber: function PostScriptLexer_getNumber(ch) {
-            var str = ch;
-            var stream = this.stream;
-            while (true) {
-               ch = stream.lookChar();
-               if ((ch >= '0' && ch <= '9') || ch == '-' || ch == '.')
-                  str += ch;
-               else
+         getNumber: function PostScriptLexer_getNumber() {
+            var ch = this.currentChar;
+            var str = String.fromCharCode(ch);
+            while ((ch = this.nextChar()) >= 0) {
+               if ((ch >= 0x30 && ch <= 0x39) || // '0'-'9'
+                  ch === 0x2D || ch === 0x2E) { // '-', '.'
+                  str += String.fromCharCode(ch);
+               } else {
                   break;
-               stream.skip();
+               }
             }
             var value = parseFloat(str);
             if (isNaN(value))
@@ -16261,6 +16319,7 @@ PDFJS.build = '8561d26';
          this.pageIndex = pageIndex;
          this.uniquePrefix = uniquePrefix;
          this.idCounters = idCounters;
+         this.fontCache = new RefSetCache();
       }
 
       // Specifies properties for each command
@@ -16348,7 +16407,7 @@ PDFJS.build = '8561d26';
          // Images
          BI: { fnName: 'beginInlineImage', numArgs: 0, variableArgs: false },
          ID: { fnName: 'beginImageData', numArgs: 0, variableArgs: false },
-         EI: { fnName: 'endInlineImage', numArgs: 0, variableArgs: false },
+         EI: { fnName: 'endInlineImage', numArgs: 1, variableArgs: false },
 
          // XObjects
          Do: { fnName: 'paintXObject', numArgs: 1, variableArgs: false },
@@ -16457,6 +16516,11 @@ PDFJS.build = '8561d26';
             var dict = image.dict;
             var w = dict.get('Width', 'W');
             var h = dict.get('Height', 'H');
+
+            if (PDFJS.maxImageSize !== -1 && w * h > PDFJS.maxImageSize) {
+               warn('Image exceeded maximum allowed size and was removed.');
+               return null;
+            }
 
             var dependencies = {};
             var retData = {
@@ -16728,38 +16792,45 @@ PDFJS.build = '8561d26';
 
          loadFont: function PartialEvaluator_loadFont(fontName, font, xref,
                                                       resources) {
-            var promise = new Promise();
-
-            var fontRes = resources.get('Font');
-            if (!fontRes) {
-               warn('fontRes not available');
-            }
-
-            font = xref.fetchIfRef(font) || (fontRes && fontRes.get(fontName));
-            if (!isDict(font)) {
-               ++this.idCounters.font;
+            function errorFont(promise) {
                promise.resolve({
                   font: {
                      translated: new ErrorFont('Font ' + fontName + ' is not available'),
-                     loadedName: 'g_font_' + this.uniquePrefix + this.idCounters.obj
+                     loadedName: 'g_font_error'
                   },
                   dependencies: {}
                });
                return promise;
             }
 
-            if (font.loaded) {
-               promise.resolve({
-                  font: font,
-                  dependencies: {}
-               });
-               return promise;
+            var fontRef;
+            if (font) { // Loading by ref.
+               assert(isRef(font));
+               fontRef = font;
+            } else { // Loading by name.
+               var fontRes = resources.get('Font');
+               if (fontRes) {
+                  fontRef = fontRes.getRaw(fontName);
+               } else {
+                  warn('fontRes not available');
+                  return errorFont(new Promise());
+               }
+            }
+            if (this.fontCache.has(fontRef)) {
+               return this.fontCache.get(fontRef);
+            }
+
+            var promise = new Promise();
+            this.fontCache.put(fontRef, promise);
+
+            font = xref.fetchIfRef(fontRef);
+            if (!isDict(font)) {
+               return errorFont(promise);
             }
 
             // keep track of each font we translated so the caller can
             // load them asynchronously before calling display on a page
-            font.loadedName = 'g_font_' + this.uniquePrefix +
-               (++this.idCounters.font);
+            font.loadedName = 'g_font_' + fontRef.num + '_' + fontRef.gen;
 
             if (!font.translated) {
                var translated;
@@ -16923,6 +16994,10 @@ PDFJS.build = '8561d26';
                         } else if ('Image' == type.name) {
                            var data = self.buildPaintImageXObject(
                               resources, xobj, false);
+                           if (!data) {
+                              args = [];
+                              continue;
+                           }
                            Util.extendObj(dependencies, data.dependencies);
                            self.insertDependencies(queue, data.dependencies);
                            fn = data.fn;
@@ -16937,6 +17012,10 @@ PDFJS.build = '8561d26';
                   } else if (cmd == 'EI') {
                      var data = self.buildPaintImageXObject(
                         resources, args[0], true);
+                     if (!data) {
+                        args = [];
+                        continue;
+                     }
                      Util.extendObj(dependencies, data.dependencies);
                      self.insertDependencies(queue, data.dependencies);
                      fn = data.fn;
@@ -18384,7 +18463,50 @@ PDFJS.build = '8561d26';
    }
 
    var FontLoader = {
+      insertRule: function fontLoaderInsertRule(rule) {
+         var styleElement = document.getElementById('PDFJS_FONT_STYLE_TAG');
+         if (!styleElement) {
+            styleElement = document.createElement('style');
+            styleElement.id = 'PDFJS_FONT_STYLE_TAG';
+            document.documentElement.getElementsByTagName('head')[0].appendChild(
+               styleElement);
+         }
+
+         var styleSheet = styleElement.sheet;
+         styleSheet.insertRule(rule, styleSheet.cssRules.length);
+      },
 //#if !(MOZCENTRAL)
+      get loadTestFont() {
+         // This is a CFF font with 1 glyph for '.' that fills its entire width and
+         // height.
+         return shadow(this, 'loadTestFont', atob(
+            'T1RUTwALAIAAAwAwQ0ZGIDHtZg4AAAOYAAAAgUZGVE1lkzZwAAAEHAAAABxHREVGABQAFQ' +
+               'AABDgAAAAeT1MvMlYNYwkAAAEgAAAAYGNtYXABDQLUAAACNAAAAUJoZWFk/xVFDQAAALwA' +
+               'AAA2aGhlYQdkA+oAAAD0AAAAJGhtdHgD6AAAAAAEWAAAAAZtYXhwAAJQAAAAARgAAAAGbm' +
+               'FtZVjmdH4AAAGAAAAAsXBvc3T/hgAzAAADeAAAACAAAQAAAAEAALZRFsRfDzz1AAsD6AAA' +
+               'AADOBOTLAAAAAM4KHDwAAAAAA+gDIQAAAAgAAgAAAAAAAAABAAADIQAAAFoD6AAAAAAD6A' +
+               'ABAAAAAAAAAAAAAAAAAAAAAQAAUAAAAgAAAAQD6AH0AAUAAAKKArwAAACMAooCvAAAAeAA' +
+               'MQECAAACAAYJAAAAAAAAAAAAAQAAAAAAAAAAAAAAAFBmRWQAwAAuAC4DIP84AFoDIQAAAA' +
+               'AAAQAAAAAAAAAAACAAIAABAAAADgCuAAEAAAAAAAAAAQAAAAEAAAAAAAEAAQAAAAEAAAAA' +
+               'AAIAAQAAAAEAAAAAAAMAAQAAAAEAAAAAAAQAAQAAAAEAAAAAAAUAAQAAAAEAAAAAAAYAAQ' +
+               'AAAAMAAQQJAAAAAgABAAMAAQQJAAEAAgABAAMAAQQJAAIAAgABAAMAAQQJAAMAAgABAAMA' +
+               'AQQJAAQAAgABAAMAAQQJAAUAAgABAAMAAQQJAAYAAgABWABYAAAAAAAAAwAAAAMAAAAcAA' +
+               'EAAAAAADwAAwABAAAAHAAEACAAAAAEAAQAAQAAAC7//wAAAC7////TAAEAAAAAAAABBgAA' +
+               'AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAA' +
+               'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' +
+               'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' +
+               'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' +
+               'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAA' +
+               'AAAAD/gwAyAAAAAQAAAAAAAAAAAAAAAAAAAAABAAQEAAEBAQJYAAEBASH4DwD4GwHEAvgc' +
+               'A/gXBIwMAYuL+nz5tQXkD5j3CBLnEQACAQEBIVhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWF' +
+               'hYWFhYWFhYAAABAQAADwACAQEEE/t3Dov6fAH6fAT+fPp8+nwHDosMCvm1Cvm1DAz6fBQA' +
+               'AAAAAAABAAAAAMmJbzEAAAAAzgTjFQAAAADOBOQpAAEAAAAAAAAADAAUAAQAAAABAAAAAg' +
+               'ABAAAAAAAAAAAD6AAAAAAAAA=='
+         ));
+      },
+
+      loadTestFontId: 0,
+
       loadingContext: {
          requests: [],
          nextRequestId: 0
@@ -18457,128 +18579,79 @@ PDFJS.build = '8561d26';
          return request;
       },
 
-      // Set things up so that at least one pdfjsFontLoad event is
-      // dispatched when all the @font-face |rules| for |fonts| have been
-      // loaded in a subdocument.  It's expected that the load of |rules|
-      // has already started in this (outer) document, so that they should
-      // be ordered before the load in the subdocument.
       prepareFontLoadEvent: function fontLoaderPrepareFontLoadEvent(rules,
                                                                     fonts,
                                                                     request) {
          /** Hack begin */
-         // There's no event when a font has finished downloading so the
+         // There's currently no event when a font has finished downloading so the
          // following code is a dirty hack to 'guess' when a font is
-         // ready.  This code will be obsoleted by Mozilla bug 471915.
-         //
-         // The only reliable way to know if a font is loaded in Gecko
-         // (at the moment) is document.onload in a document with
-         // a @font-face rule defined in a "static" stylesheet.  We use a
-         // subdocument in an <iframe>, set up properly, to know when
-         // our @font-face rule was loaded.  However, the subdocument and
-         // outer document can't share CSS rules, so the inner document
-         // is only part of the puzzle.  The second piece is an invisible
-         // div created in order to force loading of the @font-face in
-         // the *outer* document.  (The font still needs to be loaded for
-         // its metrics, for reflow).  We create the div first for the
-         // outer document, then create the iframe.  Unless something
-         // goes really wonkily, we expect the @font-face for the outer
-         // document to be processed before the inner.  That's still
-         // fragile, but seems to work in practice.
-         //
-         // The postMessage() hackery was added to work around chrome bug
-         // 82402.
+         // ready. It's assumed fonts are loaded in order, so add a known test
+         // font after the desired fonts and then test for the loading of that
+         // test font.
 
-         var requestId = request.id;
-         // Validate the requestId parameter -- the value used to construct HTML.
-         if (!/^[\w\-]+$/.test(requestId)) {
-            error('Invalid request id: ' + requestId);
+         var canvas = document.createElement('canvas');
+         canvas.width = 1;
+         canvas.height = 1;
+         var ctx = canvas.getContext('2d');
 
-            // Normally the error-function throws. But if a malicious code
-            // intercepts the function call then the return is needed.
-            return;
+         var called = 0;
+         function isFontReady(name, callback) {
+            called++;
+            // With setTimeout clamping this gives the font ~100ms to load.
+            if(called > 30) {
+               warn('Load test font never loaded.');
+               callback();
+               return;
+            }
+            ctx.font = '30px ' + name;
+            ctx.fillText('.', 0, 20);
+            var imageData = ctx.getImageData(0, 0, 1, 1);
+            if (imageData.data[3] > 0) {
+               callback();
+               return;
+            }
+            setTimeout(isFontReady.bind(null, name, callback));
          }
+
+         var loadTestFontId = 'lt' + Date.now() + this.loadTestFontId++;
+         // Chromium seems to cache fonts based on a hash of the actual font data,
+         // so the font must be modified for each load test else it will appear to
+         // be loaded already.
+         // TODO: This could maybe be made faster by avoiding the btoa of the full
+         // font by splitting it in chunks before hand and padding the font id.
+         var data = this.loadTestFont;
+         var COMMENT_OFFSET = 973;
+         var chunk1 = data.substr(0, COMMENT_OFFSET);
+         var chunk2 = data.substr(COMMENT_OFFSET + loadTestFontId.length);
+         data = chunk1 + loadTestFontId + chunk2;
+
+         var url = 'url(data:font/opentype;base64,' + btoa(data) + ');';
+         var rule = '@font-face { font-family:"' + loadTestFontId + '";src:' +
+            url + '}';
+         FontLoader.insertRule(rule);
 
          var names = [];
          for (var i = 0, ii = fonts.length; i < ii; i++)
             names.push(fonts[i].loadedName);
-
-         // Validate the names parameter -- the values can used to construct HTML.
-         if (!/^\w+$/.test(names.join(''))) {
-            error('Invalid font name(s): ' + names.join());
-
-            // Normally the error-function throws. But if a malicious code
-            // intercepts the function call then the return is needed.
-            return;
-         }
+         names.push(loadTestFontId);
 
          var div = document.createElement('div');
          div.setAttribute('style',
             'visibility: hidden;' +
                'width: 10px; height: 10px;' +
                'position: absolute; top: 0px; left: 0px;');
-         var html = '';
          for (var i = 0, ii = names.length; i < ii; ++i) {
-            html += '<span style="font-family:' + names[i] + '">Hi</span>';
+            var span = document.createElement('span');
+            span.textContent = 'Hi';
+            span.style.fontFamily = names[i];
+            div.appendChild(span);
          }
-         div.innerHTML = html;
          document.body.appendChild(div);
 
-         window.addEventListener(
-            'message',
-            function fontLoaderMessage(e) {
-               if (e.data !== requestId)
-                  return;
-               for (var i = 0, ii = fonts.length; i < ii; ++i) {
-                  var font = fonts[i];
-                  font.loading = false;
-               }
-               request.complete();
-               // cleanup
-               if (frame) {
-                  document.body.removeChild(frame);
-               }
-               window.removeEventListener('message', fontLoaderMessage, false);
-            },
-            false);
-
-         // XXX we should have a time-out here too, and maybe fire
-         // pdfjsFontLoadFailed?
-         var src = '<!DOCTYPE HTML><html><head><meta charset="utf-8">';
-         src += '<style type="text/css">';
-         for (var i = 0, ii = rules.length; i < ii; ++i) {
-            src += rules[i];
-         }
-         src += '</style>';
-         src += '<script type="application/javascript">';
-         src += '  window.onload = function fontLoaderOnload() {\n';
-         src += '    parent.postMessage("' + requestId + '", "*");\n';
-         // Chrome stuck on loading (see chrome issue 145227) - resetting url
-         src += '    window.location = "about:blank";\n';
-         src += '  }';
-         // Hack so the end script tag isn't counted if this is inline JS.
-         src += '</scr' + 'ipt></head><body>';
-         for (var i = 0, ii = names.length; i < ii; ++i) {
-            src += '<p style="font-family:\'' + names[i] + '\'">Hi</p>';
-         }
-         src += '</body></html>';
-
-         var MAX_IFRAME_SRC_LENGTH = 1000000, IFRAME_TIMEOUT = 2000;
-         // Chrome fails for long src attributes (see issue 174023)
-         if (src.length > MAX_IFRAME_SRC_LENGTH) {
-            // ... waiting for some fixed period of time instead
-            window.setTimeout(function() {
-               window.postMessage(requestId, '*');
-            }, IFRAME_TIMEOUT);
-            return;
-         }
-
-         var frame = document.createElement('iframe');
-         frame.src = 'data:text/html,' + src;
-         frame.setAttribute('style',
-            'visibility: hidden;' +
-               'width: 10px; height: 10px;' +
-               'position: absolute; top: 0px; left: 0px;');
-         document.body.appendChild(frame);
+         isFontReady(loadTestFontId, function() {
+            document.body.removeChild(div);
+            request.complete();
+         });
          /** Hack end */
       }
 //#else
@@ -20329,6 +20402,7 @@ PDFJS.build = '8561d26';
                data = this.convert(name, cff, properties);
                break;
 
+            case 'OpenType':
             case 'TrueType':
             case 'CIDFontType2':
                this.mimetype = 'font/opentype';
@@ -20336,14 +20410,10 @@ PDFJS.build = '8561d26';
                // Repair the TrueType file. It is can be damaged in the point of
                // view of the sanitizer
                data = this.checkAndRepair(name, file, properties);
-               if (!data) {
-                  // TrueType data is not found, e.g. when the font is an OpenType font
-                  warn('Font is not a TrueType font');
-               }
                break;
 
             default:
-               warn('Font ' + type + ' is not supported');
+               error('Font ' + type + ' is not supported');
                break;
          }
 
@@ -21312,7 +21382,8 @@ PDFJS.build = '8561d26';
             }
 
             function sanitizeGlyphLocations(loca, glyf, numGlyphs,
-                                            isGlyphLocationsLong, hintsValid) {
+                                            isGlyphLocationsLong, hintsValid,
+                                            dupFirstEntry) {
                var itemSize, itemDecode, itemEncode;
                if (isGlyphLocationsLong) {
                   itemSize = 4;
@@ -21371,30 +21442,21 @@ PDFJS.build = '8561d26';
                   return;
                }
 
-               glyf.data = newGlyfData.subarray(0, writeOffset);
-            }
-
-            function findEmptyGlyphs(locaTable, isGlyphLocationsLong, emptyGlyphIds) {
-               var itemSize, itemDecode;
-               if (isGlyphLocationsLong) {
-                  itemSize = 4;
-                  itemDecode = function fontItemDecodeLong(data, offset) {
-                     return (data[offset] << 24) | (data[offset + 1] << 16) |
-                        (data[offset + 2] << 8) | data[offset + 3];
-                  };
+               if (dupFirstEntry) {
+                  var firstEntryLength = itemDecode(locaData, itemSize);
+                  if (newGlyfData.length > firstEntryLength + writeOffset) {
+                     glyf.data = newGlyfData.subarray(0, firstEntryLength + writeOffset);
+                  } else {
+                     glyf.data = new Uint8Array(firstEntryLength + writeOffset);
+                     glyf.data.set(newGlyfData.subarray(0, writeOffset));
+                  }
+                  glyf.data.set(newGlyfData.subarray(0, firstEntryLength), writeOffset);
+                  loca.data = new Uint8Array(locaData.length + itemSize);
+                  loca.data.set(locaData);
+                  itemEncode(loca.data, locaData.length,
+                     writeOffset + firstEntryLength);
                } else {
-                  itemSize = 2;
-                  itemDecode = function fontItemDecode(data, offset) {
-                     return (data[offset] << 9) | (data[offset + 1] << 1);
-                  };
-               }
-               var data = locaTable.data, length = data.length;
-               var lastOffset = itemDecode(data, 0);
-               for (var i = itemSize, j = 0; i < length; i += itemSize, j++) {
-                  var offset = itemDecode(data, i);
-                  if (offset == lastOffset)
-                     emptyGlyphIds[j] = true;
-                  lastOffset = offset;
+                  glyf.data = newGlyfData.subarray(0, writeOffset);
                }
             }
 
@@ -21435,8 +21497,9 @@ PDFJS.build = '8561d26';
                      while (font.pos < end) {
                         var stringLength = font.getByte();
                         var string = '';
-                        for (var i = 0; i < stringLength; ++i)
-                           string += font.getChar();
+                        for (var i = 0; i < stringLength; ++i) {
+                           string += String.fromCharCode(font.getByte());
+                        }
                         customNames.push(string);
                      }
                      glyphNames = [];
@@ -21732,75 +21795,79 @@ PDFJS.build = '8561d26';
             // The following steps modify the original font data, making copy
             font = new Stream(new Uint8Array(font.getBytes()));
 
-            // Check that required tables are present
-            var requiredTables = ['OS/2', 'cmap', 'head', 'hhea',
-               'hmtx', 'maxp', 'name', 'post'];
+            var VALID_TABLES = ['OS/2', 'cmap', 'head', 'hhea', 'hmtx', 'maxp',
+               'name', 'post', 'loca', 'glyf', 'fpgm', 'prep', 'cvt ', 'CFF '];
 
             var header = readOpenTypeHeader(font);
             var numTables = header.numTables;
 
-            var cmap, post, maxp, hhea, hmtx, head, os2;
-            var glyf, fpgm, loca, prep, cvt;
-            var tables = [];
+            var tables = { 'OS/2': null, cmap: null, head: null, hhea: null,
+               hmtx: null, maxp: null, name: null, post: null};
             for (var i = 0; i < numTables; i++) {
                var table = readTableEntry(font);
-               var index = requiredTables.indexOf(table.tag);
-               if (index != -1) {
-                  if (table.tag == 'cmap')
-                     cmap = table;
-                  else if (table.tag == 'post')
-                     post = table;
-                  else if (table.tag == 'maxp')
-                     maxp = table;
-                  else if (table.tag == 'hhea')
-                     hhea = table;
-                  else if (table.tag == 'hmtx')
-                     hmtx = table;
-                  else if (table.tag == 'head')
-                     head = table;
-                  else if (table.tag == 'OS/2')
-                     os2 = table;
-
-                  requiredTables.splice(index, 1);
-               } else {
-                  if (table.tag == 'loca')
-                     loca = table;
-                  else if (table.tag == 'glyf')
-                     glyf = table;
-                  else if (table.tag == 'fpgm')
-                     fpgm = table;
-                  else if (table.tag == 'prep')
-                     prep = table;
-                  else if (table.tag == 'cvt ')
-                     cvt = table;
-                  else if (table.tag == 'CFF ')
-                     return null; // XXX: OpenType font is found, stopping
-                  else // skipping table if it's not a required or optional table
-                     continue;
+               if (VALID_TABLES.indexOf(table.tag) < 0) {
+                  continue; // skipping table if it's not a required or optional table
                }
-               tables.push(table);
+               tables[table.tag] = table;
             }
 
-            // Ensure the hmtx table contains the advance width and
-            // sidebearings information for numGlyphs in the maxp table
-            font.pos = (font.start || 0) + maxp.offset;
+            var isTrueType = !tables['CFF '];
+            if (!isTrueType) {
+               // OpenType font
+               if (!tables.head || !tables.hhea || !tables.maxp || !tables.post) {
+                  // no major tables: throwing everything at CFFFont
+                  var cffFile = new Stream(tables['CFF '].data);
+                  var cff = new CFFFont(cffFile, properties);
+
+                  return this.convert(name, cff, properties);
+               }
+
+               delete tables.glyf;
+               delete tables.loca;
+               delete tables.fpgm;
+               delete tables.prep;
+               delete tables['cvt '];
+            } else {
+               if (!tables.glyf || !tables.loca) {
+                  error('Required "glyf" or "loca" tables are not found');
+               }
+            }
+
+            if (!tables.maxp) {
+               error('Required "maxp" table is not found');
+            }
+
+            font.pos = (font.start || 0) + tables.maxp.offset;
             var version = int32(font.getBytes(4));
             var numGlyphs = int16(font.getBytes(2));
             var maxFunctionDefs = 0;
-            if (version >= 0x00010000 && maxp.length >= 22) {
+            if (version >= 0x00010000 && tables.maxp.length >= 22) {
                font.pos += 14;
-               var maxFunctionDefs = int16(font.getBytes(2));
+               maxFunctionDefs = int16(font.getBytes(2));
             }
 
-            var hintsValid = sanitizeTTPrograms(fpgm, prep, maxFunctionDefs);
+            var dupFirstEntry = false;
+            if (properties.type == 'CIDFontType2' && properties.toUnicode &&
+               properties.toUnicode[0] > 0) {
+               // oracle's defect (see 3427), duplicating first entry
+               dupFirstEntry = true;
+               numGlyphs++;
+               tables.maxp.data[4] = numGlyphs >> 8;
+               tables.maxp.data[5] = numGlyphs & 255;
+            }
+
+            var hintsValid = sanitizeTTPrograms(tables.fpgm, tables.prep,
+               maxFunctionDefs);
             if (!hintsValid) {
-               tables.splice(tables.indexOf(fpgm), 1);
-               fpgm = null;
-               tables.splice(tables.indexOf(prep), 1);
-               prep = null;
+               delete tables.fpgm;
+               delete tables.prep;
             }
 
-            var numTables = tables.length + requiredTables.length;
+            // Tables needs to be written by ascendant alphabetic order
+            var tablesNames = Object.keys(tables);
+            tablesNames.sort();
+
+            numTables = tablesNames.length;
 
             // header and new offsets. Table entry information is appended to the
             // end of file. The virtualOffset represents where to put the actual
@@ -21814,35 +21881,40 @@ PDFJS.build = '8561d26';
             // of missing tables
             createOpenTypeHeader(header.version, ttf, numTables);
 
-            sanitizeMetrics(font, hhea, hmtx, numGlyphs);
+            // Ensure the hmtx table contains the advance width and
+            // sidebearings information for numGlyphs in the maxp table
+            sanitizeMetrics(font, tables.hhea, tables.hmtx, numGlyphs);
 
-            if (head) {
-               sanitizeHead(head, numGlyphs, loca.length);
+            if (!tables.head) {
+               error('Required "head" table is not found');
             }
 
-            var isGlyphLocationsLong = int16([head.data[50], head.data[51]]);
-            if (head && loca && glyf) {
-               sanitizeGlyphLocations(loca, glyf, numGlyphs, isGlyphLocationsLong,
-                  hintsValid);
+            sanitizeHead(tables.head, numGlyphs, isTrueType ? tables.loca.length : 0);
+
+            if (isTrueType) {
+               var isGlyphLocationsLong = int16([tables.head.data[50],
+                  tables.head.data[51]]);
+
+               sanitizeGlyphLocations(tables.loca, tables.glyf, numGlyphs,
+                  isGlyphLocationsLong, hintsValid, dupFirstEntry);
             }
 
-            var emptyGlyphIds = [];
-            if (glyf)
-               findEmptyGlyphs(loca, isGlyphLocationsLong, emptyGlyphIds);
+            if (!tables.hhea) {
+               error('Required "hhea" table is not found');
+            }
 
             // Sanitizer reduces the glyph advanceWidth to the maxAdvanceWidth
             // Sometimes it's 0. That needs to be fixed
-            if (hhea.data[10] === 0 && hhea.data[11] === 0) {
-               hhea.data[10] = 0xFF;
-               hhea.data[11] = 0xFF;
+            if (tables.hhea.data[10] === 0 && tables.hhea.data[11] === 0) {
+               tables.hhea.data[10] = 0xFF;
+               tables.hhea.data[11] = 0xFF;
             }
 
             // The 'post' table has glyphs names.
-            if (post) {
-               var valid = readPostScriptTable(post, properties, numGlyphs);
+            if (tables.post) {
+               var valid = readPostScriptTable(tables.post, properties, numGlyphs);
                if (!valid) {
-                  tables.splice(tables.indexOf(post), 1);
-                  post = null;
+                  tables.post = null;
                }
             }
 
@@ -21856,12 +21928,11 @@ PDFJS.build = '8561d26';
                // U+00AD (soft hyphen) is not drawn.
                // So, offset all the glyphs by 0xFF to avoid these cases and use
                // the encoding to map incoming characters to the new glyph positions
-               if (!cmap) {
-                  cmap = {
+               if (!tables.cmap) {
+                  tables.cmap = {
                      tag: 'cmap',
                      data: null
                   };
-                  tables.push(cmap);
                }
 
                var cidToGidMap = properties.cidToGidMap || [];
@@ -21878,6 +21949,13 @@ PDFJS.build = '8561d26';
                      if (!gidToCidMap[i])
                         gidToCidMap[i] = nextCid++;
                   }
+               } else {
+                  for (var i = 1; i < numGlyphs; i++) {
+                     gidToCidMap[i] = i;
+                  }
+                  if (dupFirstEntry) {
+                     gidToCidMap[numGlyphs - 1] = 0;
+                  }
                }
 
                glyphs = [];
@@ -21887,7 +21965,7 @@ PDFJS.build = '8561d26';
                var unassignedUnicodeItems = [];
                var toFontChar = this.cidToFontChar || this.toFontChar;
                for (var i = 1; i < numGlyphs; i++) {
-                  var cid = gidToCidMap[i] || i;
+                  var cid = gidToCidMap[i];
                   var unicode = toFontChar[cid];
                   if (!unicode || typeof unicode !== 'number' ||
                      isSpecialUnicode(unicode) || unicode in usedUnicodes) {
@@ -21898,6 +21976,7 @@ PDFJS.build = '8561d26';
                   glyphs.push({ unicode: unicode, code: cid });
                   ids.push(i);
                }
+
                // unassigned codepoints will never be used for non-Identity CMap
                // because the input will be Unicode
                if (!this.cidToFontChar) {
@@ -21906,7 +21985,7 @@ PDFJS.build = '8561d26';
                   var unusedUnicode = CMAP_GLYPH_OFFSET;
                   for (var j = 0, jj = unassignedUnicodeItems.length; j < jj; j++) {
                      var i = unassignedUnicodeItems[j];
-                     var cid = gidToCidMap[i] || i;
+                     var cid = gidToCidMap[i];
                      while (unusedUnicode in usedUnicodes)
                         unusedUnicode++;
                      if (unusedUnicode >= CMAP_GLYPH_OFFSET + GLYPH_AREA_SIZE)
@@ -21929,7 +22008,7 @@ PDFJS.build = '8561d26';
                // but this.hasEncoding is currently true for any encodings on the
                // Encodings object (e.g. MacExpertEncoding). So should consider using
                // better check for this.
-               var cmapTable = readCmapTable(cmap, font, this.hasEncoding,
+               var cmapTable = readCmapTable(tables.cmap, font, this.hasEncoding,
                   this.isSymbolicFont);
 
                // TODO(mack): If the (3, 0) cmap table used, then the font is
@@ -22056,69 +22135,66 @@ PDFJS.build = '8561d26';
             }
 
             // Converting glyphs and ids into font's cmap table
-            cmap.data = createCmapTable(glyphs, ids);
+            tables.cmap.data = createCmapTable(glyphs, ids);
             var unicodeIsEnabled = [];
             for (var i = 0, ii = glyphs.length; i < ii; i++) {
                unicodeIsEnabled[glyphs[i].unicode] = true;
             }
             this.unicodeIsEnabled = unicodeIsEnabled;
 
-            if (os2 && !validateOS2Table(os2)) {
-               tables.splice(tables.indexOf(os2), 1);
-               os2 = null;
-            }
-
-            if (!os2) {
+            if (!tables['OS/2'] || !validateOS2Table(tables['OS/2'])) {
                // extract some more font properties from the OpenType head and
                // hhea tables; yMin and descent value are always negative
                var override = {
-                  unitsPerEm: int16([head.data[18], head.data[19]]),
-                  yMax: int16([head.data[42], head.data[43]]),
-                  yMin: int16([head.data[38], head.data[39]]) - 0x10000,
-                  ascent: int16([hhea.data[4], hhea.data[5]]),
-                  descent: int16([hhea.data[6], hhea.data[7]]) - 0x10000
+                  unitsPerEm: int16([tables.head.data[18], tables.head.data[19]]),
+                  yMax: int16([tables.head.data[42], tables.head.data[43]]),
+                  yMin: int16([tables.head.data[38], tables.head.data[39]]) - 0x10000,
+                  ascent: int16([tables.hhea.data[4], tables.hhea.data[5]]),
+                  descent: int16([tables.hhea.data[6], tables.hhea.data[7]]) - 0x10000
                };
 
-               tables.push({
+               tables['OS/2'] = {
                   tag: 'OS/2',
                   data: stringToArray(createOS2Table(properties, glyphs, override))
-               });
+               };
             }
 
             // Rewrite the 'post' table if needed
-            if (!post) {
-               tables.push({
+            if (!tables.post) {
+               tables.post = {
                   tag: 'post',
                   data: stringToArray(createPostTable(properties))
-               });
+               };
             }
 
-            // Re-creating 'name' table
-            if (requiredTables.indexOf('name') != -1) {
-               tables.push({
-                  tag: 'name',
-                  data: stringToArray(createNameTable(this.name))
-               });
-            } else {
-               // ... using existing 'name' table as prototype
-               for (var i = 0, ii = tables.length; i < ii; i++) {
-                  var table = tables[i];
-                  if (table.tag === 'name') {
-                     var namePrototype = readNameTable(table);
-                     table.data = stringToArray(createNameTable(name, namePrototype));
-                     break;
-                  }
+            if (!isTrueType) {
+               try {
+                  // Trying to repair CFF file
+                  var cffFile = new Stream(tables['CFF '].data);
+                  var parser = new CFFParser(cffFile, properties);
+                  var cff = parser.parse();
+                  var compiler = new CFFCompiler(cff);
+                  tables['CFF '].data = compiler.compile();
+               } catch (e) {
+                  warn('Failed to compile font ' + properties.loadedName);
                }
             }
 
-            // Tables needs to be written by ascendant alphabetic order
-            tables.sort(function tables_sort(a, b) {
-               return (a.tag > b.tag) - (a.tag < b.tag);
-            });
+            // Re-creating 'name' table
+            if (!tables.name) {
+               tables.name = {
+                  tag: 'name',
+                  data: stringToArray(createNameTable(this.name))
+               };
+            } else {
+               // ... using existing 'name' table as prototype
+               var namePrototype = readNameTable(tables.name);
+               tables.name.data = stringToArray(createNameTable(name, namePrototype));
+            }
 
             // rewrite the tables but tweak offsets
-            for (var i = 0, ii = tables.length; i < ii; i++) {
-               var table = tables[i];
+            for (var i = 0; i < numTables; i++) {
+               var table = tables[tablesNames[i]];
                var data = [];
 
                var tableData = table.data;
@@ -22128,8 +22204,8 @@ PDFJS.build = '8561d26';
             }
 
             // Add the table datas
-            for (var i = 0, ii = tables.length; i < ii; i++) {
-               var table = tables[i];
+            for (var i = 0; i < numTables; i++) {
+               var table = tables[tablesNames[i]];
                var tableData = table.data;
                ttf.file += arrayToString(tableData);
 
@@ -22447,16 +22523,7 @@ PDFJS.build = '8561d26';
                window.btoa(data) + ');');
             var rule = '@font-face { font-family:"' + fontName + '";src:' + url + '}';
 
-            var styleElement = document.getElementById('PDFJS_FONT_STYLE_TAG');
-            if (!styleElement) {
-               styleElement = document.createElement('style');
-               styleElement.id = 'PDFJS_FONT_STYLE_TAG';
-               document.documentElement.getElementsByTagName('head')[0].appendChild(
-                  styleElement);
-            }
-
-            var styleSheet = styleElement.sheet;
-            styleSheet.insertRule(rule, styleSheet.cssRules.length);
+            FontLoader.insertRule(rule);
 
             if (PDFJS.pdfBug && 'FontInspector' in globalScope &&
                globalScope['FontInspector'].enabled)
@@ -23048,10 +23115,10 @@ PDFJS.build = '8561d26';
       }
 
       function isSpecial(c) {
-         return c === '/' ||
-            c === '[' || c === ']' ||
-            c === '{' || c === '}' ||
-            c === '(' || c === ')';
+         return c === 0x2F || // '/'
+            c === 0x5B || c === 0x5D || // '[', ']'
+            c === 0x7B || c === 0x7D || // '{', '}'
+            c === 0x28 || c === 0x29; // '(', ')'
       }
 
       function Type1Parser(stream, encrypted) {
@@ -23059,6 +23126,7 @@ PDFJS.build = '8561d26';
             stream = new Stream(decrypt(stream.getBytes(), EEXEC_ENCRYPT_KEY, 4));
          }
          this.stream = stream;
+         this.nextChar();
       }
 
       Type1Parser.prototype = {
@@ -23094,36 +23162,39 @@ PDFJS.build = '8561d26';
             return token === 'true' ? 1 : 0;
          },
 
+         nextChar : function Type1_nextChar() {
+            return (this.currentChar = this.stream.getByte());
+         },
+
          getToken: function Type1Parser_getToken() {
             // Eat whitespace and comments.
             var comment = false;
-            var ch;
-            var stream = this.stream;
+            var ch = this.currentChar;
             while (true) {
-               if ((ch = stream.lookChar()) === null)
+               if (ch === -1) {
                   return null;
+               }
 
                if (comment) {
-                  if (ch === '\x0a' || ch === '\x0d') {
+                  if (ch === 0x0A || ch === 0x0D) {
                      comment = false;
                   }
-               } else if (ch === '%') {
+               } else if (ch === 0x25) { // '%'
                   comment = true;
                } else if (!Lexer.isSpace(ch)) {
                   break;
                }
-               stream.skip();
+               ch = this.nextChar();
             }
             if (isSpecial(ch)) {
-               stream.skip();
-               return ch;
+               this.nextChar();
+               return String.fromCharCode(ch);
             }
             var token = '';
             do {
-               token += ch;
-               stream.skip();
-               ch = stream.lookChar();
-            } while (ch !== null && !Lexer.isSpace(ch) && !isSpecial(ch));
+               token += String.fromCharCode(ch);
+               ch = this.nextChar();
+            } while (ch >= 0 && !Lexer.isSpace(ch) && !isSpecial(ch));
             return token;
          },
 
@@ -23170,12 +23241,13 @@ PDFJS.build = '8561d26';
                         var glyph = this.getToken();
                         var length = this.readInt();
                         this.getToken(); // read in 'RD' or '-|'
-                        var data = stream.makeSubStream(stream.pos + 1, length);
+                        var data = stream.makeSubStream(stream.pos, length);
                         var lenIV = program.properties.privateData['lenIV'];
                         var encoded = decrypt(data.getBytes(), CHAR_STRS_ENCRYPT_KEY,
                            lenIV);
                         // Skip past the required space and binary data.
-                        stream.skip(1 + length);
+                        stream.skip(length);
+                        this.nextChar();
                         token = this.getToken(); // read in 'ND' or '|-'
                         if (token === 'noaccess') {
                            this.getToken(); // read in 'def'
@@ -23193,12 +23265,13 @@ PDFJS.build = '8561d26';
                         var index = this.readInt();
                         var length = this.readInt();
                         this.getToken(); // read in 'RD' or '-|'
-                        var data = stream.makeSubStream(stream.pos + 1, length);
+                        var data = stream.makeSubStream(stream.pos, length);
                         var lenIV = program.properties.privateData['lenIV'];
                         var encoded = decrypt(data.getBytes(), CHAR_STRS_ENCRYPT_KEY,
                            lenIV);
                         // Skip past the required space and binary data.
-                        stream.skip(1 + length);
+                        stream.skip(length);
+                        this.nextChar();
                         token = this.getToken(); // read in 'NP' or '|'
                         if (token === 'noaccess') {
                            this.getToken(); // read in 'put'
@@ -23640,7 +23713,7 @@ PDFJS.build = '8561d26';
             } else {
                for (var charcode in encoding)
                   inverseEncoding[encoding[charcode]] = charcode | 0;
-               if (charsets[0] === '.notedef') {
+               if (charsets[0] === '.notdef') {
                   gidStart = 1;
                }
             }
@@ -30026,6 +30099,7 @@ PDFJS.build = '8561d26';
 
          this.interpolate = dict.get('Interpolate', 'I') || false;
          this.imageMask = dict.get('ImageMask', 'IM') || false;
+         this.matte = dict.get('Matte') || false;
 
          var bitsPerComponent = image.bitsPerComponent;
          if (!bitsPerComponent) {
@@ -30342,6 +30416,34 @@ PDFJS.build = '8561d26';
             }
             return buf;
          },
+         undoPreblend: function PDFImage_undoPreblend(buffer, width, height) {
+            var matte = this.smask && this.smask.matte;
+            if (!matte) {
+               return;
+            }
+
+            function clamp(value) {
+               return (value < 0 ? 0 : value > 255 ? 255 : value) | 0;
+            }
+
+            var matteRgb = this.colorSpace.getRgb(matte, 0);
+            var length = width * height * 4;
+            for (var i = 0; i < length; i += 4) {
+               var alpha = buffer[i + 3];
+               if (alpha === 0) {
+                  // according formula we have to get Infinity in all components
+                  // making it as white (tipical paper color) should be okay
+                  buffer[i] = 255;
+                  buffer[i + 1] = 255;
+                  buffer[i + 2] = 255;
+                  continue;
+               }
+               var k = 255 / alpha;
+               buffer[i] = clamp((buffer[i] - matteRgb[0]) * k + matteRgb[0]);
+               buffer[i + 1] = clamp((buffer[i + 1] - matteRgb[1]) * k + matteRgb[1]);
+               buffer[i + 2] = clamp((buffer[i + 2] - matteRgb[2]) * k + matteRgb[2]);
+            }
+         },
          fillRgbaBuffer: function PDFImage_fillRgbaBuffer(buffer, width, height) {
             var numComps = this.numComps;
             var originalWidth = this.width;
@@ -30378,6 +30480,8 @@ PDFJS.build = '8561d26';
                buffer[i + 2] = rgbBuf[compsPos++];
                buffer[i + 3] = opacity[opacityPos++];
             }
+
+            this.undoPreblend(buffer, width, actualHeight);
          },
          fillGrayBuffer: function PDFImage_fillGrayBuffer(buffer) {
             var numComps = this.numComps;
@@ -33414,8 +33518,6 @@ PDFJS.build = '8561d26';
             if (isCmd(this.buf2, 'ID')) {
                this.buf1 = this.buf2;
                this.buf2 = null;
-               // skip byte after ID
-               this.lexer.skip();
             } else {
                this.buf1 = this.buf2;
                this.buf2 = this.lexer.getObj();
@@ -33510,9 +33612,8 @@ PDFJS.build = '8561d26';
 
             // searching for the /EI\s/
             var state = 0, ch, i, ii;
-            while (state != 4 &&
-               (ch = stream.getByte()) !== null && ch !== undefined) {
-               switch (ch) {
+            while (state != 4 && (ch = stream.getByte()) !== -1) {
+               switch (ch | 0) {
                   case 0x20:
                   case 0x0D:
                   case 0x0A:
@@ -33520,7 +33621,8 @@ PDFJS.build = '8561d26';
                      var followingBytes = stream.peekBytes(5);
                      for (i = 0, ii = followingBytes.length; i < ii; i++) {
                         ch = followingBytes[i];
-                        if (ch !== 0x0A && ch != 0x0D && (ch < 0x20 || ch > 0x7F)) {
+                        if (ch !== 0x0A && ch !== 0x0D && (ch < 0x20 || ch > 0x7F)) {
+                           // not a LF, CR, SPACE or any visible ASCII character
                            state = 0;
                            break; // some binary stuff found, resetting the state
                         }
@@ -33561,7 +33663,7 @@ PDFJS.build = '8561d26';
 
             // get stream start position
             lexer.skipToNextLine();
-            var pos = stream.pos;
+            var pos = stream.pos - 1;
 
             // get length
             var length = this.fetchIfRef(dict.get('Length'));
@@ -33570,11 +33672,53 @@ PDFJS.build = '8561d26';
 
             // skip over the stream data
             stream.pos = pos + length;
+            lexer.nextChar();
+
             this.shift(); // '>>'
             this.shift(); // 'stream'
-            if (!isCmd(this.buf1, 'endstream'))
-               error('Missing endstream');
-            this.shift();
+            if (!isCmd(this.buf1, 'endstream')) {
+               // bad stream length, scanning for endstream
+               stream.pos = pos;
+               var SCAN_BLOCK_SIZE = 2048;
+               var ENDSTREAM_SIGNATURE_LENGTH = 9;
+               var ENDSTREAM_SIGNATURE = [0x65, 0x6E, 0x64, 0x73, 0x74, 0x72, 0x65,
+                  0x61, 0x6D];
+               var skipped = 0, found = false;
+               while (stream.pos < stream.end) {
+                  var scanBytes = stream.peekBytes(SCAN_BLOCK_SIZE);
+                  var scanLength = scanBytes.length - ENDSTREAM_SIGNATURE_LENGTH;
+                  var found = false, i, ii, j;
+                  for (i = 0, j = 0; i < scanLength; i++) {
+                     var b = scanBytes[i];
+                     if (b !== ENDSTREAM_SIGNATURE[j]) {
+                        i -= j;
+                        j = 0;
+                     } else {
+                        j++;
+                        if (j >= ENDSTREAM_SIGNATURE_LENGTH) {
+                           found = true;
+                           break;
+                        }
+                     }
+                  }
+                  if (found) {
+                     skipped += i - ENDSTREAM_SIGNATURE_LENGTH;
+                     stream.pos += i - ENDSTREAM_SIGNATURE_LENGTH;
+                     break;
+                  }
+                  skipped += scanLength;
+                  stream.pos += scanLength;
+               }
+               if (!found) {
+                  error('Missing endstream');
+               }
+               length = skipped;
+
+               lexer.nextChar();
+               this.shift();
+               this.shift();
+            }
+            this.shift(); // 'endstream'
 
             stream = stream.makeSubStream(pos, length, dict);
             if (cipherTransform)
@@ -33661,6 +33805,8 @@ PDFJS.build = '8561d26';
    var Lexer = (function LexerClosure() {
       function Lexer(stream, knownCommands) {
          this.stream = stream;
+         this.nextChar();
+
          // The PDFs might have "glued" commands with other commands, operands or
          // literals, e.g. "q1". The knownCommands is a dictionary of the valid
          // commands and their prefixes. The prefixes are built the following way:
@@ -33672,7 +33818,8 @@ PDFJS.build = '8561d26';
       }
 
       Lexer.isSpace = function Lexer_isSpace(ch) {
-         return ch == ' ' || ch == '\t' || ch == '\x0d' || ch == '\x0a';
+         // space is one of the following characters: SPACE, TAB, CR, or LF
+         return ch === 0x20 || ch === 0x09 || ch === 0x0D || ch === 0x0A;
       };
 
       // A '1' in this array means the character is white space.  A '1' or
@@ -33697,36 +33844,40 @@ PDFJS.build = '8561d26';
       ];
 
       function toHexDigit(ch) {
-         if (ch >= '0' && ch <= '9')
-            return ch.charCodeAt(0) - 48;
-         ch = ch.toUpperCase();
-         if (ch >= 'A' && ch <= 'F')
-            return ch.charCodeAt(0) - 55;
+         if (ch >= 0x30 && ch <= 0x39) { // '0'-'9'
+            return ch & 0x0F;
+         }
+         if ((ch >= 0x41 && ch <= 0x46) || (ch >= 0x61 && ch <= 0x66)) {
+            // 'A'-'F', 'a'-'f'
+            return (ch & 0x0F) + 9;
+         }
          return -1;
       }
 
       Lexer.prototype = {
-         getNumber: function Lexer_getNumber(ch) {
+         nextChar: function Lexer_nextChar() {
+            return (this.currentChar = this.stream.getByte());
+         },
+         getNumber: function Lexer_getNumber() {
             var floating = false;
-            var str = ch;
-            var stream = this.stream;
-            while ((ch = stream.lookChar())) {
-               if (ch == '.' && !floating) {
-                  str += ch;
+            var ch = this.currentChar;
+            var str = String.fromCharCode(ch);
+            while ((ch = this.nextChar()) >= 0) {
+               if (ch === 0x2E && !floating) { // '.'
+                  str += '.';
                   floating = true;
-               } else if (ch == '-') {
+               } else if (ch === 0x2D) { // '-'
                   // ignore minus signs in the middle of numbers to match
                   // Adobe's behavior
                   warn('Badly formated number');
-               } else if (ch >= '0' && ch <= '9') {
-                  str += ch;
-               } else if (ch == 'e' || ch == 'E') {
+               } else if (ch >= 0x30 && ch <= 0x39) { // '0'-'9'
+                  str += String.fromCharCode(ch);
+               } else if (ch === 0x45 || ch === 0x65) { // 'E', 'e'
                   floating = true;
                } else {
                   // the last character doesn't belong to us
                   break;
                }
-               stream.skip();
             }
             var value = parseFloat(str);
             if (isNaN(value))
@@ -33737,148 +33888,150 @@ PDFJS.build = '8561d26';
             var numParen = 1;
             var done = false;
             var str = '';
-            var stream = this.stream;
-            var ch;
-            do {
-               ch = stream.getChar();
-               switch (ch) {
-                  case null:
-                  case undefined:
+
+            var ch = this.nextChar();
+            while (true) {
+               var charBuffered = false;
+               switch (ch | 0) {
+                  case -1:
                      warn('Unterminated string');
                      done = true;
                      break;
-                  case '(':
+                  case 0x28: // '('
                      ++numParen;
-                     str += ch;
+                     str += '(';
                      break;
-                  case ')':
+                  case 0x29: // ')'
                      if (--numParen === 0) {
+                        this.nextChar(); // consume strings ')'
                         done = true;
                      } else {
-                        str += ch;
+                        str += ')';
                      }
                      break;
-                  case '\\':
-                     ch = stream.getChar();
+                  case 0x5C: // '\\'
+                     ch = this.nextChar();
                      switch (ch) {
-                        case null:
-                        case undefined:
+                        case -1:
                            warn('Unterminated string');
                            done = true;
                            break;
-                        case 'n':
+                        case 0x6E: // 'n'
                            str += '\n';
                            break;
-                        case 'r':
+                        case 0x72: // 'r'
                            str += '\r';
                            break;
-                        case 't':
+                        case 0x74: // 't'
                            str += '\t';
                            break;
-                        case 'b':
+                        case 0x62: // 'b'
                            str += '\b';
                            break;
-                        case 'f':
+                        case 0x66: // 'f'
                            str += '\f';
                            break;
-                        case '\\':
-                        case '(':
-                        case ')':
-                           str += ch;
+                        case 0x5C: // '\'
+                        case 0x28: // '('
+                        case 0x29: // ')'
+                           str += String.fromCharCode(ch);
                            break;
-                        case '0': case '1': case '2': case '3':
-                        case '4': case '5': case '6': case '7':
-                        var x = ch - '0';
-                        ch = stream.lookChar();
-                        if (ch >= '0' && ch <= '7') {
-                           stream.skip();
-                           x = (x << 3) + (ch - '0');
-                           ch = stream.lookChar();
-                           if (ch >= '0' && ch <= '7') {
-                              stream.skip();
-                              x = (x << 3) + (ch - '0');
+                        case 0x30: case 0x31: case 0x32: case 0x33: // '0'-'3'
+                        case 0x34: case 0x35: case 0x36: case 0x37: // '4'-'7'
+                        var x = ch & 0x0F;
+                        ch = this.nextChar();
+                        charBuffered = true;
+                        if (ch >= 0x30 && ch <= 0x37) { // '0'-'7'
+                           x = (x << 3) + (ch & 0x0F);
+                           ch = this.nextChar();
+                           if (ch >= 0x30 && ch <= 0x37) {  // '0'-'7'
+                              charBuffered = false;
+                              x = (x << 3) + (ch & 0x0F);
                            }
                         }
 
                         str += String.fromCharCode(x);
                         break;
-                        case '\r':
-                           ch = stream.lookChar();
-                           if (ch == '\n')
-                              stream.skip();
-                           break;
-                        case '\n':
-                           break;
+                        case 0x0A: case 0x0D: // LF, CR
+                        break;
                         default:
-                           str += ch;
+                           str += String.fromCharCode(ch);
                            break;
                      }
                      break;
                   default:
-                     str += ch;
+                     str += String.fromCharCode(ch);
                      break;
                }
-            } while (!done);
+               if (done) {
+                  break;
+               }
+               if (!charBuffered) {
+                  ch = this.nextChar();
+               }
+            }
             return str;
          },
-         getName: function Lexer_getName(ch) {
-            var str = '';
-            var stream = this.stream;
-            while (!!(ch = stream.lookChar()) && !specialChars[ch.charCodeAt(0)]) {
-               stream.skip();
-               if (ch == '#') {
-                  ch = stream.lookChar();
+         getName: function Lexer_getName() {
+            var str = '', ch;
+            while ((ch = this.nextChar()) >= 0 && !specialChars[ch]) {
+               if (ch === 0x23) { // '#'
+                  ch = this.nextChar();
                   var x = toHexDigit(ch);
                   if (x != -1) {
-                     stream.skip();
-                     var x2 = toHexDigit(stream.getChar());
+                     var x2 = toHexDigit(this.nextChar());
                      if (x2 == -1)
                         error('Illegal digit in hex char in name: ' + x2);
                      str += String.fromCharCode((x << 4) | x2);
                   } else {
                      str += '#';
-                     str += ch;
+                     str += String.fromCharCode(ch);
                   }
                } else {
-                  str += ch;
+                  str += String.fromCharCode(ch);
                }
             }
-            if (str.length > 128)
+            if (str.length > 128) {
                error('Warning: name token is longer than allowed by the spec: ' +
                   str.length);
+            }
             return new Name(str);
          },
-         getHexString: function Lexer_getHexString(ch) {
+         getHexString: function Lexer_getHexString() {
             var str = '';
-            var stream = this.stream;
+            var ch = this.currentChar;
             var isFirstHex = true;
             var firstDigit;
             var secondDigit;
             while (true) {
-               ch = stream.getChar();
-               if (!ch) {
+               if (ch < 0) {
                   warn('Unterminated hex string');
                   break;
-               } else if (ch === '>') {
+               } else if (ch === 0x3E) { // '>'
+                  this.nextChar();
                   break;
-               } else if (specialChars[ch.charCodeAt(0)] === 1) {
+               } else if (specialChars[ch] === 1) {
+                  ch = this.nextChar();
                   continue;
                } else {
                   if (isFirstHex) {
                      firstDigit = toHexDigit(ch);
                      if (firstDigit === -1) {
                         warn('Ignoring invalid character "' + ch + '" in hex string');
+                        ch = this.nextChar();
                         continue;
                      }
                   } else {
                      secondDigit = toHexDigit(ch);
                      if (secondDigit === -1) {
                         warn('Ignoring invalid character "' + ch + '" in hex string');
+                        ch = this.nextChar();
                         continue;
                      }
                      str += String.fromCharCode((firstDigit << 4) | secondDigit);
                   }
                   isFirstHex = !isFirstHex;
+                  ch = this.nextChar();
                }
             }
             return str;
@@ -33886,73 +34039,81 @@ PDFJS.build = '8561d26';
          getObj: function Lexer_getObj() {
             // skip whitespace and comments
             var comment = false;
-            var stream = this.stream;
-            var ch;
+            var ch = this.currentChar;
             while (true) {
-               if (!(ch = stream.getChar()))
+               if (ch < 0) {
                   return EOF;
+               }
                if (comment) {
-                  if (ch == '\r' || ch == '\n')
+                  if (ch === 0x0A || ch == 0x0D) // LF, CR
                      comment = false;
-               } else if (ch == '%') {
+               } else if (ch === 0x25) { // '%'
                   comment = true;
-               } else if (specialChars[ch.charCodeAt(0)] != 1) {
+               } else if (specialChars[ch] !== 1) {
                   break;
                }
+               ch = this.nextChar();
             }
 
             // start reading token
-            switch (ch) {
-               case '0': case '1': case '2': case '3': case '4':
-               case '5': case '6': case '7': case '8': case '9':
-               case '+': case '-': case '.':
-               return this.getNumber(ch);
-               case '(':
+            switch (ch | 0) {
+               case 0x30: case 0x31: case 0x32: case 0x33: case 0x34: // '0'-'4'
+               case 0x35: case 0x36: case 0x37: case 0x38: case 0x39: // '5'-'9'
+               case 0x2B: case 0x2D: case 0x2E: // '+', '-', '.'
+               return this.getNumber();
+               case 0x28: // '('
                   return this.getString();
-               case '/':
-                  return this.getName(ch);
+               case 0x2F: // '/'
+                  return this.getName();
                // array punctuation
-               case '[':
-               case ']':
-                  return Cmd.get(ch);
+               case 0x5B: // '['
+                  this.nextChar();
+                  return Cmd.get('[');
+               case 0x5D: // ']'
+                  this.nextChar();
+                  return Cmd.get(']');
                // hex string or dict punctuation
-               case '<':
-                  ch = stream.lookChar();
-                  if (ch == '<') {
+               case 0x3C: // '<'
+                  ch = this.nextChar();
+                  if (ch === 0x3C) {
                      // dict punctuation
-                     stream.skip();
+                     this.nextChar();
                      return Cmd.get('<<');
                   }
-                  return this.getHexString(ch);
+                  return this.getHexString();
                // dict punctuation
-               case '>':
-                  ch = stream.lookChar();
-                  if (ch == '>') {
-                     stream.skip();
+               case 0x3E: // '>'
+                  ch = this.nextChar();
+                  if (ch === 0x3E) {
+                     this.nextChar();
                      return Cmd.get('>>');
                   }
-                  return Cmd.get(ch);
-               case '{':
-               case '}':
-                  return Cmd.get(ch);
-               // fall through
-               case ')':
+                  return Cmd.get('>');
+               case 0x7B: // '{'
+                  this.nextChar();
+                  return Cmd.get('{');
+               case 0x7D: // '}'
+                  this.nextChar();
+                  return Cmd.get('}');
+               case 0x29: // ')'
                   error('Illegal character: ' + ch);
+                  break;
             }
 
             // command
-            var str = ch;
+            var str = String.fromCharCode(ch);
             var knownCommands = this.knownCommands;
             var knownCommandFound = knownCommands && (str in knownCommands);
-            while (!!(ch = stream.lookChar()) && !specialChars[ch.charCodeAt(0)]) {
+            while ((ch = this.nextChar()) >= 0 && !specialChars[ch]) {
                // stop if known command is found and next character does not make
                // the str a command
-               if (knownCommandFound && !((str + ch) in knownCommands))
+               var possibleCommand = str + String.fromCharCode(ch);
+               if (knownCommandFound && !(possibleCommand in knownCommands)) {
                   break;
-               stream.skip();
+               }
                if (str.length == 128)
                   error('Command token too long: ' + str.length);
-               str += ch;
+               str = possibleCommand;
                knownCommandFound = knownCommands && (str in knownCommands);
             }
             if (str == 'true')
@@ -33965,19 +34126,20 @@ PDFJS.build = '8561d26';
          },
          skipToNextLine: function Lexer_skipToNextLine() {
             var stream = this.stream;
-            while (true) {
-               var ch = stream.getChar();
-               if (!ch || ch == '\n')
-                  return;
-               if (ch == '\r') {
-                  if ((ch = stream.lookChar()) == '\n')
-                     stream.skip();
-                  return;
+            var ch = this.currentChar;
+            while (ch >= 0) {
+               if (ch === 0x0D) { // CR
+                  ch = this.nextChar();
+                  if (ch === 0x0A) { // LF
+                     this.nextChar();
+                  }
+                  break;
+               } else if (ch === 0x0A) { // LF
+                  this.nextChar();
+                  break;
                }
+               ch = this.nextChar();
             }
-         },
-         skip: function Lexer_skip() {
-            this.stream.skip();
          }
       };
 
@@ -34312,7 +34474,7 @@ PDFJS.build = '8561d26';
 
       var MAX_PATTERN_SIZE = 8192;
 
-      function TilingPattern(IR, color, ctx, objs, commonObjs) {
+      function TilingPattern(IR, color, ctx, objs, commonObjs, baseTransform) {
          this.name = IR[1][0].name;
          this.operatorList = IR[2];
          this.matrix = IR[3] || [1, 0, 0, 1, 0, 0];
@@ -34324,7 +34486,7 @@ PDFJS.build = '8561d26';
          this.color = color;
          this.objs = objs;
          this.commonObjs = commonObjs;
-         this.curMatrix = ctx.mozCurrentTransform;
+         this.baseTransform = baseTransform;
          this.type = 'Pattern';
          this.ctx = ctx;
       }
@@ -34369,7 +34531,8 @@ PDFJS.build = '8561d26';
 
             // Obtain scale from matrix and current transformation matrix.
             var matrixScale = Util.singularValueDecompose2dScale(this.matrix);
-            var curMatrixScale = Util.singularValueDecompose2dScale(this.curMatrix);
+            var curMatrixScale = Util.singularValueDecompose2dScale(
+               this.baseTransform);
             var combinedScale = [matrixScale[0] * curMatrixScale[0],
                matrixScale[1] * curMatrixScale[1]];
 
@@ -34453,7 +34616,7 @@ PDFJS.build = '8561d26';
             this.createPatternCanvas(temporaryPatternCanvas);
 
             var ctx = this.ctx;
-            ctx.setTransform.apply(ctx, this.curMatrix);
+            ctx.setTransform.apply(ctx, this.baseTransform);
             ctx.transform.apply(ctx, this.matrix);
             this.scaleToContext();
 
@@ -34484,7 +34647,7 @@ PDFJS.build = '8561d26';
          },
          getByte: function Stream_getByte() {
             if (this.pos >= this.end)
-               return null;
+               return -1;
             return this.bytes[this.pos++];
          },
          // returns subarray of original buffer
@@ -34508,16 +34671,6 @@ PDFJS.build = '8561d26';
             var bytes = this.getBytes(length);
             this.pos -= bytes.length;
             return bytes;
-         },
-         lookChar: function Stream_lookChar() {
-            if (this.pos >= this.end)
-               return null;
-            return String.fromCharCode(this.bytes[this.pos]);
-         },
-         getChar: function Stream_getChar() {
-            if (this.pos >= this.end)
-               return null;
-            return String.fromCharCode(this.bytes[this.pos++]);
          },
          skip: function Stream_skip(n) {
             if (!n)
@@ -34580,7 +34733,7 @@ PDFJS.build = '8561d26';
             var pos = this.pos;
             while (this.bufferLength <= pos) {
                if (this.eof)
-                  return null;
+                  return -1;
                this.readBlock();
             }
             return this.buffer[this.pos++];
@@ -34618,37 +34771,25 @@ PDFJS.build = '8561d26';
             this.pos -= bytes.length;
             return bytes;
          },
-         lookChar: function DecodeStream_lookChar() {
-            var pos = this.pos;
-            while (this.bufferLength <= pos) {
-               if (this.eof)
-                  return null;
-               this.readBlock();
-            }
-            return String.fromCharCode(this.buffer[this.pos]);
-         },
-         getChar: function DecodeStream_getChar() {
-            var pos = this.pos;
-            while (this.bufferLength <= pos) {
-               if (this.eof)
-                  return null;
-               this.readBlock();
-            }
-            return String.fromCharCode(this.buffer[this.pos++]);
-         },
          makeSubStream: function DecodeStream_makeSubStream(start, length, dict) {
             var end = start + length;
             while (this.bufferLength <= end && !this.eof)
                this.readBlock();
             return new Stream(this.buffer, start, length, dict);
          },
-         skip: function DecodeStream_skip(n) {
+         skip: function Stream_skip(n) {
             if (!n)
                n = 1;
             this.pos += n;
          },
          reset: function DecodeStream_reset() {
             this.pos = 0;
+         },
+         getBaseStreams: function DecodeStream_getBaseStreams() {
+            if (this.str && this.str.getBaseStreams) {
+               return this.str.getBaseStreams();
+            }
+            return [];
          }
       };
 
@@ -34717,6 +34858,19 @@ PDFJS.build = '8561d26';
             var buffer = this.ensureBuffer(newLength);
             buffer.set(chunk, bufferLength);
             this.bufferLength = newLength;
+         };
+
+      StreamsSequenceStream.prototype.getBaseStreams =
+         function StreamsSequenceStream_getBaseStreams() {
+
+            var baseStreams = [];
+            for (var i = 0, ii = this.streams.length; i < ii; i++) {
+               var stream = this.streams[i];
+               if (stream.getBaseStreams) {
+                  Util.concatenateToArray(baseStreams, stream.getBaseStreams());
+               }
+            }
+            return baseStreams;
          };
 
       return StreamsSequenceStream;
@@ -34951,8 +35105,11 @@ PDFJS.build = '8561d26';
             if (typeof (b = bytes[bytesPos++]) == 'undefined')
                error('Bad block header in flate stream');
             check |= (b << 8);
-            if (check != (~blockLen & 0xffff))
+            if (check != (~blockLen & 0xffff) &&
+               (blockLen !== 0 || check !== 0)) {
+               // Ignoring error for bad "empty" block (see issue 1277)
                error('Bad uncompressed block length in flate stream');
+            }
 
             this.codeBuf = 0;
             this.codeSize = 0;
@@ -35062,11 +35219,11 @@ PDFJS.build = '8561d26';
    })();
 
    var PredictorStream = (function PredictorStreamClosure() {
-      function PredictorStream(stream, params) {
+      function PredictorStream(str, params) {
          var predictor = this.predictor = params.get('Predictor') || 1;
 
          if (predictor <= 1)
-            return stream; // no prediction
+            return str; // no prediction
          if (predictor !== 2 && (predictor < 10 || predictor > 15))
             error('Unsupported predictor: ' + predictor);
 
@@ -35075,8 +35232,8 @@ PDFJS.build = '8561d26';
          else
             this.readBlock = this.readBlockPng;
 
-         this.stream = stream;
-         this.dict = stream.dict;
+         this.str = str;
+         this.dict = str.dict;
 
          var colors = this.colors = params.get('Colors') || 1;
          var bits = this.bits = params.get('BitsPerComponent') || 8;
@@ -35101,7 +35258,7 @@ PDFJS.build = '8561d26';
             var bits = this.bits;
             var colors = this.colors;
 
-            var rawBytes = this.stream.getBytes(rowBytes);
+            var rawBytes = this.str.getBytes(rowBytes);
             this.eof = !rawBytes.length;
             if (this.eof) {
                return;
@@ -35164,8 +35321,8 @@ PDFJS.build = '8561d26';
             var rowBytes = this.rowBytes;
             var pixBytes = this.pixBytes;
 
-            var predictor = this.stream.getByte();
-            var rawBytes = this.stream.getBytes(rowBytes);
+            var predictor = this.str.getByte();
+            var rawBytes = this.str.getBytes(rowBytes);
             this.eof = !rawBytes.length;
             if (this.eof) {
                return;
@@ -35255,49 +35412,10 @@ PDFJS.build = '8561d26';
     * DecodeStreams.
     */
    var JpegStream = (function JpegStreamClosure() {
-      function isAdobeImage(bytes) {
-         var maxBytesScanned = Math.max(bytes.length - 16, 1024);
-         // Looking for APP14, 'Adobe'
-         for (var i = 0; i < maxBytesScanned; ++i) {
-            if (bytes[i] == 0xFF && bytes[i + 1] == 0xEE &&
-               bytes[i + 2] === 0x00 && bytes[i + 3] == 0x0E &&
-               bytes[i + 4] == 0x41 && bytes[i + 5] == 0x64 &&
-               bytes[i + 6] == 0x6F && bytes[i + 7] == 0x62 &&
-               bytes[i + 8] == 0x65 && bytes[i + 9] === 0x00)
-               return true;
-            // scanning until frame tag
-            if (bytes[i] == 0xFF && bytes[i + 1] == 0xC0)
-               break;
-         }
-         return false;
-      }
-
-      function fixAdobeImage(bytes) {
-         // Inserting 'EMBED' marker after JPEG signature
-         var embedMarker = new Uint8Array([0xFF, 0xEC, 0, 8, 0x45, 0x4D, 0x42, 0x45,
-            0x44, 0]);
-         var newBytes = new Uint8Array(bytes.length + embedMarker.length);
-         newBytes.set(bytes, embedMarker.length);
-         // copy JPEG header
-         newBytes[0] = bytes[0];
-         newBytes[1] = bytes[1];
-         newBytes.set(embedMarker, 2);
-         return newBytes;
-      }
-
       function JpegStream(bytes, dict, xref) {
          // TODO: per poppler, some images may have 'junk' before that
          // need to be removed
          this.dict = dict;
-
-         this.isAdobeImage = false;
-         this.colorTransform = dict.get('ColorTransform') || -1;
-
-         if (isAdobeImage(bytes)) {
-            this.isAdobeImage = true;
-            bytes = fixAdobeImage(bytes);
-         }
-
          this.bytes = bytes;
 
          DecodeStream.call(this);
@@ -35326,9 +35444,6 @@ PDFJS.build = '8561d26';
       JpegStream.prototype.getIR = function JpegStream_getIR() {
          return bytesToString(this.bytes);
       };
-      JpegStream.prototype.getChar = function JpegStream_getChar() {
-         error('internal error: getChar is not valid on JpegStream');
-      };
       /**
        * Checks if the image can be decoded and displayed by the browser without any
        * further processing such as color space conversions.
@@ -35336,14 +35451,7 @@ PDFJS.build = '8561d26';
       JpegStream.prototype.isNativelySupported =
          function JpegStream_isNativelySupported(xref, res) {
             var cs = ColorSpace.parse(this.dict.get('ColorSpace', 'CS'), xref, res);
-            // when bug 674619 lands, let's check if browser can do
-            // normal cmyk and then we won't need to decode in JS
-            if (cs.name === 'DeviceGray' || cs.name === 'DeviceRGB')
-               return true;
-            if (cs.name === 'DeviceCMYK' && !this.isAdobeImage &&
-               this.colorTransform < 1)
-               return true;
-            return false;
+            return cs.name === 'DeviceGray' || cs.name === 'DeviceRGB';
          };
       /**
        * Checks if the image can be decoded by the browser.
@@ -35352,10 +35460,7 @@ PDFJS.build = '8561d26';
          function JpegStream_isNativelyDecodable(xref, res) {
             var cs = ColorSpace.parse(this.dict.get('ColorSpace', 'CS'), xref, res);
             var numComps = cs.numComps;
-            if (numComps == 1 || numComps == 3)
-               return true;
-
-            return false;
+            return numComps == 1 || numComps == 3;
          };
 
       return JpegStream;
@@ -35456,9 +35561,6 @@ PDFJS.build = '8561d26';
          this.bufferLength = data.length;
          this.eof = true;
       };
-      JpxStream.prototype.getChar = function JpxStream_getChar() {
-         error('internal error: getChar is not valid on JpxStream');
-      };
 
       return JpxStream;
    })();
@@ -35500,9 +35602,6 @@ PDFJS.build = '8561d26';
          this.buffer = data;
          this.bufferLength = dataLength;
          this.eof = true;
-      };
-      Jbig2Stream.prototype.getChar = function Jbig2Stream_getChar() {
-         error('internal error: getChar is not valid on Jbig2Stream');
       };
 
       return Jbig2Stream;
@@ -35564,15 +35663,18 @@ PDFJS.build = '8561d26';
       Ascii85Stream.prototype = Object.create(DecodeStream.prototype);
 
       Ascii85Stream.prototype.readBlock = function Ascii85Stream_readBlock() {
-         var tildaCode = '~'.charCodeAt(0);
-         var zCode = 'z'.charCodeAt(0);
+         var TILDA_CHAR = 0x7E; // '~'
+         var Z_LOWER_CHAR = 0x7A; // 'z'
+         var EOF = -1;
+
          var str = this.str;
 
          var c = str.getByte();
-         while (Lexer.isSpace(String.fromCharCode(c)))
+         while (Lexer.isSpace(c)) {
             c = str.getByte();
+         }
 
-         if (!c || c === tildaCode) {
+         if (c === EOF || c === TILDA_CHAR) {
             this.eof = true;
             return;
          }
@@ -35580,7 +35682,7 @@ PDFJS.build = '8561d26';
          var bufferLength = this.bufferLength, buffer;
 
          // special code for z
-         if (c == zCode) {
+         if (c == Z_LOWER_CHAR) {
             buffer = this.ensureBuffer(bufferLength + 4);
             for (var i = 0; i < 4; ++i)
                buffer[bufferLength + i] = 0;
@@ -35590,12 +35692,13 @@ PDFJS.build = '8561d26';
             input[0] = c;
             for (var i = 1; i < 5; ++i) {
                c = str.getByte();
-               while (Lexer.isSpace(String.fromCharCode(c)))
+               while (Lexer.isSpace(c)) {
                   c = str.getByte();
+               }
 
                input[i] = c;
 
-               if (!c || c == tildaCode)
+               if (c === EOF || c == TILDA_CHAR)
                   break;
             }
             buffer = this.ensureBuffer(bufferLength + i - 1);
@@ -35626,66 +35729,53 @@ PDFJS.build = '8561d26';
          this.str = str;
          this.dict = str.dict;
 
+         this.firstDigit = -1;
+
          DecodeStream.call(this);
       }
-
-      var hexvalueMap = {
-         9: -1, // \t
-         32: -1, // space
-         48: 0,
-         49: 1,
-         50: 2,
-         51: 3,
-         52: 4,
-         53: 5,
-         54: 6,
-         55: 7,
-         56: 8,
-         57: 9,
-         65: 10,
-         66: 11,
-         67: 12,
-         68: 13,
-         69: 14,
-         70: 15,
-         97: 10,
-         98: 11,
-         99: 12,
-         100: 13,
-         101: 14,
-         102: 15
-      };
 
       AsciiHexStream.prototype = Object.create(DecodeStream.prototype);
 
       AsciiHexStream.prototype.readBlock = function AsciiHexStream_readBlock() {
-         var gtCode = '>'.charCodeAt(0), bytes = this.str.getBytes(), c, n,
-            decodeLength, buffer, bufferLength, i, length;
-
-         decodeLength = (bytes.length + 1) >> 1;
-         buffer = this.ensureBuffer(this.bufferLength + decodeLength);
-         bufferLength = this.bufferLength;
-
-         for (i = 0, length = bytes.length; i < length; i++) {
-            c = hexvalueMap[bytes[i]];
-            while (c == -1 && (i + 1) < length) {
-               c = hexvalueMap[bytes[++i]];
-            }
-
-            if ((i + 1) < length && (bytes[i + 1] !== gtCode)) {
-               n = hexvalueMap[bytes[++i]];
-               buffer[bufferLength++] = c * 16 + n;
-            } else {
-               // EOD marker at an odd number, behave as if a 0 followed the last
-               // digit.
-               if (bytes[i] !== gtCode) {
-                  buffer[bufferLength++] = c * 16;
-               }
-            }
+         var UPSTREAM_BLOCK_SIZE = 8000;
+         var bytes = this.str.getBytes(UPSTREAM_BLOCK_SIZE);
+         if (!bytes.length) {
+            this.eof = true;
+            return;
          }
 
+         var maxDecodeLength = (bytes.length + 1) >> 1;
+         var buffer = this.ensureBuffer(this.bufferLength + maxDecodeLength);
+         var bufferLength = this.bufferLength;
+
+         var firstDigit = this.firstDigit;
+         for (var i = 0, ii = bytes.length; i < ii; i++) {
+            var ch = bytes[i], digit;
+            if (ch >= 0x30 && ch <= 0x39) { // '0'-'9'
+               digit = ch & 0x0F;
+            } else if ((ch >= 0x41 && ch <= 0x46) || (ch >= 0x61 && ch <= 0x66)) {
+               // 'A'-'Z', 'a'-'z'
+               digit = (ch & 0x0F) + 9;
+            } else if (ch === 0x3E) { // '>'
+               this.eof = true;
+               break;
+            } else { // probably whitespace
+               continue; // ignoring
+            }
+            if (firstDigit < 0) {
+               firstDigit = digit;
+            } else {
+               buffer[bufferLength++] = (firstDigit << 4) | digit;
+               firstDigit = -1;
+            }
+         }
+         if (firstDigit >= 0 && this.eof) {
+            // incomplete byte
+            buffer[bufferLength++] = (firstDigit << 4);
+            firstDigit = -1;
+         }
+         this.firstDigit = firstDigit;
          this.bufferLength = bufferLength;
-         this.eof = true;
       };
 
       return AsciiHexStream;
@@ -36683,7 +36773,7 @@ PDFJS.build = '8561d26';
       CCITTFaxStream.prototype.lookBits = function CCITTFaxStream_lookBits(n) {
          var c;
          while (this.inputBits < n) {
-            if ((c = this.str.getByte()) === null || c === undefined) {
+            if ((c = this.str.getByte()) === -1) {
                if (this.inputBits === 0)
                   return EOF;
                return ((this.inputBuf << (n - this.inputBits)) &
@@ -36737,7 +36827,7 @@ PDFJS.build = '8561d26';
          var cachedData = this.cachedData;
          while (bitsCached < n) {
             var c = this.str.getByte();
-            if (c === null || c === undefined) {
+            if (c === -1) {
                this.eof = true;
                return null;
             }
@@ -37127,6 +37217,9 @@ PDFJS.build = '8561d26';
                   });
                }
             };
+
+            PDFJS.maxImageSize = data.maxImageSize === undefined ?
+               -1 : data.maxImageSize;
 
             getPdfManager(data).then(function pdfManagerReady() {
                loadDocument(false).then(onSuccess, function loadFailure(ex) {
@@ -41496,9 +41589,11 @@ PDFJS.build = '8561d26';
                      break;
 
                   case 0xFFC0: // SOF0 (Start of Frame, Baseline DCT)
+                  case 0xFFC1: // SOF1 (Start of Frame, Extended DCT)
                   case 0xFFC2: // SOF2 (Start of Frame, Progressive DCT)
                      readUint16(); // skip data length
                      frame = {};
+                     frame.extended = (fileMarker === 0xFFC1);
                      frame.progressive = (fileMarker === 0xFFC2);
                      frame.precision = data[offset++];
                      frame.scanLines = readUint16();
@@ -41620,6 +41715,21 @@ PDFJS.build = '8561d26';
                      }
                   }
                   break;
+               case 2:
+                  // PDF might compress two component data in custom colorspace
+                  component1 = this.components[0];
+                  component2 = this.components[1];
+                  for (y = 0; y < height; y++) {
+                     component1Line = component1.lines[0 | (y * component1.scaleY * scaleY)];
+                     component2Line = component1.lines[0 | (y * component2.scaleY * scaleY)];
+                     for (x = 0; x < width; x++) {
+                        Y = component1Line[0 | (x * component1.scaleX * scaleX)];
+                        data[offset++] = Y;
+                        Y = component2Line[0 | (x * component2.scaleX * scaleX)];
+                        data[offset++] = Y;
+                     }
+                  }
+                  break;
                case 3:
                   // The default transform for three components is true
                   colorTransform = true;
@@ -41658,8 +41768,6 @@ PDFJS.build = '8561d26';
                   }
                   break;
                case 4:
-                  if (!this.adobe)
-                     throw 'Unsupported color mode (4 components)';
                   // The default transform for four components is false
                   colorTransform = false;
                   // The adobe transform marker overrides any previous setting
