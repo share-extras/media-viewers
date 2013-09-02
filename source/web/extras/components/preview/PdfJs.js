@@ -366,12 +366,12 @@
        */
       onComponentsLoaded : function PdfJs_onComponentsLoaded()
       {
-         this.workerSrc = Alfresco.constants.URL_CONTEXT + 'res/extras/components/preview/pdfjs/pdf' +  (Alfresco.constants.DEBUG ? '.js' : '-min.js');
+         this.workerSrc = Alfresco.constants.URL_CONTEXT + 'res/extras/components/preview/pdfjs/pdf.worker' +  (Alfresco.constants.DEBUG ? '.js' : '-min.js');
          // Find the name of pdf.js resource file (4.2 specific)
          var scriptElements = document.getElementsByTagName('script');
          for(i = 0, il = scriptElements.length; i < il; i++)
          {
-            if(scriptElements[i].src.indexOf('extras/components/preview/pdfjs/pdf_') > -1)
+            if(scriptElements[i].src.indexOf('extras/components/preview/pdfjs/pdf.worker_') > -1)
             {
                this.workerSrc =  scriptElements[i].src;
                break;
