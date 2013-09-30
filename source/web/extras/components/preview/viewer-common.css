@@ -71,3 +71,13 @@
    text-decoration: none;
    padding-right: 5px;
 }
+
+/* Overrides for filmstrip view */
+.alf-filmstrip .web-preview .previewer.Embed, .alf-filmstrip .web-preview .previewer.PdfJs
+{
+   margin-top: 47px;
+}
+.alf-filmstrip-content-only .web-preview .previewer.Embed, .alf-filmstrip-content-only .web-preview .previewer.PdfJs
+{
+    margin-top: 1px;
+}
