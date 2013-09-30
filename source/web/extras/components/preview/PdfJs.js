@@ -1379,7 +1379,7 @@
                effect : null,
                modal : false,
                visible : false,
-               width: "310px",
+               width: "265px",
                context : [ this.viewer, "tr", "tr", [ "beforeShow", "windowResize" ], [-20, 3] ],
                underlay: "none"
             });
