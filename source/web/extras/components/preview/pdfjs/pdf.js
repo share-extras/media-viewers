@@ -26,8 +26,8 @@ if (typeof PDFJS === 'undefined') {
    (typeof window !== 'undefined' ? window : this).PDFJS = {};
 }
 
-PDFJS.version = '0.8.478';
-PDFJS.build = '8a4a6f4';
+PDFJS.version = '0.8.558';
+PDFJS.build = 'ea50c07';
 
 (function pdfjsWrapper() {
    // Use strict in our context only - users might not want it
@@ -3677,7 +3677,6 @@ PDFJS.build = '8a4a6f4';
             container.className = 'annotText';
 
             var image = document.createElement('img');
-            image.style.width = container.style.width;
             image.style.height = container.style.height;
             var iconName = item.name;
             image.src = PDFJS.imageResourcesPath + 'annotation-' +
@@ -3705,15 +3704,23 @@ PDFJS.build = '8a4a6f4';
                      e.appendChild(document.createElement('br'));
                }
                text.appendChild(e);
-               image.addEventListener('mouseover', function annotationImageOver() {
+
+               var showAnnotation = function showAnnotation() {
                   container.style.zIndex += 1;
                   content.removeAttribute('hidden');
-               }, false);
+               };
 
-               image.addEventListener('mouseout', function annotationImageOut() {
-                  container.style.zIndex -= 1;
-                  content.setAttribute('hidden', true);
-               }, false);
+               var hideAnnotation = function hideAnnotation(e) {
+                  if (e.toElement || e.relatedTarget) { // No context menu is used
+                     container.style.zIndex -= 1;
+                     content.setAttribute('hidden', true);
+                  }
+               };
+
+               content.addEventListener('mouseover', showAnnotation, false);
+               content.addEventListener('mouseout', hideAnnotation, false);
+               image.addEventListener('mouseover', showAnnotation, false);
+               image.addEventListener('mouseout', hideAnnotation, false);
             }
 
             content.appendChild(title);
