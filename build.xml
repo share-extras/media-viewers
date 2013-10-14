@@ -31,9 +31,10 @@
     <property file="${user.home}/build.properties" />
    
    <!-- Property default values. May be overridden using above files or via command-line args -->
-    <property name="jar.name" value="share-extension.jar" />
-    <property name="zip.name" value="share-extension.zip" />
-    <property name="amp.name" value="share-extension.amp" />
+    <property name="project.name" value="share-extension" />
+    <property name="jar.name" value="${project.name}-${project.version}.jar" />
+    <property name="zip.name" value="${project.name}-${project.version}.zip" />
+    <property name="amp.name" value="${project.name}-${project.version}.amp" />
     <property name="src.zip.name" value="share-extension-src.zip" />
     <property name="config.includes" value="**/*.*" />
     <property name="config.excludes" value="" />
@@ -159,6 +160,9 @@
                 <!-- Global excludes -->
                 <exclude name="${config.excludes}" />
             </fileset>
+            <filterset>
+                <filter token="VERSION" value="${project.version}"/>
+            </filterset>
         </copy>
         <!-- Copy web-tier resources into the JAR. These can then be loaded by browsers via Share's resources 
         servlet by prefixing their path with '/res' -->
@@ -262,6 +266,9 @@
     <target name="build-zip-config">
         <copy todir="${build.zip.dir}/${build.classes.dir}">
             <fileset dir="${config.dir}" includes="${config.includes}" excludes="${config.excludes}" />
+            <filterset>
+                <filter token="VERSION" value="${project.version}"/>
+            </filterset>
         </copy>
     </target>
     
@@ -284,6 +291,9 @@
         <mkdir dir="${build.amp.dir}/config" />
         <copy todir="${build.amp.dir}/config">
             <fileset dir="${config.dir}" includes="${config.includes}" excludes="${config.excludes}" />
+            <filterset>
+                <filter token="VERSION" value="${project.version}"/>
+            </filterset>
         </copy>
         
         <!-- Copy resource files -->
