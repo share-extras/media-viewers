@@ -366,12 +366,12 @@
        */
       onComponentsLoaded : function PdfJs_onComponentsLoaded()
       {
-         this.workerSrc = Alfresco.constants.URL_CONTEXT + 'res/extras/components/preview/pdfjs/pdf' +  (Alfresco.constants.DEBUG ? '.js' : '-min.js');
+         this.workerSrc = Alfresco.constants.URL_CONTEXT + 'res/extras/components/preview/pdfjs/pdf.worker' +  (Alfresco.constants.DEBUG ? '.js' : '-min.js');
          // Find the name of pdf.js resource file (4.2 specific)
          var scriptElements = document.getElementsByTagName('script');
          for(i = 0, il = scriptElements.length; i < il; i++)
          {
-            if(scriptElements[i].src.indexOf('extras/components/preview/pdfjs/pdf_') > -1)
+            if(scriptElements[i].src.indexOf('extras/components/preview/pdfjs/pdf.worker_') > -1)
             {
                this.workerSrc =  scriptElements[i].src;
                break;
@@ -748,6 +748,11 @@
 
          // Set the worker source
          PDFJS.workerSrc = this.workerSrc;
+
+         // PDFJS Disable new range feature if not loading from first page
+         PDFJS.disableRange = true;
+         // disable autofetch - retrieve just the ranges needed to display
+         PDFJS.disableAutoFetch = false;
 
          if (Alfresco.logger.isDebugEnabled())
          {
@@ -1374,7 +1379,7 @@
                effect : null,
                modal : false,
                visible : false,
-               width: "310px",
+               width: "265px",
                context : [ this.viewer, "tr", "tr", [ "beforeShow", "windowResize" ], [-20, 3] ],
                underlay: "none"
             });

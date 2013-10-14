@@ -141,7 +141,7 @@
    border-color: #B7B7B7;
    border-width: 1px;
    background-color: transparent;
-   padding: 0 2px;
+   padding: 0 3px;
 }
 
 .previewer.PdfJs .controlssearch input[type="search"] {
@@ -150,9 +150,10 @@
 }
 
 .previewer.PdfJs .controlssearch .yui-checkbox-button .first-child { 
-    border: none; 
-    padding-right: 0.3em;
-    padding-left: 0.3em;
+    border: none;
+    display: inline;
+    margin-right: 0px;
+    margin-left: 0px;
 }
 
 .previewer.PdfJs .controlssearch .buttonHighLightAll .yui-checkbox-button { 
@@ -195,6 +196,12 @@
 .linkDialog, .searchDialog {
 	visibility: hidden;
 	position: absolute;
+}
+
+/* Some themes have a min width set to large for our needs */
+.searchDialog.yui-panel
+{
+    min-width: 23em;
 }
 
 .yui-panel.linkDialog .bd, .yui-panel.searchDialog .bd {
@@ -440,6 +447,12 @@ canvas {
 
 ::-moz-selection {
 	background: rgba(0, 0, 255, 0.3);
+}
+
+/* Specific theme overrides */
+.yui-skin-lightTheme .searchDialog.yui-panel .hd
+{
+   padding: 0.10em;
 }
 
 /* === Printed media overrides === */
