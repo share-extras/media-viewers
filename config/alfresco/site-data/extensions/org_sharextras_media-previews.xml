@@ -25,6 +25,10 @@
                     <targetPackageRoot>org.alfresco.components.preview</targetPackageRoot>              
                     <sourcePackageRoot>org.sharextras.customization.media-previews.flvplayer-config</sourcePackageRoot>
                 </customization>
+                <customization>
+                    <targetPackageRoot>org.alfresco.components.documentlibrary</targetPackageRoot>
+                    <sourcePackageRoot>org.sharextras.customization.media-previews.flvplayer-viewrender</sourcePackageRoot>
+                </customization>
             </customizations>
             <auto-deploy>false</auto-deploy>
         </module>
@@ -49,6 +53,10 @@
                     <targetPackageRoot>org.alfresco.components.preview</targetPackageRoot>
                     <sourcePackageRoot>org.sharextras.customization.media-previews.mp3player-config</sourcePackageRoot>
                 </customization>
+                <customization>
+                    <targetPackageRoot>org.alfresco.components.documentlibrary</targetPackageRoot>
+                    <sourcePackageRoot>org.sharextras.customization.media-previews.mp3player-viewrender</sourcePackageRoot>
+                </customization>
             </customizations>
             <auto-deploy>false</auto-deploy>
         </module>
@@ -72,6 +80,10 @@
                 <customization>
                     <targetPackageRoot>org.alfresco.components.preview</targetPackageRoot>
                     <sourcePackageRoot>org.sharextras.customization.media-previews.pdfjs-config</sourcePackageRoot>
+                </customization>
+                <customization>
+                    <targetPackageRoot>org.alfresco.components.documentlibrary</targetPackageRoot>
+                    <sourcePackageRoot>org.sharextras.customization.media-previews.pdfjs-viewrender</sourcePackageRoot>
                 </customization>
             </customizations>
             <auto-deploy>false</auto-deploy>
@@ -132,6 +144,10 @@
                 <customization>
                     <targetPackageRoot>org.alfresco.components.preview</targetPackageRoot>
                     <sourcePackageRoot>org.sharextras.customization.media-previews.prettify-config</sourcePackageRoot>
+                </customization>
+                <customization>
+                    <targetPackageRoot>org.alfresco.components.documentlibrary</targetPackageRoot>
+                    <sourcePackageRoot>org.sharextras.customization.media-previews.prettify-viewrender</sourcePackageRoot>
                 </customization>
             </customizations>
             <auto-deploy>false</auto-deploy>
