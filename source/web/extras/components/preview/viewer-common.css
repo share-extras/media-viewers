@@ -72,12 +72,32 @@
    padding-right: 5px;
 }
 
+/* Reset yui button in filmstrip */
+.previewer .yui-overlay ul
+{
+    padding: 0 !important;
+    margin-left: 0 !important;
+    list-style-position: inside !important;
+}
+
+.previewer .yui-overlay li
+{
+    list-style: none !important;
+    overflow-y: visible !important;
+    overflow-x: visible !important;
+    float: none;
+}
+
 /* Overrides for filmstrip view */
-.alf-filmstrip .web-preview .previewer.Embed, .alf-filmstrip .web-preview .previewer.PdfJs
+.alf-filmstrip .web-preview .previewer.Embed,
+.alf-filmstrip .web-preview .previewer.PdfJs,
+.alf-filmstrip .web-preview .previewer.Prettify
 {
    margin-top: 47px;
 }
-.alf-filmstrip-content-only .web-preview .previewer.Embed, .alf-filmstrip-content-only .web-preview .previewer.PdfJs
+.alf-filmstrip-content-only .web-preview .previewer.Embed,
+.alf-filmstrip-content-only .web-preview .previewer.PdfJs,
+.alf-filmstrip-content-only .web-preview .previewer.Prettify
 {
     margin-top: 1px;
 }

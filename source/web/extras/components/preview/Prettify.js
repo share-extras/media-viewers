@@ -102,7 +102,16 @@
       {
          // Set to syncronous rendering, since async. code contains a bug which means it never executes
          window['PR_SHOULD_USE_CONTINUATION'] = false;
-         
+
+         // Set up previewer size
+         var previewHeight = this.wp.setupPreviewSize({
+            commentsList: true,
+            commentContent: false,
+            siteNavigation: true,
+            nodeHeader: true
+         });
+         //Dom.setStyle(this.wp.getPreviewerElement(), "height", (previewHeight - 10).toString() + "px");
+
          Alfresco.util.Ajax.request({
             url: this.wp.getContentUrl(),
             successCallback: {
