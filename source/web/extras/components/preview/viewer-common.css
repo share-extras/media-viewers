@@ -91,13 +91,15 @@
 /* Overrides for filmstrip view */
 .alf-filmstrip .web-preview .previewer.Embed,
 .alf-filmstrip .web-preview .previewer.PdfJs,
-.alf-filmstrip .web-preview .previewer.Prettify
+.alf-filmstrip .web-preview .previewer.Prettify,
+.alf-filmstrip .web-preview .previewer.WebODF
 {
    margin-top: 47px;
 }
 .alf-filmstrip-content-only .web-preview .previewer.Embed,
 .alf-filmstrip-content-only .web-preview .previewer.PdfJs,
-.alf-filmstrip-content-only .web-preview .previewer.Prettify
+.alf-filmstrip-content-only .web-preview .previewer.Prettify,
+.alf-filmstrip-content-only .web-preview .previewer.WebODF
 {
     margin-top: 1px;
 }

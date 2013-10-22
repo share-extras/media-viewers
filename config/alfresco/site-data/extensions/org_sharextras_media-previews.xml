@@ -121,6 +121,10 @@
                     <targetPackageRoot>org.alfresco.components.preview</targetPackageRoot>
                     <sourcePackageRoot>org.sharextras.customization.media-previews.webodf-config</sourcePackageRoot>
                 </customization>
+                <customization>
+                    <targetPackageRoot>org.alfresco.components.documentlibrary</targetPackageRoot>
+                    <sourcePackageRoot>org.sharextras.customization.media-previews.webodf-viewrender</sourcePackageRoot>
+                </customization>
             </customizations>
             <auto-deploy>false</auto-deploy>
         </module>
