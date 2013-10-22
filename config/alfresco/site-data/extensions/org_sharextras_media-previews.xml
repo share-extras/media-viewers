@@ -88,7 +88,23 @@
             </customizations>
             <auto-deploy>false</auto-deploy>
         </module>
-        
+
+        <module>
+            <id>PdfJs Configuration (Experimental Progressive loading)</id>
+            <version>@VERSION@</version>
+            <customizations>
+                <customization>
+                    <targetPackageRoot>org.alfresco.components.preview</targetPackageRoot>
+                    <sourcePackageRoot>org.sharextras.customization.media-previews.pdfjs-config-experimental</sourcePackageRoot>
+                </customization>
+                <customization>
+                    <targetPackageRoot>org.alfresco.components.documentlibrary</targetPackageRoot>
+                    <sourcePackageRoot>org.sharextras.customization.media-previews.pdfjs-viewrender</sourcePackageRoot>
+                </customization>
+            </customizations>
+            <auto-deploy>false</auto-deploy>
+        </module>
+
         <module>
             <id>Embed Viewer</id>
             <version>@VERSION@</version>
