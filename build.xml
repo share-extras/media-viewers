@@ -115,11 +115,24 @@
     </taskdef>
     
     
+    <!-- Pre-flight checks -->
+    <target name="check-buildfile" description="Check that the correct build file was called">
+        <condition property="wrong.buildfile">
+            <and>
+                <available file="${basedir}/project.xml" />
+                <not><matches string="${ant.file}" pattern="/project.xml$" /></not>
+            </and>
+        </condition>
+    </target>
+    
+    
     <!-- Main build target definitions -->
     
     
    <!-- Clean out the build and distribution directories -->
-   <target name="clean" description="Clean out all build directories">
+   <target name="clean" description="Clean out all build directories" depends="check-buildfile">
+      <!-- Check the correct file was called -->
+      <fail if="wrong.buildfile">Please use project.xml to build this project</fail>
       <delete dir="${build.dir}" />
       <delete dir="${dist.dir}" />
    </target>
