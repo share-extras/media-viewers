@@ -89,6 +89,9 @@
             <auto-deploy>false</auto-deploy>
         </module>
 
+        <!-- This module is disabled for now. You can still enable by custom configuration and using
+             property progressiveLoading: "true" -->
+        <!--
         <module>
             <id>PdfJs Configuration (Experimental Progressive loading)</id>
             <version>@VERSION@</version>
@@ -104,6 +107,7 @@
             </customizations>
             <auto-deploy>false</auto-deploy>
         </module>
+        -->
 
         <module>
             <id>Embed Viewer</id>
