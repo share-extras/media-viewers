@@ -15,5 +15,23 @@
 
     <dependencies>
     </dependencies>
+    
+    <build>
+        <resources>
+            <resource>
+                <directory>config</directory>
+            </resource>
+        </resources>
+        <plugins>
+            <plugin>
+                <artifactId>maven-war-plugin</artifactId>
+                <version>2.4</version>
+                <configuration>
+                    <warSourceDirectory>source/web</warSourceDirectory>
+                    <useCache>true</useCache>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 
 </project>
