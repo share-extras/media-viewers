@@ -32,9 +32,11 @@
    
    <!-- Property default values. May be overridden using above files or via command-line args -->
     <property name="project.name" value="share-extension" />
+    <property name="project.version" value="1.0" />
     <property name="jar.name" value="${project.name}-${project.version}.jar" />
     <property name="zip.name" value="${project.name}-${project.version}.zip" />
     <property name="amp.name" value="${project.name}-${project.version}.amp" />
+    <property name="amp.version" value="project.version" />
     <property name="src.zip.name" value="share-extension-src.zip" />
     <property name="config.includes" value="**/*.*" />
     <property name="config.excludes" value="" />
@@ -284,8 +286,12 @@
     
     <target name="build-amp-assemble">
         <!-- Copy properties files -->
-        <copy todir="${build.amp.dir}" file="${amp.file.properties}" failonerror="true" />
-        <copy todir="${build.amp.dir}" file="${amp.file.mappings}" failonerror="true" />
+        <copy todir="${build.amp.dir}" file="${amp.file.properties}" failonerror="true">
+            <filterset>
+                <filter token="VERSION" value="${amp.version}"/>
+            </filterset>
+        </copy>
+        <copy todir="${build.amp.dir}" file="${amp.file.mappings}" failonerror="false" />
         
         <!-- Copy config files -->
         <mkdir dir="${build.amp.dir}/config" />
