@@ -24,11 +24,13 @@
     project directory. These may be removed at any time using the 'clean' target.
 
 -->
-<project basedir="." default="dist-amp-jar" name="Share Extras Build Script">
+<project basedir="." default="dist-amp-jar" name="Share Extras Build Script"
+   xmlns:artifact="antlib:org.apache.maven.artifact.ant">
 
    <!-- Allow override properties -->
     <property file="build.properties" />
     <property file="${user.home}/build.properties" />
+    <property file="${user.home}/.ant/build.properties" />
    
    <!-- Property default values. May be overridden using above files or via command-line args -->
     <property name="project.name" value="share-extension" />
@@ -114,6 +116,10 @@
         </classpath>
     </taskdef>
     
+    <path id="maven-ant-tasks.classpath" path="lib/maven-ant-tasks-2.1.4-SNAPSHOT.jar" />
+    
+    <typedef resource="org/apache/maven/artifact/ant/antlib.xml" uri="antlib:org.apache.maven.artifact.ant" 
+        classpathref="maven-ant-tasks.classpath" />
     
     <!-- Pre-flight checks -->
     <target name="check-buildfile" description="Check that the correct build file was called">
@@ -497,5 +503,25 @@
             path="${webapp.share.path}"/>
     </target>
     -->
-   
+
+    <target name="mvn-install" depends="dist-amp-jar" description="Install to local Maven repo">
+        <artifact:pom id="mypom" file="pom.xml" />
+        <artifact:install file="${dist.dir}/${jar.name}">
+            <pom refid="mypom"/>
+            <attach file="${dist.dir}/${amp.name}" type="amp" />
+        </artifact:install>
+    </target>
+
+    <target name="mvn-deploy" depends="dist-amp-jar" description="Deploy to remote Maven repo">
+        <echo message="Uploading to Maven repo as user '${repository.username}'"></echo>
+        <artifact:pom id="mypom" file="pom.xml" />
+        <artifact:deploy file="${dist.dir}/${jar.name}">
+            <remoteRepository url="https://artifacts.alfresco.com/nexus/content/repositories/share-extras-snapshots">
+                <authentication username="${repository.username}" password="${repository.password}" />
+            </remoteRepository>
+            <pom refid="mypom"/>
+            <attach file="${dist.dir}/${amp.name}" type="amp" />
+        </artifact:deploy>
+    </target>
+
 </project>
