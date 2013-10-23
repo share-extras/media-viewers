@@ -24,7 +24,7 @@
     project directory. These may be removed at any time using the 'clean' target.
 
 -->
-<project basedir="." default="dist-jar" name="Share Extras Build Script">
+<project basedir="." default="dist-amp-jar" name="Share Extras Build Script">
 
    <!-- Allow override properties -->
     <property file="build.properties" />
@@ -343,6 +343,24 @@
     
     <!-- Build the AMP file -->
     <target name="dist-amp" depends="clean, prepare, build-amp" description="Build an AMP file containing all customisations">
+        <zip destfile="${dist.dir}/${amp.name}">
+            <fileset dir="${build.amp.dir}" />
+        </zip>
+    </target>
+    
+    <!-- Build an AMP file in non-exploded form -->
+    <target name="dist-amp-jar" depends="clean, dist-jar" description="Build an AMP file in non-exploded form. The AMP file will contain only a single JAR.">
+        <!-- Copy properties files -->
+        <copy todir="${build.amp.dir}" file="${amp.file.properties}" failonerror="true">
+            <filterset>
+                <filter token="VERSION" value="${project.version}"/>
+            </filterset>
+        </copy>
+        <copy todir="${build.amp.dir}" file="${amp.file.mappings}" failonerror="false" />
+        <!-- Copy JAR file -->
+        <mkdir dir="${build.amp.dir}/lib" />
+        <copy todir="${build.amp.dir}/lib" file="${dist.dir}/${jar.name}" failonerror="true" />
+    	<!-- Create the AMP -->
         <zip destfile="${dist.dir}/${amp.name}">
             <fileset dir="${build.amp.dir}" />
         </zip>
