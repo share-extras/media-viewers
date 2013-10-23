@@ -181,7 +181,17 @@
           * @type String
           * @default "true"
           */
-         autoSearch : "true"
+         autoSearch : "true",
+
+          /**
+           * Should progresse loading be used?
+           * NOTE: Experimental feature
+           *
+           * @property autoSearch
+           * @type String
+           * @default "false"
+           */
+          progressiveLoading : "false"
       },
 
       /**
@@ -749,10 +759,18 @@
          // Set the worker source
          PDFJS.workerSrc = this.workerSrc;
 
-         // PDFJS Disable new range feature if not loading from first page
-         PDFJS.disableRange = true;
-         // disable autofetch - retrieve just the ranges needed to display
-         PDFJS.disableAutoFetch = false;
+         // PDFJS range request for progessive loading
+         // We also test if it may already be set to true by compatibility.js tests, some browsers do not support it.
+         if(this.attributes.progressiveLoading == "true" && PDFJS.disableRange != true)
+         {
+             PDFJS.disableRange = false;
+             // disable autofetch - retrieve just the ranges needed to display
+             PDFJS.disableAutoFetch = false;
+         }
+         else
+         {
+             PDFJS.disableRange = true;
+         }
 
          if (Alfresco.logger.isDebugEnabled())
          {
