@@ -191,7 +191,18 @@
            * @type String
            * @default "false"
            */
-          progressiveLoading : "false"
+          progressiveLoading: "false",
+
+          /**
+           * Disabled page Linking.
+           * Page linking should only be enabled on specific pages
+           *
+           * @property disabledPageLinking
+           * @type boolean
+           * @default true
+           */
+          disabledPageLinking: true
+
       },
 
       /**
@@ -393,9 +404,21 @@
             this._loadDocumentConfig();
          }
 
+
+         // Setup display options, page linking only works for specific pages
+         this.disabledPageLinking = (Alfresco.constants.PAGEID==='document-details') ? false : true;
+
          // Set page number
          var urlParams = Alfresco.util.getQueryStringParameters(window.location.hash.replace("#", ""));
-         this.pageNum = urlParams.page || (this.documentConfig.pageNum ? parseInt(this.documentConfig.pageNum) : this.pageNum);
+         if(this.disabledPageLinking)
+         {
+             this.pageNum = this.documentConfig.pageNum ? parseInt(this.documentConfig.pageNum) : this.pageNum;
+         }
+         else
+         {
+             this.pageNum = urlParams.page || (this.documentConfig.pageNum ? parseInt(this.documentConfig.pageNum) : this.pageNum);
+         }
+         this.pageNum = parseInt(this.pageNum); // If value from urlParams.page is used it's a string
 
          // Viewer HTML is contained in an external web script, which we load via XHR, then onViewerLoad() does the rest
          Alfresco.util.Ajax.request({
@@ -951,6 +974,12 @@
             }
 
             this.documentView.render();
+            // Make sure we do not have a page number greater than actual pages
+            if(this.pageNum > this.pdfDoc.numPages)
+            {
+                this.pageNum = this.pdfDoc.numPages;
+                this._updatePageControls();
+            }
             // Scroll to the current page, this will force the visible content to render
             this.documentView.scrollTo(this.pageNum);
 
@@ -1729,23 +1758,26 @@
        */
       onWindowHashChange : function PdfJs_onWindowHashChange(p_obj)
       {
+          if(this.disabledPageLinking)    // Ignore page hash change
+            return;
+
          // Set page number
          var urlParams = Alfresco.util.getQueryStringParameters(window.location.hash.replace("#", ""));
          pn = urlParams.page;
 
          if (pn)
          {
-            if (pn > this.pdfDoc.numPages || pn < 1)
+            if (pn > this.pdfDoc.numPages)
             {
-               Alfresco.util.PopupManager.displayPrompt({
-                  text : this.wp.msg('error.badpage')
-               });
-             }
-             else
-            {
-               this.pageNum = pn;
-               this._scrollToPage(this.pageNum);
+                pn = this.pdfDoc.numPages;
             }
+            else if(pn < 1)
+            {
+                pn = 1;
+            }
+
+            this.pageNum = parseInt(pn);
+            this._scrollToPage(this.pageNum);
          }
       },
 
