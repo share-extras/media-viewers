@@ -44,7 +44,7 @@
 	border-top: 1px solid #CCCCCC;
 	border-bottom: 1px solid #666;
 	padding: 5px 0 3px 0;
-	height: 25px;
+	height: 26px;
 	width: 100%;
 	white-space: nowrap;
 	overflow: hidden;
@@ -256,7 +256,7 @@
 	background-color: transparent !important;
 	border-width: 0px !important;
 	position: absolute !important;
-	top: 25px !important;
+	top: 26px !important;
 	bottom: 0px !important;
 	left: 0px !important;
 	right: 0px !important;
