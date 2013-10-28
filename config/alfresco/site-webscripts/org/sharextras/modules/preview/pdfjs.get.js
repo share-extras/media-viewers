@@ -121,9 +121,18 @@ function main()
                             wrapperClassName: "maximizebutton"
                         },
                         {
+                            id: "present",
+                            title: "",
+                            type: "button",
+                            icon: "components/documentlibrary/actions/default-16.png",
+                            label: msg.get("button.present"),
+                            useWrapper: true,
+                            wrapperClassName: "presentbutton"
+                        },
+                        {
                             type: "separator",
                             useWrapper: true,
-                            wrapperClassName: "maximizebutton"
+                            wrapperClassName: "maximizebuttonSep"
                         },
                         {
                             id: "download",

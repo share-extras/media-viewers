@@ -192,8 +192,10 @@
    display: none;
 }
 
-/* Hide the Maximize in the dashlet, since this suffers from z-index issues at present */
-.body .previewer.PdfJs .controls .maximizebutton {
+/* Hide the Maximize and Present buttons, since we only need one and the viewer will work out which one to use */
+.previewer.PdfJs .controls .maximizebutton,
+.previewer.PdfJs .controls .maximizebuttonSep,
+.previewer.PdfJs .controls .presentbutton {
    display: none;
 }
 

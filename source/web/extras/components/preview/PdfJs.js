@@ -500,10 +500,35 @@
             type : "menu",
             menu : downloadMenu
          });
-         this.widgets.maximize = Alfresco.util.createYUIButton(this, "fullpage", this.onMaximizeClick, {
-            title: this.wp.msg("button.maximize.tip", 
-                  YAHOO.env.ua.os == "macintosh" ? this.wp.msg("key.meta") : this.wp.msg("key.ctrl"))
-         });
+         // Maximise button should show on the document details and document list pages
+         if (Alfresco.constants.PAGEID==="document-details" || Alfresco.constants.PAGEID==="document-details")
+         {
+            if (this.wp.options.mimeType == "application/vnd.ms-powerpoint" || 
+               this.wp.options.mimeType == "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
+               this.wp.options.mimeType == "application/vnd.oasis.opendocument.presentation")
+            {
+               Alfresco.util.createYUIButton(this, "present", this.onFullScreen, {
+                  title: this.wp.msg("button.present.tip", 
+                        YAHOO.env.ua.os == "macintosh" ? this.wp.msg("key.meta") : this.wp.msg("key.ctrl"))
+               });
+               Dom.getElementsByClassName("presentbutton", "span", this.controls, function setDisplay(el) {
+                  Dom.setStyle(el, "display", "inline");
+               });
+            }
+            else
+            {
+               this.widgets.maximize = Alfresco.util.createYUIButton(this, "fullpage", this.onMaximizeClick, {
+                  title: this.wp.msg("button.maximize.tip", 
+                        YAHOO.env.ua.os == "macintosh" ? this.wp.msg("key.meta") : this.wp.msg("key.ctrl"))
+               });
+               Dom.getElementsByClassName("maximizebutton", "span", this.controls, function setDisplay(el) {
+                  Dom.setStyle(el, "display", "inline");
+               });
+            }
+            Dom.getElementsByClassName("maximizebuttonSep", "span", this.controls, function setDisplay(el) {
+               Dom.setStyle(el, "display", "inline");
+            });
+         }
          // Only show and set up the link button on the document details page (fixes #12)
          if (Alfresco.constants.PAGEID==="document-details")
          {
