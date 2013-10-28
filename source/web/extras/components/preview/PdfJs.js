@@ -504,9 +504,16 @@
             title: this.wp.msg("button.maximize.tip", 
                   YAHOO.env.ua.os == "macintosh" ? this.wp.msg("key.meta") : this.wp.msg("key.ctrl"))
          });
-         this.widgets.linkBn = Alfresco.util.createYUIButton(this, "link", this.onLinkClick, {
-            type: "checkbox"
-         });
+         // Only show and set up the link button on the document details page (fixes #12)
+         if (Alfresco.constants.PAGEID==="document-details")
+         {
+             Dom.getElementsByClassName("linkbutton", "span", this.controls, function setDisplay(el) {
+                 Dom.setStyle(el, "display", "inline");
+             });
+             this.widgets.linkBn = Alfresco.util.createYUIButton(this, "link", this.onLinkClick, {
+                 type: "checkbox"
+              });
+         }
 
          // Set up search toolbar
          Event.addListener(this.wp.id + "-findInput", "change", this.onFindChange, this, true);
@@ -557,7 +564,7 @@
          this._loadPdf();
 
          // Keyboard shortcuts
-         if (!this.inWikiPage && !this.inDashlet)
+         if (Alfresco.constants.PAGEID==='document-details')
          {
             var findShortcutHandler = function findShortcutHandler(type, args) {
                var e = args[1];
