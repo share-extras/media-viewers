@@ -1,85 +1,42 @@
 <#-- This file is part of the Share Extras PdfJs Viewer project -->
 <#assign el=args.htmlid?html>
     <div id="${el}-controls" class="controls flat-button">
-      
-      <div class="sidebarBtn">
-          <button id="${el}-sidebarBtn" disabled="disabled">
-            <img src="${url.context}/res/extras/components/preview/images/sidebar-show-16.png" align="top" height="16" title="${msg("button.sidebar")}" />
-          </button>
-      </div>
-
-      <button id="${el}-previous" disabled="disabled">
-        <img src="${url.context}/res/components/images/back-arrow.png" align="top" height="16"/>
-        ${msg("button.previous")}
-      </button>
-
-      <button id="${el}-next" disabled="disabled">
-        <img src="${url.context}/res/components/images/forward-arrow-16.png" align="top" height="16"/>
-        ${msg("button.next")}
-      </button>
     
-      <input type="number" id="${el}-pageNumber" value="1" size="4" min="1" disabled="disabled" />
-
-      <span>/</span>
-      <span id="${el}-numPages" class="numPages">--</span>
-
-      <div class="separator"></div>
+        <div class="sidebarBtn">
+            <button id="${el}-sidebarBtn" disabled="disabled">
+                <img src="${url.context}/res/extras/components/preview/images/sidebar-show-16.png" align="top" height="16" title="${msg("button.sidebar")}" />
+            </button>
+        </div>
       
-      <button id="${el}-zoomOut" title="${msg("button.zoomout")}" disabled="disabled">
-        <img src="${url.context}/res/extras/components/preview/images/zoom-out.svg" align="top" height="16"/>
-      </button>
-      <button id="${el}-zoomIn" title="${msg("button.zoomin")}" disabled="disabled">
-        <img src="${url.context}/res/extras/components/preview/images/zoom-in.svg" align="top" height="16"/>
-      </button>
-
-      <button id="${el}-scaleSelectBtn" disabled="disabled"></button>
-      <select id="${el}-scaleSelect">
-        <option value="0.25">25%</option>
-        <option value="0.5">50%</option>
-        <option value="0.75">75%</option>
-        <option value="1">100%</option>
-        <option value="1.25">125%</option>
-        <option value="1.5">150%</option>
-        <option value="2">200%</option>
-        <option value="4">400%</option>
-        <option value="page-width">${msg("select.pagewidth")}</option>
-        <option value="two-page-width">${msg("select.twopagewidth")}</option>
-        <option value="page-fit">${msg("select.pagefit")}</option>
-        <option value="two-page-fit">${msg("select.twopagefit")}</option>
-        <option value="auto">${msg("select.auto")}</option>
-      </select>
-
-      <div class="separator"></div>
-      
-      <span class="maximizebutton">
-         <button id="${el}-fullpage" title="">
-           <img src="${url.context}/res/components/documentlibrary/actions/default-16.png" align="top" height="16"/>
-           ${msg("button.maximize")}
-         </button>
-
-         <div class="separator"></div>
-      </span>
-
-      <button id="${el}-download" title="${msg("button.download")}">
-        <img src="${url.context}/res/components/documentlibrary/actions/document-download-16.png" align="top" height="16"/>
-        ${msg("button.download")}
-      </button>
-
-      <span class="linkbutton">
-         <button id="${el}-link" title="${msg("button.link")}">
-           <img src="${url.context}/res/components/images/link-16.png" align="top" height="16"/>
-         </button>
-      </span>
-      
-      <span class="searchBarToggle">
-         <div class="separator"></div>
-         
-         <button id="${el}-searchBarToggle" disabled="disabled">
-           <img src="${url.context}/res/components/images/search-16.png" align="top" height="16"/>
-           ${msg("button.search")}
-         </button>
-      </span>    
-      
+        <#list toolbarItems as item>
+        <#if item.useWrapper?? && item.useWrapper == true>
+        <span<#if item.wrapperClassName??> class="${item.wrapperClassName}"</#if>>
+        </#if>
+        <#if item.type == "button">
+            <button<#if item.id??> id="${el}-${item.id}"</#if><#if item.disabled?? && item.disabled> disabled="disabled"</#if><#if item.title??> title="${item.title}"</#if><#if item.className??> class="${item.className}"</#if>>
+                <#if item.icon??>
+                <img src="${url.context}/res/${item.icon}" align="top" height="16"/>
+                </#if>
+                <#if item.label??>${item.label}</#if>
+            </button>
+        <#elseif item.type == "select">
+            <button<#if item.id??> id="${el}-${item.id}Btn"</#if><#if item.disabled?? && item.disabled> disabled="disabled"</#if>></button>
+            <select<#if item.id??> id="${el}-${item.id}"</#if>>
+            <#list item.options as option>
+                <option value="${option.value}">${option.label}</option>
+            </#list>
+            </select>
+        <#elseif item.type == "number">
+            <input type="number"<#if item.id??> id="${el}-${item.id}"</#if> value="1" size="4" min="1"<#if item.disabled?? && item.disabled> disabled="disabled"</#if> />
+        <#elseif item.type == "span">
+            <span<#if item.id??> id="${el}-${item.id}"</#if><#if item.className??> class="${item.className}"</#if>><#if item.text??>${item.text}</#if></span>
+        <#elseif item.type == "separator">
+            <div<#if item.id??> id="${el}-${item.id}"</#if><#if item.className??> class="${item.className}"<#else> class="separator"</#if>></div>
+        </#if>
+        <#if item.useWrapper?? && item.useWrapper == true>
+        </span>
+        </#if>
+        </#list>
     </div>
     
     <div id="${el}-searchDialog" class="searchDialog">
