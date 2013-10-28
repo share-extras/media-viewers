@@ -84,6 +84,11 @@
 	padding: 0 2px;
 }
 
+.yui-skin-lightTheme .previewer.PdfJs .controls .yui-button,
+.yui-skin-lightTheme .previewer.PdfJs .controls .yui-button .first-child {
+    background-color: transparent;
+}
+
 /* Add extra padding for down-arrow on RHS of menu buttons, otherwise removed by previous rule */
 .previewer.PdfJs .controls .yui-menu-button button {
 	padding-right: 20px;
