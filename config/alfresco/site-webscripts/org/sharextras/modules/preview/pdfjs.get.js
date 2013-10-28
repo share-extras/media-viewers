@@ -36,14 +36,14 @@ function main()
                         {
                             id: "zoomOut",
                             type: "button",
-                            icon: "extras/components/preview/images/zoom-out.svg",
+                            icon: "extras/components/preview/images/zoom-out-16.png",
                             title: msg.get("button.zoomout"),
                             disabled: true
                         },
                         {
                             id: "zoomIn",
                             type: "button",
-                            icon: "extras/components/preview/images/zoom-in.svg",
+                            icon: "extras/components/preview/images/zoom-in-16.png",
                             title: msg.get("button.zoomin"),
                             disabled: true
                         },
@@ -124,7 +124,7 @@ function main()
                             id: "present",
                             title: "",
                             type: "button",
-                            icon: "components/documentlibrary/actions/default-16.png",
+                            icon: "extras/components/preview/images/present-16.png",
                             label: msg.get("button.present"),
                             useWrapper: true,
                             wrapperClassName: "presentbutton"

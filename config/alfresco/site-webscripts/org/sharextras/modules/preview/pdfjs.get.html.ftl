@@ -4,7 +4,7 @@
     
         <div class="sidebarBtn">
             <button id="${el}-sidebarBtn" disabled="disabled">
-                <img src="${url.context}/res/extras/components/preview/images/sidebar-show-16.png" align="top" height="16" title="${msg("button.sidebar")}" />
+                <img src="${url.context}/res/extras/components/preview/images/sidebar-show-flat-16.png" align="top" height="16" title="${msg("button.sidebar")}" />
             </button>
         </div>
       
