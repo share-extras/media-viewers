@@ -96,6 +96,11 @@
 {
    margin-top: 47px;
 }
+/* Ensure that Maximise view still works */
+.alf-filmstrip .web-preview .previewer.PdfJs.fullPage
+{
+   margin-top: auto;
+}
 .alf-filmstrip-content-only .web-preview .previewer.Embed,
 .alf-filmstrip-content-only .web-preview .previewer.PdfJs,
 .alf-filmstrip-content-only .web-preview .previewer.Prettify,
