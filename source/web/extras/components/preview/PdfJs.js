@@ -1389,7 +1389,8 @@
             this.documentView.fullscreen = false;
             
             this.documentView.setScale(this.oldScale);
-            this.pageNum = this.oldPageNum;
+            // WA - Avoid res-setting page number as otherwise we cannot easily get back to where we were
+            //this.pageNum = this.oldPageNum;
 
             this._setViewerHeight();
             
