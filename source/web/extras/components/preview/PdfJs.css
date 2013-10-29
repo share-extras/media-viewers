@@ -334,7 +334,8 @@
 	margin: 10px 0 0 10px !important;
 }
 
-.previewer.PdfJs .sidebar .thumbnailView .page.activePage {
+.previewer.PdfJs .sidebar .thumbnailView .page.activePage,
+.previewer.PdfJs .documentView .page.activePage {
    box-shadow: 0 0 8px #6CA5CE !important;
    -moz-box-shadow: 0 0 8px #6CA5CE !important;
    -webkit-box-shadow: 0 0 8px #6CA5CE !important;
