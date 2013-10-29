@@ -101,6 +101,17 @@
          src : null,
 
          /**
+          * Maximum file size in bytes which should be displayed. Note that this refers to 
+          * the size of the original file and not the PDF rendition, which may be larger or 
+          * smaller than this value. Empty or non-numeric string means no limit.
+          * 
+          * @property srcMaxSize
+          * @type String
+          * @default ""
+          */
+         srcMaxSize: "",
+
+         /**
           * Skipbrowser test, mostly for developer to force test loading. Valid
           * options "true" "false" as String.
           * 
@@ -315,7 +326,14 @@
        */
       report : function PdfJs_report()
       {
-         var canvassupport = false, skipbrowsertest = (this.attributes.skipbrowsertest && this.attributes.skipbrowsertest === "true") ? true : false;
+         var canvassupport = false, 
+            skipbrowsertest = (this.attributes.skipbrowsertest && this.attributes.skipbrowsertest === "true") ? true : false,
+            srcMaxSize = this.attributes.srcMaxSize;
+
+         if (srcMaxSize.match(/^\d+$/) && this.wp.options.size > parseInt(srcMaxSize))
+         {
+            return this.wp.msg("PdfJs.tooLargeFile", Alfresco.util.formatFileSize(this.wp.options.size), parseInt(srcMaxSize));
+         }
 
          if (skipbrowsertest === false)
          {
