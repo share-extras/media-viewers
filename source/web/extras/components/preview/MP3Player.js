@@ -55,6 +55,14 @@
        this.swfDiv = null;
        this.previews = this.wp.options.thumbnails;
        this.availablePreviews = null;
+       if (typeof wp.options.thumbnailModification === "object")
+       {
+          this.availablePreviews = [];
+          for (var i = 0; i < wp.options.thumbnailModification.length; i++)
+          {
+             this.availablePreviews.push(wp.options.thumbnailModification[i].split(":")[0]);
+          }
+       }
        this.thumbnailQueued = false;
        return this;
     };
@@ -151,94 +159,124 @@
           }
           else // Otherwise we need to work out which renditions have already been generated
           {
-             // Load available thumbnail definitions, i.e. which thumbnails have been generated already
-             Alfresco.util.Ajax.jsonGet(
+             if (this.availablePreviews === null) // Pre-4.2 the generated thumnails list is not provided
              {
-                url: Alfresco.constants.PROXY_URI + "api/node/" + this.wp.options.nodeRef.replace(":/", "") + "/content/thumbnails",
-                successCallback:
+                if (this.wp.id.indexOf("_quickshare_") == -1) // Check that we are not in the QuickShare screen (no external API access)
                 {
-                   fn: function VP_onLoadThumbnails(p_resp, p_obj)
+                   // Load available thumbnail definitions, i.e. which thumbnails have been generated already
+                   Alfresco.util.Ajax.jsonGet(
                    {
-                       var thumbnails = [];
-                       for (var i = 0; i < p_resp.json.length; i++)
-                       {
-                           thumbnails.push(p_resp.json[i].thumbnailName);
-                       }
-                       this.availablePreviews = thumbnails;
+                      url: Alfresco.constants.PROXY_URI + "api/node/" + this.wp.options.nodeRef.replace(":/", "") + "/content/thumbnails",
+                      successCallback:
+                      {
+                         fn: function VP_onLoadThumbnails(p_resp, p_obj)
+                         {
+                             var thumbnails = [];
+                             for (var i = 0; i < p_resp.json.length; i++)
+                             {
+                                 thumbnails.push(p_resp.json[i].thumbnailName);
+                             }
+                             this.availablePreviews = thumbnails;
 
-                       var previewCtx = this.resolveUrls();
+                             previewCtx = this.resolveUrls();
 
-                       /*
-                        * TODO Add logic for maximum file size
-                        * 
-                        *  var srcMaxSize = this.attributes.srcMaxSize;
-                        *  if (!this.attributes.src && srcMaxSize.match(/^\d+$/) && this.wp.options.size > parseInt(srcMaxSize))
-                        *  {
-                        *  }
-                       */
-                       
-                       if (previewCtx.audiourl) // Present if audio is a native mimetype, e.g. mp3
-                       {
-                           this._displayPlayer(previewCtx);
-                           return "<div></div>";
-                       }
-                       else
-                       {
-                          // Audio rendition is not yet ready, or could not be generated
-                          if (this.attributes.queueMissingRenditions)
-                          {
-                              // Fire off a request to queue the rendition generation, if it's not already been done
-                              if (!this.thumbnailQueued)
-                              {
-                                  this._queueAudioThumbnailGeneration();
-                                  this.thumbnailQueued = true;
-                              }
-                              
-                              // Add a message to the preview area to indicate we are waiting for the audio to be converted
-                              var pEl = this.wp.getPreviewerElement();
-                              pEl.innerHTML = "";
-                              var msgEl = document.createElement("div");
-                              // TODO Add poster behind this message area, if available
-                              //previewCtx.imageurl
-                              //msgEl.set("id", this.wp.id + "-full-window-div");
-                              //msgEl.setStyle("position", "absolute");
-                              Dom.addClass(msgEl, "message");
-                              msgEl.innerHTML = this.wp.msg("label.audioConverting");
-                              pEl.appendChild(msgEl);
-                              
-                              // Poll again in 10 seconds, to see if the thumbnail is available yet
-                              YAHOO.lang.later(10000, this, this.display);
-                              
-                              return pEl.innerHTML;
-                          }
-                          else
-                          {
-                              var pEl = this.wp.getPreviewerElement();
-                              
-                              pEl.innerHTML = "";
-                              
-                              var msgEl = document.createElement("div");
-                              Dom.addClass(msgEl, "message");
+                             /*
+                              * TODO Add logic for maximum file size
+                              * 
+                              *  var srcMaxSize = this.attributes.srcMaxSize;
+                              *  if (!this.attributes.src && srcMaxSize.match(/^\d+$/) && this.wp.options.size > parseInt(srcMaxSize))
+                              *  {
+                              *  }
+                             */
+                             
+                             if (previewCtx.audiourl) // Present if audio is a native mimetype, e.g. mp3, or has a suitable pre-generated rendition
+                             {
+                                 this._displayPlayer(previewCtx);
+                                 return "<div></div>";
+                             }
+                             else
+                             {
+                                // Audio rendition is not yet ready, or could not be generated
+                                if (this.attributes.queueMissingRenditions)
+                                {
+                                    // Fire off a request to queue the rendition generation, if it's not already been done
+                                    if (!this.thumbnailQueued)
+                                    {
+                                        this._queueAudioThumbnailGeneration();
+                                        this.thumbnailQueued = true;
+                                    }
+                                    
+                                    // Add a message to the preview area to indicate we are waiting for the audio to be converted
+                                    var pEl = this.wp.getPreviewerElement();
+                                    pEl.innerHTML = "";
+                                    var msgEl = document.createElement("div");
+                                    // TODO Add poster behind this message area, if available
+                                    //previewCtx.imageurl
+                                    //msgEl.set("id", this.wp.id + "-full-window-div");
+                                    //msgEl.setStyle("position", "absolute");
+                                    Dom.addClass(msgEl, "message");
+                                    msgEl.innerHTML = this.wp.msg("label.audioConverting");
+                                    pEl.appendChild(msgEl);
+                                    
+                                    // Poll again in 10 seconds, to see if the thumbnail is available yet
+                                    YAHOO.lang.later(10000, this, this.display);
+                                    
+                                    return pEl.innerHTML;
+                                }
+                                else
+                                {
+                                    var pEl = this.wp.getPreviewerElement();
+                                    
+                                    pEl.innerHTML = "";
+                                    
+                                    var msgEl = document.createElement("div");
+                                    Dom.addClass(msgEl, "message");
 
-                              // TODO Add poster behind this message area, if available
-                              var msg = '';
-                              msg += this.wp.msg("label.noAudioAvailable");
-                              msg += '<br/>';
-                              msg += '<a class="theme-color-1" href="' + this.wp.getContentUrl(true) + '">';
-                              msg += this.wp.msg("label.noAudioDownloadFile");
-                              msg += '</a>';
+                                    // TODO Add poster behind this message area, if available
+                                    var msg = '';
+                                    msg += this.wp.msg("label.noAudioAvailable");
+                                    msg += '<br/>';
+                                    msg += '<a class="theme-color-1" href="' + this.wp.getContentUrl(true) + '">';
+                                    msg += this.wp.msg("label.noAudioDownloadFile");
+                                    msg += '</a>';
 
-                              msgEl.innerHTML = msg;
-                              pEl.appendChild(msgEl);
-                              
-                              return pEl.innerHTML;
-                          }
-                       }
-                   },
-                   scope: this
-                },
-                failureMessage: "Could not load thumbnails list" // TODO localise this error message
-             });
+                                    msgEl.innerHTML = msg;
+                                    pEl.appendChild(msgEl);
+                                    
+                                    return pEl.innerHTML;
+                                }
+                             }
+                         },
+                         scope: this
+                      },
+                      failureMessage: "Could not load thumbnails list" // TODO localise this error message
+                   });
+                }
+             }
+             else // Otherwise assume that all previews that we can generate are available
+             {
+                this.availablePreviews = this.previews;
+                previewCtx = this.resolveUrls();
+                if (previewCtx.audiourl) // Present if video is a native mimetype, e.g. mp3, or has a suitable pre-generated rendition
+                {
+                    this._displayPlayer(previewCtx);
+                    return "<div></div>";
+                }
+                else
+                {
+                   var msg = '';
+                   msg += this.wp.msg("label.noAudioAvailable");
+                   msg += '<br/>';
+                   msg += '<a class="theme-color-1" href="' + this.wp.getContentUrl(true) + '">';
+                   msg += this.wp.msg("label.noAudioDownloadFile");
+                   msg += '</a>';
+
+                   msgEl.innerHTML = msg;
+                   pEl.appendChild(msgEl);
+                   
+                   return pEl.innerHTML;
+                }
+             }
           }
        },
     
