@@ -139,7 +139,7 @@
         */
        report: function MP3Player_report()
        {
-           return this._getSupportedAudioMimeTypes().length > 0 ? "" : "No supported MIME type available";
+           return this._getSupportedMimeTypes().length > 0 ? "" : "No supported MIME type available";
        },
     
        /**
@@ -148,134 +148,85 @@
         * @method display
         * @public
         */
-       display: function MP3Player_display()
+       display: function MP3Player_display(forceReload)
        {
           var previewCtx = this.resolveUrls();
-          
           if (previewCtx.audiourl) // Present if audio is a natively-previewable type, e.g. mp3
           {
               this._displayPlayer(previewCtx);
-              return "<div></div>";
           }
           else // Otherwise we need to work out which renditions have already been generated
           {
-             if (this.availablePreviews === null) // Pre-4.2 the generated thumnails list is not provided
+             if (this._getSupportedMimeTypes().length > 0)
              {
                 if (this.wp.id.indexOf("_quickshare_") == -1) // Check that we are not in the QuickShare screen (no external API access)
                 {
-                   // Load available thumbnail definitions, i.e. which thumbnails have been generated already
-                   Alfresco.util.Ajax.jsonGet(
+                   if (this.availablePreviews === null || forceReload === true) // Pre-4.2 the generated thumnails list is not provided
                    {
-                      url: Alfresco.constants.PROXY_URI + "api/node/" + this.wp.options.nodeRef.replace(":/", "") + "/content/thumbnails",
-                      successCallback:
+                      // Load available thumbnail definitions, i.e. which thumbnails have been generated already
+                      Alfresco.util.Ajax.jsonGet(
                       {
-                         fn: function VP_onLoadThumbnails(p_resp, p_obj)
+                         url: Alfresco.constants.PROXY_URI + "api/node/" + this.wp.options.nodeRef.replace(":/", "") + "/content/thumbnails",
+                         successCallback:
                          {
-                             var thumbnails = [];
-                             for (var i = 0; i < p_resp.json.length; i++)
-                             {
-                                 thumbnails.push(p_resp.json[i].thumbnailName);
-                             }
-                             this.availablePreviews = thumbnails;
-
-                             previewCtx = this.resolveUrls();
-
-                             /*
-                              * TODO Add logic for maximum file size
-                              * 
-                              *  var srcMaxSize = this.attributes.srcMaxSize;
-                              *  if (!this.attributes.src && srcMaxSize.match(/^\d+$/) && this.wp.options.size > parseInt(srcMaxSize))
-                              *  {
-                              *  }
-                             */
-                             
-                             if (previewCtx.audiourl) // Present if audio is a native mimetype, e.g. mp3, or has a suitable pre-generated rendition
-                             {
-                                 this._displayPlayer(previewCtx);
-                                 return "<div></div>";
-                             }
-                             else
-                             {
-                                // Audio rendition is not yet ready, or could not be generated
-                                if (this.attributes.queueMissingRenditions)
+                            fn: function VP_onLoadThumbnails(p_resp, p_obj)
+                            {
+                                var thumbnails = [];
+                                for (var i = 0; i < p_resp.json.length; i++)
                                 {
-                                    // Fire off a request to queue the rendition generation, if it's not already been done
-                                    if (!this.thumbnailQueued)
-                                    {
-                                        this._queueAudioThumbnailGeneration();
-                                        this.thumbnailQueued = true;
-                                    }
-                                    
-                                    // Add a message to the preview area to indicate we are waiting for the audio to be converted
-                                    var pEl = this.wp.getPreviewerElement();
-                                    pEl.innerHTML = "";
-                                    var msgEl = document.createElement("div");
-                                    // TODO Add poster behind this message area, if available
-                                    //previewCtx.imageurl
-                                    //msgEl.set("id", this.wp.id + "-full-window-div");
-                                    //msgEl.setStyle("position", "absolute");
-                                    Dom.addClass(msgEl, "message");
-                                    msgEl.innerHTML = this.wp.msg("label.audioConverting");
-                                    pEl.appendChild(msgEl);
-                                    
-                                    // Poll again in 10 seconds, to see if the thumbnail is available yet
-                                    YAHOO.lang.later(10000, this, this.display);
-                                    
-                                    return pEl.innerHTML;
+                                    thumbnails.push(p_resp.json[i].thumbnailName);
                                 }
-                                else
-                                {
-                                    var pEl = this.wp.getPreviewerElement();
-                                    
-                                    pEl.innerHTML = "";
-                                    
-                                    var msgEl = document.createElement("div");
-                                    Dom.addClass(msgEl, "message");
-
-                                    // TODO Add poster behind this message area, if available
-                                    var msg = '';
-                                    msg += this.wp.msg("label.noAudioAvailable");
-                                    msg += '<br/>';
-                                    msg += '<a class="theme-color-1" href="' + this.wp.getContentUrl(true) + '">';
-                                    msg += this.wp.msg("label.noAudioDownloadFile");
-                                    msg += '</a>';
-
-                                    msgEl.innerHTML = msg;
-                                    pEl.appendChild(msgEl);
-                                    
-                                    return pEl.innerHTML;
-                                }
-                             }
+                                this.availablePreviews = thumbnails;
+                                // Call self
+                                this.display.call(this);
+                            },
+                            scope: this
                          },
-                         scope: this
-                      },
-                      failureMessage: "Could not load thumbnails list" // TODO localise this error message
-                   });
+                         failureMessage: "Could not load thumbnails list" // TODO localise this error message
+                      });
+                   }
                 }
-             }
-             else // Otherwise assume that all previews that we can generate are available
-             {
-                this.availablePreviews = this.previews;
+                else // Otherwise assume that all previews that we can generate are available
+                {
+                   this.availablePreviews = this.previews;
+                }
+
                 previewCtx = this.resolveUrls();
                 if (previewCtx.audiourl) // Present if video is a native mimetype, e.g. mp3, or has a suitable pre-generated rendition
                 {
                     this._displayPlayer(previewCtx);
-                    return "<div></div>";
                 }
                 else
                 {
-                   var msg = '';
-                   msg += this.wp.msg("label.noAudioAvailable");
-                   msg += '<br/>';
-                   msg += '<a class="theme-color-1" href="' + this.wp.getContentUrl(true) + '">';
-                   msg += this.wp.msg("label.noAudioDownloadFile");
-                   msg += '</a>';
-
-                   msgEl.innerHTML = msg;
-                   pEl.appendChild(msgEl);
-                   
-                   return pEl.innerHTML;
+                   // Audio rendition is not yet ready, or could not be generated
+                   if (this.attributes.queueMissingRenditions && 
+                         this.wp.id.indexOf("_quickshare_") == -1)
+                   {
+                       // Fire off a request to queue the rendition generation, if it's not already been done
+                       if (!this.thumbnailQueued)
+                       {
+                           this._queueAudioThumbnailGeneration();
+                           this.thumbnailQueued = true;
+                       }
+                       
+                       // Poll again in 10 seconds, to see if the thumbnail is available yet
+                       YAHOO.lang.later(10000, this, this.display, [true]);
+                       // Add a message to the preview area to indicate we are waiting for the audio to be converted
+                       return this.wp.msg("label.audioConverting");
+                   }
+                   else
+                   {
+                       // TODO Add poster behind this message area, if available
+                       return this.wp.msg("label.noAudioAvailable") + '<br/><a class="theme-color-1" href="' + 
+                          this.wp.getContentUrl(true) + '">' + this.wp.msg("label.noAudioDownloadFile") + '</a>';
+                   }
                 }
+             }
+             else
+             {
+                 // No supported formats available
+                 return this.wp.msg("label.noVideoAvailable") + '<br/>' + '<a class="theme-color-1" href="' + this.wp.getContentUrl(true) + '">' + 
+                    this.wp.msg("label.noVideoDownloadFile") + '</a>';
              }
           }
        },
@@ -397,10 +348,10 @@
        /**
         * Return mime types supported by the audio previewer for this file
         * 
-        * @method _getSupportedAudioMimeTypes
+        * @method _getSupportedMimeTypes
         * @return Array containing the audio MIME types supported by the Flash audio player for this file, in order of preference
         */
-       _getSupportedAudioMimeTypes: function VP__getSupportedAudioMimeTypes()
+       _getSupportedMimeTypes: function VP__getSupportedMimeTypes()
        {
            var ps = this.previews, // List of thumbnails that are available (might not have actually been generated yet) 
                mp3preview = this.attributes.mp3ThumbnailName, 
@@ -434,7 +385,7 @@
           // Static image to display before the user clicks 'play' - we do not care if this has been generated already or not
           imageurl = Alfresco.util.arrayContains(ps, imgpreview) ? this.wp.getThumbnailUrl(imgpreview) : null;
           
-          var supportedtypes = this._getSupportedAudioMimeTypes();
+          var supportedtypes = this._getSupportedMimeTypes();
           
           // Permissively allow the content item itself to be returned if supported - strict compliance would imply we always return the preferred thumbnail format
           if (Alfresco.util.arrayContains(supportedtypes, this.wp.options.mimeType))

@@ -290,7 +290,7 @@
         * @method display
         * @public
         */
-       display: function FLVPlayer_display()
+       display: function FLVPlayer_display(forceReload)
        {
           // Set up message area
           this.msgEl = Dom.getFirstChild(this.wp.getPreviewerElement());
@@ -298,85 +298,80 @@
           var previewCtx = this.resolveUrls();
           if (previewCtx.videourl) // Present if video is a natively-previewable type, e.g. flv or mp4, or has a pre-generated rendition of this type
           {
-              /*
-               * TODO Add logic for maximum file size
-               * 
-               *  var srcMaxSize = this.attributes.srcMaxSize;
-               *  if (!this.attributes.src && srcMaxSize.match(/^\d+$/) && this.wp.options.size > parseInt(srcMaxSize))
-               *  {
-               *  }
-              */
               this._displayPlayer(previewCtx);
           }
-          else // Otherwise we need to work out which renditions have already been generated
+          else // Otherwise we need to work out which renditions can be generated
           {
-             if (this.availablePreviews === null) // Pre-4.2 the generated thumnails list is not provided
+             if (this._getSupportedMimeTypes().length > 0)
              {
                 if (this.wp.id.indexOf("_quickshare_") == -1) // Check that we are not in the QuickShare screen (no external API access)
                 {
-                   // Load available thumbnail definitions, i.e. which thumbnails have been generated already
-                   Alfresco.util.Ajax.jsonGet(
+                   if (this.availablePreviews === null || forceReload === true) // Pre-4.2 the generated thumnails list is not provided
                    {
-                      url: Alfresco.constants.PROXY_URI + "api/node/" + this.wp.options.nodeRef.replace(":/", "") + "/content/thumbnails",
-                      successCallback:
+                      // Load available thumbnail definitions, i.e. which thumbnails have been generated already
+                      Alfresco.util.Ajax.jsonGet(
                       {
-                         fn: function FLVPlayer_onLoadThumbnails(p_resp, p_obj)
+                         url: Alfresco.constants.PROXY_URI + "api/node/" + this.wp.options.nodeRef.replace(":/", "") + "/content/thumbnails",
+                         successCallback:
                          {
-                             var thumbnails = [];
-                             for (var i = 0; i < p_resp.json.length; i++)
-                             {
-                                 thumbnails.push(p_resp.json[i].thumbnailName);
-                             }
-                             this.availablePreviews = thumbnails;
-
-                             previewCtx = this.resolveUrls();
-                             if (previewCtx.videourl) // Present if video is a native mimetype, e.g. mp4
-                             {
-                                 this._displayPlayer(previewCtx);
-                             }
-                             else
-                             {
-                                // Video rendition is not yet ready, or could not be generated
-                                if (this.attributes.queueMissingRenditions == "true")
+                            fn: function FLVPlayer_onLoadThumbnails(p_resp, p_obj)
+                            {
+                                var thumbnails = [];
+                                for (var i = 0; i < p_resp.json.length; i++)
                                 {
-                                    // Fire off a request to queue the rendition generation, if it's not already been done
-                                    if (!this.thumbnailQueued)
-                                    {
-                                        this._queueThumbnailGeneration();
-                                        this.thumbnailQueued = true;
-                                    }
-                                    
-                                    // Poll again in 10 seconds, to see if the thumbnail is available yet
-                                    YAHOO.lang.later(10000, this, this.display);
-                                    // Add a message to the preview area to indicate we are waiting for the video to be converted
-                                    return this._displayMessage(this.wp.msg("label.videoConverting"), previewCtx);
+                                    thumbnails.push(p_resp.json[i].thumbnailName);
                                 }
-                                else
-                                {
-                                    return this._displayMessage(this.wp.msg("label.noVideoAvailable") + '<br/>' + '<a class="theme-color-1" href="' + this.wp.getContentUrl(true) + '">' + 
-                                       this.wp.msg("label.noVideoDownloadFile") + '</a>', previewCtx);
-                                }
-                             }
+                                this.availablePreviews = thumbnails;
+                                // Call self
+                                this.display.call(this);
+                            },
+                            scope: this
                          },
-                         scope: this
-                      },
-                      failureMessage: this.wp.msg("error.thumbnailsFailure")
-                   });
+                         failureMessage: this.wp.msg("error.thumbnailsFailure")
+                      });
+                   }
                 }
                 else // Otherwise assume that all previews that we can generate are available
                 {
                    this.availablePreviews = this.previews;
-                   previewCtx = this.resolveUrls();
-                   if (previewCtx.videourl) // Present if video is a native mimetype, e.g. mp4
+                }
+
+                previewCtx = this.resolveUrls();
+                if (previewCtx.videourl) // Present if video is a native mimetype, e.g. mp4
+                {
+                    this._displayPlayer(previewCtx);
+                }
+                else
+                {
+                   // Video rendition is not yet ready, or could not be generated
+                   if (this.attributes.queueMissingRenditions == "true" && 
+                         this.wp.id.indexOf("_quickshare_") == -1)
                    {
-                       this._displayPlayer(previewCtx);
+                       // Fire off a request to queue the rendition generation, if it's not already been done
+                       if (!this.thumbnailQueued)
+                       {
+                           this._queueThumbnailGeneration();
+                           this.thumbnailQueued = true;
+                       }
+                       
+                       // Poll again in 10 seconds, to see if the thumbnail is available yet
+                       YAHOO.lang.later(10000, this, this.display, [true]);
+                       // Add a message to the preview area to indicate we are waiting for the video to be converted
+                       return this._displayMessage(this.wp.msg("label.videoConverting"), previewCtx);
                    }
                    else
                    {
+                       // No pre-generated rendition available and unable to queue up
                        return this._displayMessage(this.wp.msg("label.noVideoAvailable") + '<br/>' + '<a class="theme-color-1" href="' + this.wp.getContentUrl(true) + '">' + 
                           this.wp.msg("label.noVideoDownloadFile") + '</a>', previewCtx);
                    }
                 }
+             }
+             else
+             {
+                 // No supported formats available
+                 return this._displayMessage(this.wp.msg("label.noVideoAvailable") + '<br/>' + '<a class="theme-color-1" href="' + this.wp.getContentUrl(true) + '">' + 
+                    this.wp.msg("label.noVideoDownloadFile") + '</a>', previewCtx);
              }
           }
        },
