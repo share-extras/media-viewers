@@ -87,7 +87,7 @@
 
    <bean id="org_sharextras_media-viewers_ffmpeg.transform.mp3" parent="org_sharextras_media-viewers_ffmpeg.transform">
       <property name="defaultProperties">
-          <map>
+          <map merge="true">
               <entry key="outfile_format" value="mp3" />
           </map>
       </property>
