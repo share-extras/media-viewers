@@ -67,6 +67,9 @@
     <!-- Paths to local Tomcat instances -->
     <property name="tomcat.repo.home" value="${tomcat.home}" />
     <property name="tomcat.share.home" value="${tomcat.home}" />
+    <!-- Maven repo parameters -->
+    <property name="repository.name" value="share-extras-snapshots" />
+    <property name="repository.url" value="https://artifacts.alfresco.com/nexus/content/repositories/${repository.name}" />
    
     <!-- Additional property values. Generally should not be overridden -->
     <property name="config.dir" value="${basedir}/config" />
@@ -516,7 +519,7 @@
         <echo message="Uploading to Maven repo as user '${repository.username}'"></echo>
         <artifact:pom id="mypom" file="pom.xml" />
         <artifact:deploy file="${dist.dir}/${jar.name}">
-            <remoteRepository url="https://artifacts.alfresco.com/nexus/content/repositories/share-extras-snapshots">
+            <remoteRepository url="${repository.url}">
                 <authentication username="${repository.username}" password="${repository.password}" />
             </remoteRepository>
             <pom refid="mypom"/>
