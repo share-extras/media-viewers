@@ -17,11 +17,11 @@
         /config - All web-tier configuration files, e.g. web scripts and Surf configuration
         /source/web - All static resource files, e.g. CSS, JS
         
-    For building AMP files, the files module.properties and file-mapping.properties are also required
-    in the project's root directory.
+    For building AMP files, a file module.properties is also required in the project's root 
+    directory. A file-mapping.properties file in the same location may optionally be provided.
     
-    During the build process, temporary 'build' and 'dist' directories will be created in the base 
-    project directory. These may be removed at any time using the 'clean' target.
+    During the build process, temporary a 'build' and directory will be created in the base project 
+    directory, which may be removed at any time using the 'clean' target.
 
 -->
 <project basedir="." default="dist-amp-jar" name="Share Extras Build Script"
