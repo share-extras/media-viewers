@@ -11,7 +11,7 @@ function main()
    
    if (json.status == 200)
    {
-      var obj = eval('(' + json + ')');
+      var obj = jsonUtils.toObject(json);
       if (obj)
       {
          userIsSiteManager = (obj.role == "SiteManager");

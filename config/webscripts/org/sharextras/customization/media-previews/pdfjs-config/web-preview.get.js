@@ -33,7 +33,7 @@ if (model.widgets)
                attributes: { src: "pdf" }
             }]
          });
-         var oldConditions = eval("(" + widget.options.pluginConditions + ")");
+         var oldConditions = jsonUtils.toObject("{\"tmp\":" + widget.options.pluginConditions + "}").tmp;
          // Add the other conditions back in
          for (var j = 0; j < oldConditions.length; j++)
          {
