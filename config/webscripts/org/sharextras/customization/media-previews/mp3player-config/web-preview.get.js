@@ -25,7 +25,7 @@ if (model.widgets)
                attributes: {}
             }]
          });
-         var oldConditions = jsonUtils.toObject("{\"tmp\":" + widget.options.pluginConditions + "}").tmp;
+         var oldConditions = eval("("+jsonUtils.toObject("{\"tmp\":" + widget.options.pluginConditions + "}").tmp.toString()+")");
          // Add the other conditions back in
          for (var j = 0; j < oldConditions.length; j++)
          {
