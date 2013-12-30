@@ -2,19 +2,20 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 
+	<!--
+	CHANGES:
+	- Include Web Resources in JAR as in META-INF/ directory
+	- Remove WAR plugin, as it is not uses: this is JAR
+	- Sync artifact version number, to be the same as ANT build
+	- Consider using parent Maven project
+	-->
+
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.sharextras</groupId>
     <artifactId>media-viewers</artifactId>
     <packaging>jar</packaging>
     <name>Media Viewers</name>
-    <version>2.6-${buildnumber}</version>
-
-    <properties>
-        <buildnumber>SNAPSHOT</buildnumber>
-    </properties>
-
-    <dependencies>
-    </dependencies>
+    <version>2.6.1</version>
     
     <build>
         <resources>
@@ -23,14 +24,30 @@
             </resource>
         </resources>
         <plugins>
-            <plugin>
-                <artifactId>maven-war-plugin</artifactId>
-                <version>2.4</version>
-                <configuration>
-                    <warSourceDirectory>source/web</warSourceDirectory>
-                    <useCache>true</useCache>
-                </configuration>
-            </plugin>
+			<!-- Copy Web resources to META-INF/ -->
+			<plugin>
+				<artifactId>maven-resources-plugin</artifactId>
+				<version>2.6</version>
+				<executions>
+					<execution>
+						<id>copy-resources</id>
+						<phase>validate</phase>
+						<goals>
+							<goal>copy-resources</goal>
+						</goals>
+						<configuration>
+							<outputDirectory>${basedir}/target/classes/META-INF</outputDirectory>
+							<resources>
+								<resource>
+									<directory>source/web</directory>
+									<filtering>true</filtering>
+								</resource>
+							</resources>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<!-- / Copy Web resources to META-INF/ -->
         </plugins>
     </build>
 
