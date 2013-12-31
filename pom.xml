@@ -1,54 +1,71 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 
 	<!--
-	CHANGES:
-	- Include Web Resources in JAR as in META-INF/ directory
-	- Remove WAR plugin, as it is not uses: this is JAR
-	- Sync artifact version number, to be the same as ANT build
-	- Consider using parent Maven project
-	-->
+    CHANGES:
+        - Include Web Resources in JAR as in META-INF/ directory
+        - Remove WAR plugin, as it is not uses: this is JAR - Sync artifact version 
+          number, to be the same as ANT build
+        - Consider using parent Maven project
+    -->
 
-    <modelVersion>4.0.0</modelVersion>
-    <groupId>org.sharextras</groupId>
-    <artifactId>media-viewers</artifactId>
-    <packaging>jar</packaging>
-    <name>Media Viewers</name>
-    <version>2.6.1</version>
-    
-    <build>
-        <resources>
-            <resource>
-                <directory>config</directory>
-            </resource>
-        </resources>
-        <plugins>
-			<!-- Copy Web resources to META-INF/ -->
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>org.sharextras</groupId>
+	<artifactId>media-viewers</artifactId>
+	<packaging>jar</packaging>
+	<name>Media Viewers</name>
+	<version>2.6.1</version>
+
+	<build>
+		<plugins>
+			<!-- (step 1.) Generate resources with Ant build script -->
+			<plugin>
+				<artifactId>maven-antrun-plugin</artifactId>
+				<version>1.7</version>
+				<executions>
+					<execution>
+						<id>generate-ant-resources</id>
+						<phase>process-resources</phase>
+						<goals>
+							<goal>run</goal>
+						</goals>
+						<configuration>
+							<target>
+								<ant antfile="project.xml" target="clean" />
+								<ant antfile="build.xml" target="prepare" />
+								<ant antfile="build.xml" target="build-jar" />
+							</target>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<!-- (/1.) -->
+
+			<!-- (step 2.) Copy Web resources from Ant generated resources -->
 			<plugin>
 				<artifactId>maven-resources-plugin</artifactId>
 				<version>2.6</version>
 				<executions>
 					<execution>
-						<id>copy-resources</id>
-						<phase>validate</phase>
+						<id>copy-ant-generated-source</id>
+						<phase>process-resources</phase>
 						<goals>
 							<goal>copy-resources</goal>
 						</goals>
 						<configuration>
-							<outputDirectory>${basedir}/target/classes/META-INF</outputDirectory>
+							<outputDirectory>${basedir}/target/classes/</outputDirectory>
 							<resources>
 								<resource>
-									<directory>source/web</directory>
-									<filtering>true</filtering>
+									<directory>build/jar</directory>
 								</resource>
 							</resources>
 						</configuration>
 					</execution>
 				</executions>
 			</plugin>
-			<!-- / Copy Web resources to META-INF/ -->
-        </plugins>
-    </build>
+			<!-- (/2.) -->
+		</plugins>
+	</build>
 
 </project>
