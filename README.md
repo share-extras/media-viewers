@@ -150,6 +150,7 @@ The final step to configure the exact content types which the viewer should be u
 ### Alfresco 4.2
 
 If you are using Media Viewers 2.5 or greater on Alfresco 4.2, then you can use the additional configuration modules, e.g. **PdfJs Configuration**, to automatically enable the viewers in the Document Details page and the dashlet. No overriding of `web-preview.get.config.xml` is required.
+(**For Alfresco 4.2.e please use Media Viewers 2.6.0 or greater**)
 
 ### Alfresco 4.0/4.1
 
