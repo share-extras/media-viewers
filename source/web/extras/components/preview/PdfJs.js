@@ -101,6 +101,17 @@
          src : null,
 
          /**
+          * Maximum file size in bytes which should be displayed. Note that this refers to 
+          * the size of the original file and not the PDF rendition, which may be larger or 
+          * smaller than this value. Empty or non-numeric string means no limit.
+          * 
+          * @property srcMaxSize
+          * @type String
+          * @default ""
+          */
+         srcMaxSize: "",
+
+         /**
           * Skipbrowser test, mostly for developer to force test loading. Valid
           * options "true" "false" as String.
           * 
@@ -181,7 +192,28 @@
           * @type String
           * @default "true"
           */
-         autoSearch : "true"
+         autoSearch : "true",
+
+          /**
+           * Should progresse loading be used?
+           * NOTE: Experimental feature
+           *
+           * @property autoSearch
+           * @type String
+           * @default "false"
+           */
+          progressiveLoading: "false",
+
+          /**
+           * Disabled page Linking.
+           * Page linking should only be enabled on specific pages
+           *
+           * @property disabledPageLinking
+           * @type boolean
+           * @default true
+           */
+          disabledPageLinking: true
+
       },
 
       /**
@@ -294,7 +326,14 @@
        */
       report : function PdfJs_report()
       {
-         var canvassupport = false, skipbrowsertest = (this.attributes.skipbrowsertest && this.attributes.skipbrowsertest === "true") ? true : false;
+         var canvassupport = false, 
+            skipbrowsertest = (this.attributes.skipbrowsertest && this.attributes.skipbrowsertest === "true") ? true : false,
+            srcMaxSize = this.attributes.srcMaxSize;
+
+         if (srcMaxSize.match(/^\d+$/) && this.wp.options.size > parseInt(srcMaxSize))
+         {
+            return this.wp.msg("PdfJs.tooLargeFile", Alfresco.util.formatFileSize(this.wp.options.size), parseInt(srcMaxSize));
+         }
 
          if (skipbrowsertest === false)
          {
@@ -366,12 +405,12 @@
        */
       onComponentsLoaded : function PdfJs_onComponentsLoaded()
       {
-         this.workerSrc = Alfresco.constants.URL_CONTEXT + 'res/extras/components/preview/pdfjs/pdf' +  (Alfresco.constants.DEBUG ? '.js' : '-min.js');
+         this.workerSrc = Alfresco.constants.URL_CONTEXT + 'res/extras/components/preview/pdfjs/pdf.worker' +  (Alfresco.constants.DEBUG ? '.js' : '-min.js');
          // Find the name of pdf.js resource file (4.2 specific)
          var scriptElements = document.getElementsByTagName('script');
          for(i = 0, il = scriptElements.length; i < il; i++)
          {
-            if(scriptElements[i].src.indexOf('extras/components/preview/pdfjs/pdf_') > -1)
+            if(scriptElements[i].src.indexOf('extras/components/preview/pdfjs/pdf.worker_') > -1)
             {
                this.workerSrc =  scriptElements[i].src;
                break;
@@ -383,9 +422,21 @@
             this._loadDocumentConfig();
          }
 
+
+         // Setup display options, page linking only works for specific pages
+         this.disabledPageLinking = (Alfresco.constants.PAGEID==='document-details') ? false : true;
+
          // Set page number
          var urlParams = Alfresco.util.getQueryStringParameters(window.location.hash.replace("#", ""));
-         this.pageNum = urlParams.page || (this.documentConfig.pageNum ? parseInt(this.documentConfig.pageNum) : this.pageNum);
+         if(this.disabledPageLinking)
+         {
+             this.pageNum = this.documentConfig.pageNum ? parseInt(this.documentConfig.pageNum) : this.pageNum;
+         }
+         else
+         {
+             this.pageNum = urlParams.page || (this.documentConfig.pageNum ? parseInt(this.documentConfig.pageNum) : this.pageNum);
+         }
+         this.pageNum = parseInt(this.pageNum); // If value from urlParams.page is used it's a string
 
          // Viewer HTML is contained in an external web script, which we load via XHR, then onViewerLoad() does the rest
          Alfresco.util.Ajax.request({
@@ -467,13 +518,45 @@
             type : "menu",
             menu : downloadMenu
          });
-         this.widgets.maximize = Alfresco.util.createYUIButton(this, "fullpage", this.onMaximizeClick, {
-            title: this.wp.msg("button.maximize.tip", 
-                  YAHOO.env.ua.os == "macintosh" ? this.wp.msg("key.meta") : this.wp.msg("key.ctrl"))
-         });
-         this.widgets.linkBn = Alfresco.util.createYUIButton(this, "link", this.onLinkClick, {
-            type: "checkbox"
-         });
+         // Maximise button should show on the document details and document list pages
+         if (Alfresco.constants.PAGEID==="document-details" || Alfresco.constants.PAGEID==="document-details")
+         {
+            if (this.wp.options.mimeType == "application/vnd.ms-powerpoint" || 
+               this.wp.options.mimeType == "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
+               this.wp.options.mimeType == "application/vnd.oasis.opendocument.presentation")
+            {
+               Alfresco.util.createYUIButton(this, "present", this.onFullScreen, {
+                  title: this.wp.msg("button.present.tip", 
+                        YAHOO.env.ua.os == "macintosh" ? this.wp.msg("key.meta") : this.wp.msg("key.ctrl"))
+               });
+               Dom.getElementsByClassName("presentbutton", "span", this.controls, function setDisplay(el) {
+                  Dom.setStyle(el, "display", "inline");
+               });
+            }
+            else
+            {
+               this.widgets.maximize = Alfresco.util.createYUIButton(this, "fullpage", this.onMaximizeClick, {
+                  title: this.wp.msg("button.maximize.tip", 
+                        YAHOO.env.ua.os == "macintosh" ? this.wp.msg("key.meta") : this.wp.msg("key.ctrl"))
+               });
+               Dom.getElementsByClassName("maximizebutton", "span", this.controls, function setDisplay(el) {
+                  Dom.setStyle(el, "display", "inline");
+               });
+            }
+            Dom.getElementsByClassName("maximizebuttonSep", "span", this.controls, function setDisplay(el) {
+               Dom.setStyle(el, "display", "inline");
+            });
+         }
+         // Only show and set up the link button on the document details page (fixes #12)
+         if (Alfresco.constants.PAGEID==="document-details")
+         {
+             Dom.getElementsByClassName("linkbutton", "span", this.controls, function setDisplay(el) {
+                 Dom.setStyle(el, "display", "inline");
+             });
+             this.widgets.linkBn = Alfresco.util.createYUIButton(this, "link", this.onLinkClick, {
+                 type: "checkbox"
+              });
+         }
 
          // Set up search toolbar
          Event.addListener(this.wp.id + "-findInput", "change", this.onFindChange, this, true);
@@ -524,7 +607,7 @@
          this._loadPdf();
 
          // Keyboard shortcuts
-         if (!this.inWikiPage && !this.inDashlet)
+         if (Alfresco.constants.PAGEID==='document-details')
          {
             var findShortcutHandler = function findShortcutHandler(type, args) {
                var e = args[1];
@@ -749,6 +832,19 @@
          // Set the worker source
          PDFJS.workerSrc = this.workerSrc;
 
+         // PDFJS range request for progessive loading
+         // We also test if it may already be set to true by compatibility.js tests, some browsers do not support it.
+         if(this.attributes.progressiveLoading == "true" && PDFJS.disableRange != true)
+         {
+             PDFJS.disableRange = false;
+             // disable autofetch - retrieve just the ranges needed to display
+             PDFJS.disableAutoFetch = false;
+         }
+         else
+         {
+             PDFJS.disableRange = true;
+         }
+
          if (Alfresco.logger.isDebugEnabled())
          {
             Alfresco.logger.debug("Loading PDF file from " + fileurl);
@@ -911,6 +1007,7 @@
                {
                   this.pageNum = newPn;
                   this._updatePageControls();
+                  this.documentView.setActivePage(this.pageNum);
                }
             }, this, true);
             
@@ -928,8 +1025,15 @@
             }
 
             this.documentView.render();
+            // Make sure we do not have a page number greater than actual pages
+            if(this.pageNum > this.pdfDoc.numPages)
+            {
+                this.pageNum = this.pdfDoc.numPages;
+                this._updatePageControls();
+            }
             // Scroll to the current page, this will force the visible content to render
             this.documentView.scrollTo(this.pageNum);
+            this.documentView.setActivePage(this.pageNum);
 
             // Enable the sidebar
             if (this.documentConfig.sidebarEnabled)
@@ -1022,7 +1126,11 @@
        */
       _scrollToPage : function PdfJs__scrollToPage(n)
       {
+         // Disable the documentView onScroll event temporarily
+         this.documentView.removeScrollListener();
+
          this.documentView.scrollTo(n);
+         this.documentView.setActivePage(this.pageNum);
          this.pageNum = n;
 
          // Update toolbar controls
@@ -1034,6 +1142,9 @@
          {
             this.thumbnailView.setActivePage(this.pageNum);
          }
+
+         // Re-add the documentView onScroll event
+         YAHOO.lang.later(50, this.documentView, this.documentView.addScrollListener);
       },
 
       /**
@@ -1305,7 +1416,8 @@
             this.documentView.fullscreen = false;
             
             this.documentView.setScale(this.oldScale);
-            this.pageNum = this.oldPageNum;
+            // WA - Avoid res-setting page number as otherwise we cannot easily get back to where we were
+            //this.pageNum = this.oldPageNum;
 
             this._setViewerHeight();
             
@@ -1374,7 +1486,7 @@
                effect : null,
                modal : false,
                visible : false,
-               width: "310px",
+               width: "265px",
                context : [ this.viewer, "tr", "tr", [ "beforeShow", "windowResize" ], [-20, 3] ],
                underlay: "none"
             });
@@ -1706,23 +1818,26 @@
        */
       onWindowHashChange : function PdfJs_onWindowHashChange(p_obj)
       {
+          if(this.disabledPageLinking)    // Ignore page hash change
+            return;
+
          // Set page number
          var urlParams = Alfresco.util.getQueryStringParameters(window.location.hash.replace("#", ""));
          pn = urlParams.page;
 
          if (pn)
          {
-            if (pn > this.pdfDoc.numPages || pn < 1)
+            if (pn > this.pdfDoc.numPages)
             {
-               Alfresco.util.PopupManager.displayPrompt({
-                  text : this.wp.msg('error.badpage')
-               });
-             }
-             else
-            {
-               this.pageNum = pn;
-               this._scrollToPage(this.pageNum);
+                pn = this.pdfDoc.numPages;
             }
+            else if(pn < 1)
+            {
+                pn = 1;
+            }
+
+            this.pageNum = parseInt(pn);
+            this._scrollToPage(this.pageNum);
          }
       },
 
@@ -2030,10 +2145,7 @@
       
       this.pdfJsPlugin.onResize.subscribe(this.onResize, this, true);
       
-      Event.addListener(this.viewer, "scroll", function (e) {
-         this.renderOnScrollZero++;
-         YAHOO.lang.later(500, this, this.onScroll);
-      }, this, true);
+      this.addScrollListener();
       
       /*
        * Custom events generated by this component
@@ -2416,12 +2528,28 @@
          this.viewerRegion = Dom.getRegion(this.viewer);
       },
 
+      addScrollListener: function DocumentView_addScrollListener()
+      {
+         Event.addListener(this.viewer, "scroll", this.onScrollEvent, this, true);
+      },
+
+      removeScrollListener: function DocumentView_addScrollListener()
+      {
+         Event.removeListener(this.viewer, "scroll", this.onScrollEvent);
+      },
+
+      onScrollEvent: function DocumentView_onScrollEvent(e)
+      {
+         this.renderOnScrollZero++;
+         YAHOO.lang.later(500, this, this.onScroll, e);
+      },
+
       /**
        * Event handler for scroll event within the view area
        * 
        * @method onScroll
        */
-      onScroll : function PdfJs_onViewerScroll(e_obj)
+      onScroll : function DocumentView_onScroll(e_obj)
       {
          this.renderOnScrollZero--;
          if (this.renderOnScrollZero == 0)

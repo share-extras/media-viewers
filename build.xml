@@ -5,7 +5,7 @@
                             ***********************************
     
     Author: Will Abson
-    Version: 1.5.4
+    Version: 1.6.2
     
     Provides a set of targets for building extensions to Alfresco Share in ZIP, AMP and JAR archive 
     formats. Since Alfresco 3.3, JAR is the recommended package structure for all simple extensions.
@@ -17,23 +17,28 @@
         /config - All web-tier configuration files, e.g. web scripts and Surf configuration
         /source/web - All static resource files, e.g. CSS, JS
         
-    For building AMP files, the files module.properties and file-mapping.properties are also required
-    in the project's root directory.
+    For building AMP files, a file module.properties is also required in the project's root 
+    directory. A file-mapping.properties file in the same location may optionally be provided.
     
-    During the build process, temporary 'build' and 'dist' directories will be created in the base 
-    project directory. These may be removed at any time using the 'clean' target.
+    During the build process, temporary a 'build' and directory will be created in the base project 
+    directory, which may be removed at any time using the 'clean' target.
 
 -->
-<project basedir="." default="dist-jar" name="Share Extras Build Script">
+<project basedir="." default="dist-amp-jar" name="Share Extras Build Script"
+   xmlns:artifact="antlib:org.apache.maven.artifact.ant">
 
    <!-- Allow override properties -->
     <property file="build.properties" />
     <property file="${user.home}/build.properties" />
+    <property file="${user.home}/.ant/build.properties" />
    
    <!-- Property default values. May be overridden using above files or via command-line args -->
-    <property name="jar.name" value="share-extension.jar" />
-    <property name="zip.name" value="share-extension.zip" />
-    <property name="amp.name" value="share-extension.amp" />
+    <property name="project.name" value="share-extension" />
+    <property name="project.version" value="1.0" />
+    <property name="jar.name" value="${project.name}-${project.version}.jar" />
+    <property name="zip.name" value="${project.name}-${project.version}.zip" />
+    <property name="amp.name" value="${project.name}-${project.version}.amp" />
+    <property name="amp.version" value="${project.version}" />
     <property name="src.zip.name" value="share-extension-src.zip" />
     <property name="config.includes" value="**/*.*" />
     <property name="config.excludes" value="" />
@@ -62,6 +67,9 @@
     <!-- Paths to local Tomcat instances -->
     <property name="tomcat.repo.home" value="${tomcat.home}" />
     <property name="tomcat.share.home" value="${tomcat.home}" />
+    <!-- Maven repo parameters -->
+    <property name="repository.name" value="share-extras-snapshots" />
+    <property name="repository.url" value="https://artifacts.alfresco.com/nexus/content/repositories/${repository.name}" />
    
     <!-- Additional property values. Generally should not be overridden -->
     <property name="config.dir" value="${basedir}/config" />
@@ -111,12 +119,29 @@
         </classpath>
     </taskdef>
     
+    <path id="maven-ant-tasks.classpath" path="lib/maven-ant-tasks-2.1.4-SNAPSHOT.jar" />
+    
+    <typedef resource="org/apache/maven/artifact/ant/antlib.xml" uri="antlib:org.apache.maven.artifact.ant" 
+        classpathref="maven-ant-tasks.classpath" />
+    
+    <!-- Pre-flight checks -->
+    <target name="check-buildfile" description="Check that the correct build file was called">
+        <condition property="wrong.buildfile">
+            <and>
+                <available file="${basedir}/project.xml" />
+                <not><matches string="${ant.file}" pattern="[/\\]project.xml$" /></not>
+            </and>
+        </condition>
+    </target>
+    
     
     <!-- Main build target definitions -->
     
     
    <!-- Clean out the build and distribution directories -->
-   <target name="clean" description="Clean out all build directories">
+   <target name="clean" description="Clean out all build directories" depends="check-buildfile">
+      <!-- Check the correct file was called -->
+      <fail if="wrong.buildfile">Please use project.xml to build this project</fail>
       <delete dir="${build.dir}" />
       <delete dir="${dist.dir}" />
    </target>
@@ -136,12 +161,12 @@
         </zip>
     </target>
    
-	<!-- Build-jar sub-tasks - allows us to override these more easily -->
-	
+    <!-- Build-jar sub-tasks - allows us to override these more easily -->
+    
     <target name="build-jar-prepare" depends="">
           <mkdir dir="${build.jar.dir}" />
     </target>
-	
+    
     <target name="build-jar-assemble" depends="">
         <!-- Copy configuration files, web scripts, etc. directly into the JAR so they appear on the 
         classpath. -->
@@ -159,6 +184,9 @@
                 <!-- Global excludes -->
                 <exclude name="${config.excludes}" />
             </fileset>
+            <filterset>
+                <filter token="VERSION" value="${project.version}"/>
+            </filterset>
         </copy>
         <!-- Copy web-tier resources into the JAR. These can then be loaded by browsers via Share's resources 
         servlet by prefixing their path with '/res' -->
@@ -200,7 +228,7 @@
         from where it can be loaded in 3.4.
     -->
     <target name="build-jar" depends="build-jar-prepare,build-jar-assemble,build-jar-jscompress" 
-	        description="Assemble configuration and resource files in a JAR file structure">
+            description="Assemble configuration and resource files in a JAR file structure">
     </target>
    
    <!-- Build the JAR file -->
@@ -210,16 +238,16 @@
          <fileset dir="${build.jar.dir}" />
       </jar>
     </target>
-	
-	<!-- build-zip-tomcat sub-tasks -->
-	
+    
+    <!-- build-zip-tomcat sub-tasks -->
+    
     <target name="build-zip-tomcat-assemble">
         <!-- Copy web assets -->
         <copy todir="${build.zip.dir}/${build.res.dir}">
             <fileset dir="${res.dir}" includes="${build.res.includes}" excludes="${build.res.excludes}" />
         </copy>
     </target>
-	
+    
     <target name="build-zip-tomcat-jscompress">
         <!-- Minify JS -->
         <yuicompress fromdir="${res.dir}" todir="${build.zip.dir}/${build.res.dir}" excludes="**/*-min.js" warn="${yuicompress.warn}">
@@ -262,6 +290,9 @@
     <target name="build-zip-config">
         <copy todir="${build.zip.dir}/${build.classes.dir}">
             <fileset dir="${config.dir}" includes="${config.includes}" excludes="${config.excludes}" />
+            <filterset>
+                <filter token="VERSION" value="${project.version}"/>
+            </filterset>
         </copy>
     </target>
     
@@ -277,13 +308,20 @@
     
     <target name="build-amp-assemble">
         <!-- Copy properties files -->
-        <copy todir="${build.amp.dir}" file="${amp.file.properties}" failonerror="true" />
-        <copy todir="${build.amp.dir}" file="${amp.file.mappings}" failonerror="true" />
+        <copy todir="${build.amp.dir}" file="${amp.file.properties}" failonerror="true">
+            <filterset>
+                <filter token="VERSION" value="${amp.version}"/>
+            </filterset>
+        </copy>
+        <copy todir="${build.amp.dir}" file="${amp.file.mappings}" failonerror="false" />
         
         <!-- Copy config files -->
         <mkdir dir="${build.amp.dir}/config" />
         <copy todir="${build.amp.dir}/config">
             <fileset dir="${config.dir}" includes="${config.includes}" excludes="${config.excludes}" />
+            <filterset>
+                <filter token="VERSION" value="${project.version}"/>
+            </filterset>
         </copy>
         
         <!-- Copy resource files -->
@@ -294,7 +332,7 @@
     </target>
     
     <target name="build-amp-jscompress">
-    	<!-- Minify JS -->
+        <!-- Minify JS -->
         <yuicompress fromdir="${res.dir}" todir="${build.amp.dir}/web" excludes="**/*-min.js" warn="${yuicompress.warn}">
             <include name="**/*.js" />
         </yuicompress>
@@ -322,11 +360,29 @@
         non-complex extensions.
     -->
     <target name="build-amp" depends="build-amp-assemble,build-amp-jscompress" 
-    	description="Assemble the configuration and resource files in an AMP file structure">
+        description="Assemble the configuration and resource files in an AMP file structure">
     </target>
     
     <!-- Build the AMP file -->
     <target name="dist-amp" depends="clean, prepare, build-amp" description="Build an AMP file containing all customisations">
+        <zip destfile="${dist.dir}/${amp.name}">
+            <fileset dir="${build.amp.dir}" />
+        </zip>
+    </target>
+    
+    <!-- Build an AMP file in non-exploded form -->
+    <target name="dist-amp-jar" depends="clean, dist-jar" description="Build an AMP file in non-exploded form. The AMP file will contain only a single JAR.">
+        <!-- Copy properties files -->
+        <copy todir="${build.amp.dir}" file="${amp.file.properties}" failonerror="true">
+            <filterset>
+                <filter token="VERSION" value="${project.version}"/>
+            </filterset>
+        </copy>
+        <copy todir="${build.amp.dir}" file="${amp.file.mappings}" failonerror="false" />
+        <!-- Copy JAR file -->
+        <mkdir dir="${build.amp.dir}/lib" />
+        <copy todir="${build.amp.dir}/lib" file="${dist.dir}/${jar.name}" failonerror="true" />
+        <!-- Create the AMP -->
         <zip destfile="${dist.dir}/${amp.name}">
             <fileset dir="${build.amp.dir}" />
         </zip>
@@ -450,5 +506,25 @@
             path="${webapp.share.path}"/>
     </target>
     -->
-   
+
+    <target name="mvn-install" depends="dist-amp-jar" description="Install to local Maven repo">
+        <artifact:pom id="mypom" file="pom.xml" />
+        <artifact:install file="${dist.dir}/${jar.name}">
+            <pom refid="mypom"/>
+            <attach file="${dist.dir}/${amp.name}" type="amp" />
+        </artifact:install>
+    </target>
+
+    <target name="mvn-deploy" depends="dist-amp-jar" description="Deploy to remote Maven repo">
+        <echo message="Uploading to Maven repo as user '${repository.username}'"></echo>
+        <artifact:pom id="mypom" file="pom.xml" />
+        <artifact:deploy file="${dist.dir}/${jar.name}">
+            <remoteRepository url="${repository.url}">
+                <authentication username="${repository.username}" password="${repository.password}" />
+            </remoteRepository>
+            <pom refid="mypom"/>
+            <attach file="${dist.dir}/${amp.name}" type="amp" />
+        </artifact:deploy>
+    </target>
+
 </project>

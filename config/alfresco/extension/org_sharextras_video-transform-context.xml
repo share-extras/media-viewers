@@ -1,96 +1,107 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<!DOCTYPE beans PUBLIC '-//SPRING//DTD BEAN//EN' 'http://www.springframework.org/dtd/spring-beans.dtd'>
- 
-<beans>
- <!-- To decide if FFMpeg is present -->
- <bean id="ffmpeg.present" class="org.alfresco.util.exec.RuntimeExec">
-    <property name="commandsAndArguments">
-       <map>
-          <entry key="Windows.*">
-             <list>
-                <value>${ffmpeg.exe}</value>
-                <value>-version</value>
-             </list>
-          </entry>
-          <entry key="Linux">
-             <list>
-                <value>${ffmpeg.exe}</value>
-                <value>-version</value>
-             </list>
-          </entry>
-          <entry key="Mac OS X">
-             <list>
-                <value>${ffmpeg.exe}</value>
-                <value>-version</value>
-             </list>
-          </entry>
-       </map>
-    </property>
- </bean>
+<!DOCTYPE beans PUBLIC '-//SPRING//DTD BEAN//EN' 'http://www.springframework.org/dtd/spring-beans-2.0.dtd'>
 
- <!-- Default FFMpeg execution -->
- <bean id="ffmpeg.transform" class="org.alfresco.util.exec.RuntimeExec" abstract="true">
-    <property name="commandsAndArguments">
-       <map>
-          <entry key="Windows.*">
-             <list>
-                <value>${ffmpeg.exe}</value>
-                <value>SPLIT:${opts}</value>
-                <value>SPLIT:${infile_opts}</value>
-                <value>-i</value>
-                <value>${source}</value>
-                <value>SPLIT:${outfile_opts}</value>
-                <value>${target}</value>
-             </list>
-          </entry>
-          <entry key="Linux">
-             <list>
-                <value>${ffmpeg.exe}</value>
-                <value>SPLIT:${opts}</value>
-                <value>SPLIT:${infile_opts}</value>
-                <value>-i</value>
-                <value>${source}</value>
-                <value>SPLIT:${outfile_opts}</value>
-                <value>${target}</value>
-             </list>
-          </entry>
-          <entry key="Mac OS X">
-             <list>
-                <value>${ffmpeg.exe}</value>
-                <value>SPLIT:${opts}</value>
-                <value>SPLIT:${infile_opts}</value>
-                <value>-i</value>
-                <value>${source}</value>
-                <value>SPLIT:${outfile_opts}</value>
-                <value>${target}</value>
-             </list>
-          </entry>
-       </map>
-    </property>
-    <property name="waitForCompletion">
-       <value>true</value>
-    </property>
- </bean>
+<beans>
+
+   <!-- To decide if FFMpeg is present -->
+   <bean id="org_sharextras_media-viewers_ffmpeg.present" class="org.alfresco.util.exec.RuntimeExec">
+      <property name="commandsAndArguments">
+         <map>
+            <entry key="*">
+               <list>
+                  <value>${ffmpeg.exe}</value>
+                  <value>-version</value>
+               </list>
+            </entry>
+         </map>
+      </property>
+   </bean>
+
+   <!-- Default FFMpeg execution -->
+   <bean id="org_sharextras_media-viewers_ffmpeg.transform" class="org.alfresco.util.exec.RuntimeExec" abstract="true">
+      <property name="commandsAndArguments">
+         <map>
+            <entry key="*">
+               <list>
+                  <value>${ffmpeg.exe}</value>
+                  <value>SPLIT:${opts}</value>
+                  <value>SPLIT:${infile_opts}</value>
+                  <value>-i</value>
+                  <value>${source}</value>
+                  <value>-f</value>
+                  <value>${outfile_format}</value>
+                  <value>SPLIT:${outfile_opts}</value>
+                  <value>${target}</value>
+               </list>
+            </entry>
+         </map>
+      </property>
+         <property name="defaultProperties">
+            <map>
+               <entry key="opts" value="-y" />
+               <entry key="infile_opts" value="" />
+               <entry key="outfile_opts" value="" />
+            </map>
+         </property>
+      <property name="waitForCompletion">
+         <value>true</value>
+      </property>
+   </bean>
+
+   <bean id="org_sharextras_media-viewers_ffmpeg.transform.flv" parent="org_sharextras_media-viewers_ffmpeg.transform">
+      <property name="defaultProperties">
+          <map merge="true">
+              <entry key="outfile_format" value="flv" />
+              <entry key="outfile_opts" value="-ar 44100" />
+          </map>
+      </property>
+   </bean>
+
+   <bean id="org_sharextras_media-viewers_ffmpeg.transform.mp4" parent="org_sharextras_media-viewers_ffmpeg.transform">
+      <property name="defaultProperties">
+          <map merge="true">
+              <entry key="outfile_format" value="mp4" />
+              <!-- Following suitable for FFmpeg frem Feb 2012 onwards (r10464) -->
+              <!--
+              <entry key="outfile_opts">-f mp4 -ar 44100 -ab 96k -vcodec libx264 -crf 25 -g 250 -r 25 -coder 1 -flags +loop -cmp +chroma -partitions +parti8x8+parti4x4+partp8x8+partb8x8 -me_method hex -subq 7 -me_range 16 -keyint_min 25 -sc_threshold 40 -i_qfactor 0.71 -b_strategy 1 -qcomp 0.6 -qmin 10 -qmax 51 -qdiff 4 -bf 3 -refs 3 -trellis 1 -flags2 +bpyramid+mixed_refs+wpred+dct8x8+fastpskip -wpredp 2</entry>
+              -->
+              <!-- New options avoiding -flags2 - see http://avanti.arrozcru.com/tpl_upd.htm (does not work as of Jul 12 due to +chroma flag) -->
+              <!--
+              <entry key="outfile_opts">-f mp4 -ar 44100 -ab 96k -vcodec libx264 -crf 25 -g 250 -r 25 -coder 1 -flags +loop -cmp +chroma -partitions +parti8x8+parti4x4+partp8x8+partb8x8 -me_method hex -subq 7 -me_range 16 -keyint_min 25 -sc_threshold 40 -i_qfactor 0.71 -b_strategy 1 -qcomp 0.6 -qmin 10 -qmax 51 -qdiff 4 -bf 3 -refs 3 -trellis 1 -b-pyramid 1 -mixed-refs 1 -weightb 1 -8x8dct 1 -fast-pskip 1 -wpredp 2</entry>
+              -->
+              <!-- Stripped down config to be used from Jul 12 -->
+              <entry key="outfile_opts" value="-ar 44100 -ab 96k -vcodec libx264 -crf 25 -g 250 -r 25" />
+          </map>
+      </property>
+   </bean>
+
+   <bean id="org_sharextras_media-viewers_ffmpeg.transform.thumbnail" parent="org_sharextras_media-viewers_ffmpeg.transform">
+      <property name="defaultProperties">
+          <map merge="true">
+              <entry key="infile_opts" value="-ss 10" />
+              <entry key="outfile_format" value="image2" />
+              <entry key="outfile_opts" value="-vframes 1" />
+          </map>
+      </property>
+   </bean>
+
+   <bean id="org_sharextras_media-viewers_ffmpeg.transform.mp3" parent="org_sharextras_media-viewers_ffmpeg.transform">
+      <property name="defaultProperties">
+          <map merge="true">
+              <entry key="outfile_format" value="mp3" />
+          </map>
+      </property>
+   </bean>
 
    <!-- Content Transformations -->
 
    <!-- Generic FFmpeg transformation worker -->
-   <bean id="transformer.worker.ffmpeg.flv" class="org.alfresco.repo.content.transform.RuntimeExecutableContentTransformerWorker">
+   <bean id="transformer.worker.org_sharextras_media-viewers_ffmpeg.flv" class="org.alfresco.repo.content.transform.RuntimeExecutableContentTransformerWorker">
       <property name="mimetypeService">
          <ref bean="mimetypeService" />
       </property>
-      <property name="checkCommand" ref="ffmpeg.present" />
-      <property name="transformCommand">
-         <bean parent="ffmpeg.transform">
-            <property name="defaultProperties">
-                <props>
-                    <prop key="opts">-y</prop>
-                    <prop key="infile_opts"></prop>
-                    <prop key="outfile_opts">-f flv -ar 44100</prop>
-                </props>
-            </property>
-         </bean>
-      </property>
+      <property name="checkCommand" ref="org_sharextras_media-viewers_ffmpeg.present" />
+      <property name="transformCommand" ref="org_sharextras_media-viewers_ffmpeg.transform.flv" />
       <property name="explicitTransformations">
          <list>
             <!-- Transform to FLV -->
@@ -147,30 +158,15 @@
    </bean>
 
    <!-- Generic FFmpeg transformation worker -->
-   <bean id="transformer.worker.ffmpeg.mp4" class="org.alfresco.repo.content.transform.RuntimeExecutableContentTransformerWorker">
+   <bean id="transformer.worker.org_sharextras_media-viewers_ffmpeg.mp4" class="org.alfresco.repo.content.transform.RuntimeExecutableContentTransformerWorker">
       <property name="mimetypeService">
          <ref bean="mimetypeService" />
       </property>
-      <property name="checkCommand" ref="ffmpeg.present" />
-      <property name="transformCommand">
-         <bean parent="ffmpeg.transform">
-            <property name="defaultProperties">
-                <props>
-                    <prop key="opts">-y</prop>
-                    <prop key="infile_opts"></prop>
-                    <!-- Following suitable for FFmpeg frem Feb 2012 onwards (r10464) -->
-                    <!--
-                    <prop key="outfile_opts">-f mp4 -ar 44100 -ab 96k -vcodec libx264 -crf 25 -g 250 -r 25 -coder 1 -flags +loop -cmp +chroma -partitions +parti8x8+parti4x4+partp8x8+partb8x8 -me_method hex -subq 7 -me_range 16 -keyint_min 25 -sc_threshold 40 -i_qfactor 0.71 -b_strategy 1 -qcomp 0.6 -qmin 10 -qmax 51 -qdiff 4 -bf 3 -refs 3 -trellis 1 -flags2 +bpyramid+mixed_refs+wpred+dct8x8+fastpskip -wpredp 2</prop>
-                    -->
-                    <!-- New options avoiding -flags2 - see http://avanti.arrozcru.com/tpl_upd.htm -->
-                    <prop key="outfile_opts">-f mp4 -ar 44100 -ab 96k -vcodec libx264 -crf 25 -g 250 -r 25 -coder 1 -flags +loop -cmp +chroma -partitions +parti8x8+parti4x4+partp8x8+partb8x8 -me_method hex -subq 7 -me_range 16 -keyint_min 25 -sc_threshold 40 -i_qfactor 0.71 -b_strategy 1 -qcomp 0.6 -qmin 10 -qmax 51 -qdiff 4 -bf 3 -refs 3 -trellis 1 -b-pyramid 1 -mixed-refs 1 -weightb 1 -8x8dct 1 -fast-pskip 1 -wpredp 2</prop>
-                </props>
-            </property>
-         </bean>
-      </property>
+      <property name="checkCommand" ref="org_sharextras_media-viewers_ffmpeg.present" />
+      <property name="transformCommand" ref="org_sharextras_media-viewers_ffmpeg.transform.mp4" />
+      <!-- Transform to MP4 -->
       <property name="explicitTransformations">
          <list>
-            <!-- Transform to MP4 -->
             <bean class="org.alfresco.repo.content.transform.ExplictTransformationDetails" >
                 <property name="sourceMimetype"><value>video/mpeg</value></property>
                 <property name="targetMimetype"><value>video/mp4</value></property>
@@ -216,22 +212,12 @@
    </bean>
 
    <!-- Video Thumbnails FFmpeg transformation worker -->
-   <bean id="transformer.worker.ffmpeg.thumbnail" class="org.alfresco.repo.content.transform.RuntimeExecutableContentTransformerWorker">
+   <bean id="transformer.worker.org_sharextras_media-viewers_ffmpeg.thumbnail" class="org.alfresco.repo.content.transform.RuntimeExecutableContentTransformerWorker">
       <property name="mimetypeService">
          <ref bean="mimetypeService" />
       </property>
-      <property name="checkCommand" ref="ffmpeg.present" />
-      <property name="transformCommand">
-         <bean parent="ffmpeg.transform">
-            <property name="defaultProperties">
-                <props>
-                    <prop key="opts">-y</prop>
-                    <prop key="infile_opts">-ss 10</prop>
-                    <prop key="outfile_opts">-f image2 -vframes 1</prop>
-                </props>
-            </property>
-         </bean>
-      </property>
+      <property name="checkCommand" ref="org_sharextras_media-viewers_ffmpeg.present" />
+      <property name="transformCommand" ref="org_sharextras_media-viewers_ffmpeg.transform.thumbnail" />
       <property name="explicitTransformations">
          <list>
             <bean class="org.alfresco.repo.content.transform.ExplictTransformationDetails" >
@@ -291,25 +277,15 @@
    </bean>
 
    <!-- Generic MP3 transformation worker -->
-   <bean id="transformer.worker.ffmpeg.mp3" class="org.alfresco.repo.content.transform.RuntimeExecutableContentTransformerWorker">
+   <bean id="transformer.worker.org_sharextras_media-viewers_ffmpeg.mp3" class="org.alfresco.repo.content.transform.RuntimeExecutableContentTransformerWorker">
       <property name="mimetypeService">
          <ref bean="mimetypeService" />
       </property>
-      <property name="checkCommand" ref="ffmpeg.present" />
-      <property name="transformCommand">
-         <bean parent="ffmpeg.transform">
-            <property name="defaultProperties">
-                <props>
-                    <prop key="opts">-y</prop>
-                    <prop key="infile_opts"></prop>
-                    <prop key="outfile_opts">-f mp3</prop>
-                </props>
-            </property>
-         </bean>
-      </property>
+      <property name="checkCommand" ref="org_sharextras_media-viewers_ffmpeg.present" />
+      <property name="transformCommand" ref="org_sharextras_media-viewers_ffmpeg.transform.mp3" />
+      <!-- Transform to MP3 -->
       <property name="explicitTransformations">
          <list>
-            <!-- Transform to MP3 -->
             <bean class="org.alfresco.repo.content.transform.ExplictTransformationDetails" >
                 <property name="sourceMimetype"><value>audio/x-aiff</value></property>
                 <property name="targetMimetype"><value>audio/mpeg</value></property>
@@ -334,44 +310,47 @@
                 <property name="sourceMimetype"><value>audio/x-flac</value></property>
                 <property name="targetMimetype"><value>audio/mpeg</value></property>
             </bean>
+            <!-- WA Disable webm audio transform as audio/webm does not seem to be defined -->
+            <!--
             <bean class="org.alfresco.repo.content.transform.ExplictTransformationDetails" >
                 <property name="sourceMimetype"><value>audio/webm</value></property>
                 <property name="targetMimetype"><value>audio/mpeg</value></property>
             </bean>
+            -->
          </list>
       </property>
    </bean>
    
-   <bean id="transformer.ffmpeg.flv" class="org.alfresco.repo.content.transform.ProxyContentTransformer" parent="baseContentTransformer">
+   <bean id="transformer.org_sharextras_media-viewers_ffmpeg.flv" class="org.alfresco.repo.content.transform.ProxyContentTransformer" parent="baseContentTransformer">
       <property name="worker">
-         <ref bean="transformer.worker.ffmpeg.flv" />
+         <ref bean="transformer.worker.org_sharextras_media-viewers_ffmpeg.flv" />
       </property>
    </bean>
    
-   <bean id="transformer.ffmpeg.mp4" class="org.alfresco.repo.content.transform.ProxyContentTransformer" parent="baseContentTransformer">
+   <bean id="transformer.org_sharextras_media-viewers_ffmpeg.mp4" class="org.alfresco.repo.content.transform.ProxyContentTransformer" parent="baseContentTransformer">
       <property name="worker">
-         <ref bean="transformer.worker.ffmpeg.mp4" />
+         <ref bean="transformer.worker.org_sharextras_media-viewers_ffmpeg.mp4" />
       </property>
    </bean>
    
-   <bean id="transformer.ffmpeg.thumbnail" class="org.alfresco.repo.content.transform.ProxyContentTransformer" parent="baseContentTransformer">
+   <bean id="transformer.org_sharextras_media-viewers_ffmpeg.thumbnail" class="org.alfresco.repo.content.transform.ProxyContentTransformer" parent="baseContentTransformer">
       <property name="worker">
-         <ref bean="transformer.worker.ffmpeg.thumbnail" />
+         <ref bean="transformer.worker.org_sharextras_media-viewers_ffmpeg.thumbnail" />
       </property>
    </bean>
    
-   <bean id="transformer.ffmpeg.mp3" class="org.alfresco.repo.content.transform.ProxyContentTransformer" parent="baseContentTransformer">
+   <bean id="transformer.org_sharextras_media-viewers_ffmpeg.mp3" class="org.alfresco.repo.content.transform.ProxyContentTransformer" parent="baseContentTransformer">
       <property name="worker">
-         <ref bean="transformer.worker.ffmpeg.mp3" />
+         <ref bean="transformer.worker.org_sharextras_media-viewers_ffmpeg.mp3" />
       </property>
    </bean>
    
-   <bean id="transformer.complex.ffmpeg.Image"
+   <bean id="transformer.complex.org_sharextras_media-viewers_ffmpeg.Image"
         class="org.alfresco.repo.content.transform.ComplexContentTransformer"
         parent="baseContentTransformer" >
       <property name="transformers">
          <list>
-            <ref bean="transformer.ffmpeg.thumbnail" />
+            <ref bean="transformer.org_sharextras_media-viewers_ffmpeg.thumbnail" />
             <ref bean="transformer.ImageMagick" />
          </list>
       </property>

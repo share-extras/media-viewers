@@ -44,7 +44,7 @@
 	border-top: 1px solid #CCCCCC;
 	border-bottom: 1px solid #666;
 	padding: 5px 0 3px 0;
-	height: 25px;
+	height: 26px;
 	width: 100%;
 	white-space: nowrap;
 	overflow: hidden;
@@ -82,6 +82,11 @@
 	border-width: 1px;
 	background-color: transparent;
 	padding: 0 2px;
+}
+
+.yui-skin-lightTheme .previewer.PdfJs .controls .yui-button,
+.yui-skin-lightTheme .previewer.PdfJs .controls .yui-button .first-child {
+    background-color: transparent;
 }
 
 /* Add extra padding for down-arrow on RHS of menu buttons, otherwise removed by previous rule */
@@ -141,7 +146,7 @@
    border-color: #B7B7B7;
    border-width: 1px;
    background-color: transparent;
-   padding: 0 2px;
+   padding: 0 3px;
 }
 
 .previewer.PdfJs .controlssearch input[type="search"] {
@@ -150,9 +155,10 @@
 }
 
 .previewer.PdfJs .controlssearch .yui-checkbox-button .first-child { 
-    border: none; 
-    padding-right: 0.3em;
-    padding-left: 0.3em;
+    border: none;
+    display: inline;
+    margin-right: 0px;
+    margin-left: 0px;
 }
 
 .previewer.PdfJs .controlssearch .buttonHighLightAll .yui-checkbox-button { 
@@ -182,19 +188,31 @@
 }
 
 /* Hide the link and search buttons in the dashlet, as the panel CSS is broken */
-.body .previewer.PdfJs .controls .linkbutton,
 .body .previewer.PdfJs .controls .searchBarToggle {
    display: none;
 }
 
-/* Hide the Maximize in the dashlet, since this suffers from z-index issues at present */
-.body .previewer.PdfJs .controls .maximizebutton {
+/* Hide the Maximize and Present buttons, since we only need one and the viewer will work out which one to use */
+.previewer.PdfJs .controls .maximizebutton,
+.previewer.PdfJs .controls .maximizebuttonSep,
+.previewer.PdfJs .controls .presentbutton {
+   display: none;
+}
+
+/* Hide the link button in all pages except document-details */
+.previewer.PdfJs .controls .linkbutton {
    display: none;
 }
 
 .linkDialog, .searchDialog {
 	visibility: hidden;
 	position: absolute;
+}
+
+/* Some themes have a min width set to large for our needs */
+.searchDialog.yui-panel
+{
+    min-width: 23em;
 }
 
 .yui-panel.linkDialog .bd, .yui-panel.searchDialog .bd {
@@ -240,7 +258,7 @@
 	background-color: transparent !important;
 	border-width: 0px !important;
 	position: absolute !important;
-	top: 25px !important;
+	top: 26px !important;
 	bottom: 0px !important;
 	left: 0px !important;
 	right: 0px !important;
@@ -316,7 +334,8 @@
 	margin: 10px 0 0 10px !important;
 }
 
-.previewer.PdfJs .sidebar .thumbnailView .page.activePage {
+.previewer.PdfJs .sidebar .thumbnailView .page.activePage,
+.previewer.PdfJs .documentView .page.activePage {
    box-shadow: 0 0 8px #6CA5CE !important;
    -moz-box-shadow: 0 0 8px #6CA5CE !important;
    -webkit-box-shadow: 0 0 8px #6CA5CE !important;
@@ -440,6 +459,12 @@ canvas {
 
 ::-moz-selection {
 	background: rgba(0, 0, 255, 0.3);
+}
+
+/* Specific theme overrides */
+.yui-skin-lightTheme .searchDialog.yui-panel .hd
+{
+   padding: 0.10em;
 }
 
 /* === Printed media overrides === */

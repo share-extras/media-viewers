@@ -22,7 +22,7 @@
  *
  * @namespace ShareExtras
  * @class ShareExtras.ViewerExtension
- * @author Peter Lšfgren Loftux AB
+ * @author Peter Lofgren Loftux AB
  */
 
 (function()
@@ -51,7 +51,8 @@
 	      commentsList: true,
 	      commentContent: true,
 	      siteNavigation: true,
-	      nodeHeader: true
+	      nodeHeader: true,
+          filmstrip: true
 	   },
 	   
 		/**
@@ -89,12 +90,26 @@
 				// there is a navigation section, subtract space for that
 				previewHeight = previewHeight - 125;
 			}
+            // New header menu
+            elementPresent = YAHOO.util.Dom.getElementsByClassName("alf-header");
+            if (elementPresent.length > 0 && opts.siteNavigation)
+            {
+                // there is a navigation section, subtract space for that
+                previewHeight = previewHeight - 125;
+            }
 			elementPresent = YAHOO.util.Dom.getElementsByClassName("node-header");
 			if (elementPresent.length > 0 && opts.nodeHeader)
 			{
 				// there is a node header section, subtract space for that
 				previewHeight = previewHeight - 110;
 			}
+
+            elementPresent = YAHOO.util.Dom.getElementsByClassName("alf-filmstrip-nav-buttons");
+            if (elementPresent.length > 0 && opts.filmstrip)
+            {
+                // there is a node header section, subtract space for that
+                previewHeight = previewHeight - 220;
+            }
 			
 			previewHeight = Math.max(previewHeight, this.viewerMinHeight);
 			

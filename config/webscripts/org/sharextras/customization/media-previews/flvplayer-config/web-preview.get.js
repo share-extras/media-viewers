@@ -18,6 +18,15 @@ if (model.widgets)
          });
          conditions.push({
             attributes: {
+               mimeType: "video/x-m4v"
+            },
+            plugins: [{
+               name: "FLVPlayer",
+               attributes: {}
+            }]
+         });
+         conditions.push({
+            attributes: {
                mimeType: "video/m4v"
             },
             plugins: [{
@@ -43,7 +52,7 @@ if (model.widgets)
                attributes: {}
             }]
          });
-         var oldConditions = eval("(" + widget.options.pluginConditions + ")");
+         var oldConditions = eval("("+jsonUtils.toObject("{\"tmp\":" + widget.options.pluginConditions + "}").tmp.toString()+")");
          // Add the other conditions back in
          for (var j = 0; j < oldConditions.length; j++)
          {
