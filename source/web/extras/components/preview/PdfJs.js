@@ -1685,7 +1685,7 @@
          {
             Dom.removeClass(this.wp.getPreviewerElement(), "fullPage");
             this.widgets.maximize.set("label", this.wp.msg("button.maximize"));
-            this.widgets.maximize.set("title", this.wp.msg("button.maximize.tip"));
+            this.widgets.maximize.set("title", this.wp.msg("button.maximize.tip", YAHOO.env.ua.os == "macintosh" ? this.wp.msg("key.meta") : this.wp.msg("key.ctrl")));
          }
 
          this._setPreviewerElementHeight();
