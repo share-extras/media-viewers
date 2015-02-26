@@ -1479,13 +1479,13 @@
          {
             this.widgets.searchDialog = new YAHOO.widget.SimpleDialog(this.wp.id + '-searchDialog',
             {
-               close : false,
-               draggable : false,
+               close : true,
+               draggable : true,
                effect : null,
                modal : false,
                visible : false,
-               width: "265px",
-               context : [ this.viewer, "tr", "tr", [ "beforeShow", "windowResize" ], [-20, 3] ],
+               width: "auto",
+               context : [ this.viewer, "tr", "tr", [ "beforeShow", "windowResize" ], [-30, 2] ],
                underlay: "none"
             });
             this.widgets.searchDialog.render();
@@ -1747,13 +1747,13 @@
          {
             var linkDialog = new YAHOO.widget.SimpleDialog(dialogid,
             {
-               close : false,
-               draggable : false,
+               close : true,
+               draggable : true,
                effect : null,
                modal : false,
                visible : false,
-               context : [ this.viewer, "tr", "tr", [ "beforeShow", "windowResize" ], [-20, 3] ],
-               width : "40em",
+               context : [ this.viewer, "tr", "tr", [ "beforeShow", "windowResize" ], [-30, 2] ],
+               width : "auto",
                underlay: "none"
             });
             var slideurl = window.location.href.replace(window.location.hash, "") + "#page=" + this.pageNum;
