@@ -1,19 +1,20 @@
-/*
- * Copyright (C) 2010-2013 Share Extras contributors
+/**
+ * Copyright (C) 2005-2014 Alfresco Software Limited.
  *
- * This file is part of the Share Extras project.
+ * This file is part of Alfresco
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Alfresco is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ * Alfresco is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with Alfresco. If not, see <http://www.gnu.org/licenses/>.
  */
 
 /**
@@ -24,12 +25,15 @@
  * future.
  * 
  * Supports the "application/pdf" mime type directly, plus any other type
- * for which a PDF thumbnail definition is available.
+ * for which a PDF thumbnail definition is available. The repository has now
+ * been configured to support a "pdf" thumbnail name for virtually all supported
+ * document formats that Alfresco process via its transform pipeline.
  * 
  * @namespace Alfresco.WebPreview.prototype.Plugins
  * @class Alfresco.WebPreview.prototype.Plugins.PdfJs
  * @author Peter Lofgren Loftux AB
  * @author Will Abson
+ * @author Kevin Roast
  */
 
 (function()
@@ -66,7 +70,7 @@
       this.widgets = {};
       this.documentConfig = {};
       this.wp = wp;
-      this.id = wp.id; // needed by Alfresco.util.createYUIButton
+      this.wp.id = wp.id; // needed by Alfresco.util.createYUIButton
       this.attributes = YAHOO.lang.merge(Alfresco.util.deepCopy(this.attributes), attributes);
       
       /*
@@ -144,9 +148,10 @@
           * 
           * @property autoMinScale
           * @type String
-          * @default "0.7"
+          * @default "0.65"
           */
-         autoMinScale : "0.7",
+         autoMinScale : "0.65",
+         autoMinScaleMobile: "0.525",
 
          /**
           * Maximum scale level to use when auto-scaling a document
@@ -192,38 +197,36 @@
           * @type String
           * @default "true"
           */
-         autoSearch : "true",
+         autoSearch : "false",
 
-          /**
-           * Should progresse loading be used?
-           * NOTE: Experimental feature
-           *
-           * @property autoSearch
-           * @type String
-           * @default "false"
-           */
-          progressiveLoading: "false",
+         /**
+          * Should progresse loading be used?
+          *
+          * @property progressiveLoading
+          * @type String
+          * @default "false"
+          */
+         progressiveLoading: "false",
 
-          /**
-           * Disabled page Linking.
-           * Page linking should only be enabled on specific pages
-           *
-           * @property disabledPageLinking
-           * @type boolean
-           * @default true
-           */
-          disabledPageLinking: true
-
+         /**
+          * Disabled page Linking.
+          * Page linking should only be enabled on specific pages
+          *
+          * @property disabledPageLinking
+          * @type boolean
+          * @default true
+          */
+         disabledPageLinking: true
       },
 
       /**
        * Cached PDF document, once loaded from the server
        * 
-       * @property pdfDoc
+       * @property pdfDocument
        * @type {object}
        * @default null
        */
-      pdfDoc : null,
+      pdfDocument : null,
 
       /**
        * Current page number
@@ -289,15 +292,6 @@
       documentConfig : {},
 
       /**
-       * Whether the previewer is embedded in a wiki page
-       * 
-       * @property inWikiPage
-       * @type boolean
-       * @default false
-       */
-      inWikiPage : false,
-
-      /**
        * Whether the previewer is embedded in a dashlet
        * 
        * @property inDashlet
@@ -314,6 +308,15 @@
        * @default empty string
        */
       workerSrc : "",
+      
+      /**
+       * Current scale selection from the drop-down scale menu
+       * 
+       * @property currentScaleSelection
+       * @type string
+       * @default null
+       */
+      currentScaleSelection: null,
 
       /**
        * Tests if the plugin can be used in the users browser.
@@ -326,8 +329,8 @@
        */
       report : function PdfJs_report()
       {
-         var canvassupport = false, 
-            skipbrowsertest = (this.attributes.skipbrowsertest && this.attributes.skipbrowsertest === "true") ? true : false,
+         var isBrowserSupported = true,
+            skipBrowserTest = this.attributes.skipbrowsertest === "true",
             srcMaxSize = this.attributes.srcMaxSize;
 
          if (srcMaxSize.match(/^\d+$/) && this.wp.options.size > parseInt(srcMaxSize))
@@ -335,45 +338,56 @@
             return this.wp.msg("PdfJs.tooLargeFile", Alfresco.util.formatFileSize(this.wp.options.size), parseInt(srcMaxSize));
          }
 
-         if (skipbrowsertest === false)
+         if (!skipBrowserTest)
          {
             // Test if canvas is supported
-            if (window.HTMLCanvasElement)
+            if (this._isCanvasSupported())
             {
-               canvassupport = true;
                // Do some engine test as well, some support canvas but not the
                // rest for full html5
                if (YAHOO.env.ua.webkit > 0 && YAHOO.env.ua.webkit < 534)
                {
                   // http://en.wikipedia.org/wiki/Google_Chrome
                   // Guessing for the same for safari
-                  canvassupport = false;
+                  isBrowserSupported = false;
                }
                // It actually works with ie9, but lack fo support for typed
                // arrays makes performance terrible.
                if (YAHOO.env.ua.ie > 0 && YAHOO.env.ua.ie < 10)
                {
-                  canvassupport = false;
+                  isBrowserSupported = false;
                }
                if (YAHOO.env.ua.gecko > 0 && YAHOO.env.ua.gecko < 5)
                {
                   // http://en.wikipedia.org/wiki/Gecko_(layout_engine)
-                  canvassupport = false;
+                  isBrowserSupported = false;
                }
             }
-
+            else
+            {
+               isBrowserSupported = false;
+            }
          }
-         else
-         {
-            canvassupport = true;
-         }
 
-         // If neither is supported, then report this, and bail out as viewer
-         if (canvassupport === false && skipbrowsertest === false)
+         // If browser is not supported then report this, and we should fall back to another viewer
+         if (!isBrowserSupported)
          {
             return this.wp.msg("label.browserReport", "&lt;canvas&gt; element");
          }
+      },
 
+      /**
+       * Sniff test to determine if the browser supports the canvas element
+       * 
+       * <p>Based on http://stackoverflow.com/questions/2745432/best-way-to-detect-that-html5-canvas-is-not-supported</p>
+       * 
+       * @method _isCanvasSupported
+       * @private
+       */
+      _isCanvasSupported: function PdfJs__isCanvasSupported()
+      {
+         var elem = document.createElement('canvas');
+         return !!(elem.getContext && elem.getContext('2d'));
       },
 
       /**
@@ -382,10 +396,10 @@
        * @method display
        * @public
        */
-      display : function PdfJs_display()
+      display: function PdfJs_display()
       {
-         this.inWikiPage = Dom.getAncestorByClassName(this.wp.getPreviewerElement(), "wiki-page") != null;
-         this.inDashlet = Dom.getAncestorByClassName(this.wp.getPreviewerElement(), "body") != null;
+         this.inDashlet = Dom.getAncestorByClassName(this.wp.getPreviewerElement(), "body") != null ||
+                          Dom.getAncestorByClassName(this.wp.getPreviewerElement(), "yui-panel") != null;
 
          Alfresco.util.YUILoaderHelper.require([ "tabview" ], this.onComponentsLoaded, this);
          Alfresco.util.YUILoaderHelper.loadComponents();
@@ -403,32 +417,28 @@
        * @method onComponentsLoaded
        * @public
        */
-      onComponentsLoaded : function PdfJs_onComponentsLoaded()
+      onComponentsLoaded: function PdfJs_onComponentsLoaded()
       {
          this.workerSrc = Alfresco.constants.URL_CONTEXT + 'res/extras/components/preview/pdfjs/pdf.worker' +  (Alfresco.constants.DEBUG ? '.js' : '-min.js');
          // Find the name of pdf.js resource file (4.2 specific)
          var scriptElements = document.getElementsByTagName('script');
-         for(i = 0, il = scriptElements.length; i < il; i++)
+         for (var i = 0, il = scriptElements.length; i < il; i++)
          {
-            if(scriptElements[i].src.indexOf('extras/components/preview/pdfjs/pdf.worker_') > -1)
+            if (scriptElements[i].src.indexOf('extras/components/preview/pdfjs/pdf.worker_') > -1)
             {
                this.workerSrc =  scriptElements[i].src;
                break;
             }
          }
 
-         if (!this.inWikiPage && !this.inDashlet)
-         {
-            this._loadDocumentConfig();
-         }
-
+         this._loadDocumentConfig();
 
          // Setup display options, page linking only works for specific pages
-         this.disabledPageLinking = (Alfresco.constants.PAGEID==='document-details') ? false : true;
+         this.attributes.disabledPageLinking = (Alfresco.constants.PAGEID==='document-details') ? false : true;
 
          // Set page number
          var urlParams = Alfresco.util.getQueryStringParameters(window.location.hash.replace("#", ""));
-         if(this.disabledPageLinking)
+         if (this.disabledPageLinking)
          {
              this.pageNum = this.documentConfig.pageNum ? parseInt(this.documentConfig.pageNum) : this.pageNum;
          }
@@ -448,17 +458,14 @@
             failureMessage : this.wp.msg("error.viewerload")
          });
 
-         if (!this.inWikiPage)
-         {
-            // Window resize behaviour
-            Event.addListener(window, "resize", this.onRecalculatePreviewLayout, this, true);
+         // Window resize behaviour
+         Event.addListener(window, "resize", this.onRecalculatePreviewLayout, this, true);
 
-            // Hash change behaviour
-            Event.addListener(window, "hashchange", this.onWindowHashChange, this, true);
+         // Hash change behaviour
+         Event.addListener(window, "hashchange", this.onWindowHashChange, this, true);
 
-            // Window unload behaviour
-            Event.addListener(window, "beforeunload", this.onWindowUnload, this, true);
-         }
+         // Window unload behaviour
+         Event.addListener(window, "beforeunload", this.onWindowUnload, this, true);
       },
 
       /**
@@ -467,7 +474,7 @@
        * @method onViewerLoaded
        * @public
        */
-      onViewerLoaded : function PdfJs_onViewerLoaded(p_obj)
+      onViewerLoaded: function PdfJs_onViewerLoaded(p_obj)
       {
          this.wp.getPreviewerElement().innerHTML = p_obj.serverResponse.responseText;
 
@@ -487,23 +494,23 @@
          this.widgets.sidebarButton = Alfresco.util.createYUIButton(this, "sidebarBtn", this.onSidebarToggle, {
             type: "checkbox",
             disabled: true
-         });
+         }, this.wp.id + "-sidebarBtn");
          this.widgets.nextButton = Alfresco.util.createYUIButton(this, "next", this.onPageNext, {
             disabled: true
-         });
+         }, this.wp.id + "-next");
          this.widgets.previousButton = Alfresco.util.createYUIButton(this, "previous", this.onPagePrevious, {
             disabled: true
-         });
+         }, this.wp.id + "-previous");
          Event.addListener(this.wp.id + "-pageNumber", "change", this.onPageChange, this, true);
          this.widgets.zoomOutButton = Alfresco.util.createYUIButton(this, "zoomOut", this.onZoomOut, {
             disabled: true
-         });
+         }, this.wp.id + "-zoomOut");
          this.widgets.zoomInButton = Alfresco.util.createYUIButton(this, "zoomIn", this.onZoomIn, {
             disabled: true
-         });
-         this.widgets.scaleMenu = new YAHOO.widget.Button(this.id + "-scaleSelectBtn", {
+         }, this.wp.id + "-zoomIn");
+         this.widgets.scaleMenu = new YAHOO.widget.Button(this.wp.id + "-scaleSelectBtn", {
             type : "menu",
-            menu : this.id + "-scaleSelect",
+            menu : this.wp.id + "-scaleSelect",
             disabled: true
          });
          this.widgets.scaleMenu.getMenu().subscribe("click", this.onZoomChange, null, this);
@@ -514,16 +521,20 @@
          {
             downloadMenu.push({ text: this.wp.msg("link.downloadPdf"), value: "", onclick: { fn: this.onDownloadPDFClick, scope: this } });
          }
-         this.widgets.downloadButton = new YAHOO.widget.Button(this.id + "-download", {
+         this.widgets.downloadButton = new YAHOO.widget.Button(this.wp.id + "-download", {
             type : "menu",
             menu : downloadMenu
          });
          // Maximise button should show on the document details and document list pages
-         if (Alfresco.constants.PAGEID==="document-details" || Alfresco.constants.PAGEID==="document-details")
+         if (Alfresco.constants.PAGEID === "document-details" || Alfresco.constants.PAGEID === "documentlibrary" ||
+             window.location.pathname.match("/document-details$"))
          {
-            if (this.wp.options.mimeType == "application/vnd.ms-powerpoint" || 
-               this.wp.options.mimeType == "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
-               this.wp.options.mimeType == "application/vnd.oasis.opendocument.presentation")
+            // TODO: Full Screen doesn't work in IE10 or IE11 - also the range of mimetypes isn't complete
+            //       I am unsure if this is the best solution or if generally Maximize is better
+            //       The user can always hit F11 for Full Screen in *any* browser also...
+            /*if (this.wp.options.mimeType == "application/vnd.ms-powerpoint" || 
+                this.wp.options.mimeType == "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
+                this.wp.options.mimeType == "application/vnd.oasis.opendocument.presentation")
             {
                Alfresco.util.createYUIButton(this, "present", this.onFullScreen, {
                   title: this.wp.msg("button.present.tip", 
@@ -534,28 +545,27 @@
                });
             }
             else
-            {
+            {*/
                this.widgets.maximize = Alfresco.util.createYUIButton(this, "fullpage", this.onMaximizeClick, {
-                  title: this.wp.msg("button.maximize.tip", 
-                        YAHOO.env.ua.os == "macintosh" ? this.wp.msg("key.meta") : this.wp.msg("key.ctrl"))
-               });
+                  title: this.wp.msg("button.maximize.tip", YAHOO.env.ua.os == "macintosh" ? this.wp.msg("key.meta") : this.wp.msg("key.ctrl"))
+               }, this.wp.id + "-fullpage");
                Dom.getElementsByClassName("maximizebutton", "span", this.controls, function setDisplay(el) {
                   Dom.setStyle(el, "display", "inline");
                });
-            }
+            //}
             Dom.getElementsByClassName("maximizebuttonSep", "span", this.controls, function setDisplay(el) {
                Dom.setStyle(el, "display", "inline");
             });
          }
          // Only show and set up the link button on the document details page (fixes #12)
-         if (Alfresco.constants.PAGEID==="document-details")
+         if (Alfresco.constants.PAGEID === "document-details")
          {
-             Dom.getElementsByClassName("linkbutton", "span", this.controls, function setDisplay(el) {
-                 Dom.setStyle(el, "display", "inline");
-             });
-             this.widgets.linkBn = Alfresco.util.createYUIButton(this, "link", this.onLinkClick, {
-                 type: "checkbox"
-              });
+            Dom.getElementsByClassName("linkbutton", "span", this.controls, function setDisplay(el) {
+               Dom.setStyle(el, "display", "inline");
+            });
+            this.widgets.linkBn = Alfresco.util.createYUIButton(this, "link", this.onLinkClick, {
+               type: "checkbox"
+            }, this.wp.id + "-link");
          }
 
          // Set up search toolbar
@@ -569,23 +579,21 @@
                _this.onFindChange("find");
             }
          });
-         this.widgets.previousSearchButton = Alfresco.util.createYUIButton(this, "findPrevious", this.onFindChange);
-         this.widgets.nextSearchButton = Alfresco.util.createYUIButton(this, "findNext", this.onFindChange);
-         this.widgets.searchHighlight = Alfresco.util.createYUIButton(this, "findHighlightAll",
-               this.onFindChangeHighlight, {
-                  type : "checkbox"
-               });
-         this.widgets.searchMatchCase = Alfresco.util.createYUIButton(this, "findMatchCase",
-               this.onFindChangeMatchCase, {
-                  type : "checkbox"
-               });
+         this.widgets.previousSearchButton = Alfresco.util.createYUIButton(this, "findPrevious", this.onFindChange, {}, this.wp.id + "-findPrevious");
+         this.widgets.nextSearchButton = Alfresco.util.createYUIButton(this, "findNext", this.onFindChange, {}, this.wp.id + "-findNext");
+         this.widgets.searchHighlight = Alfresco.util.createYUIButton(this, "findHighlightAll", this.onFindChangeHighlight, {
+            type : "checkbox"
+         }, this.wp.id + "-findHighlightAll");
+         this.widgets.searchMatchCase = Alfresco.util.createYUIButton(this, "findMatchCase",this.onFindChangeMatchCase, {
+            type : "checkbox"
+         }, this.wp.id + "-findMatchCase");
          this.widgets.searchBarToggle = Alfresco.util.createYUIButton(this, "searchBarToggle", this.onToggleSearchBar,
          {
             type : "checkbox",
             disabled: true,
             title: this.wp.msg("button.search.tip", 
                   YAHOO.env.ua.os == "macintosh" ? this.wp.msg("key.meta") : this.wp.msg("key.ctrl"))
-         });
+         }, this.wp.id + "-searchBarToggle");
          
          // Enable sidebar, scale drop-down and search button when PDF is loaded
          // Other buttons are enabled by custom functions
@@ -599,15 +607,11 @@
          this._setPreviewerElementHeight();
          this._setViewerHeight();
 
-         // Create new instance of PFFFinderController. Needs to be created
-         // early to be available at all places.
-         this.pdfFindController = new PDFFindController();
-
          // Load the PDF itself
          this._loadPdf();
 
          // Keyboard shortcuts
-         if (Alfresco.constants.PAGEID==='document-details')
+         if (Alfresco.constants.PAGEID === 'document-details')
          {
             var findShortcutHandler = function findShortcutHandler(type, args) {
                var e = args[1];
@@ -685,28 +689,31 @@
        * @method _setPreviewerElementHeight
        * @private
        */
-      _setPreviewerElementHeight : function PdfJs_setPreviewerElementHeight()
+      _setPreviewerElementHeight: function PdfJs_setPreviewerElementHeight()
       {
          // Is the viewer maximized?
          if (!this.maximized)
          {
+            var dialogPane;
             if (this.inDashlet)
             {
-               Dom.setStyle(this.wp.getPreviewerElement(), "height", "100%");
+               Dom.setStyle(this.wp.getPreviewerElement(), "height", (Dom.getClientHeight() - 64) + "px");
             }
-            else if (this.inWikiPage)
+            else if (dialogPane = Dom.getAncestorByClassName(this.wp.getPreviewerElement(), "dijitDialogPaneContent"))
             {
-               Dom.setStyle(this.wp.getPreviewerElement(), "height", null);
+               var h = Dom.getStyle(dialogPane, "height");
+               var previewHeight = (parseInt(h)-42) + "px";
+               Dom.setStyle(this.wp.getPreviewerElement(), "height", previewHeight);
             }
             else
             {
-               var previewHeight = this.wp.setupPreviewSize({
-                  commentsList: true,
-                  commentContent: false,
-                  siteNavigation: true,
-                  nodeHeader: true
-               });
-               Dom.setStyle(this.wp.getPreviewerElement(), "height", (previewHeight - 10).toString() + "px");
+               var sourceYuiEl = new YAHOO.util.Element(this.wp.getPreviewerElement()),
+                   docHeight = Dom.getDocumentHeight(),
+                   clientHeight = Dom.getClientHeight();
+			      // Take the smaller of the two
+			      var previewHeight = ((docHeight < clientHeight) ? docHeight : clientHeight) - 220;
+			      // Leave space for header etc.
+               Dom.setStyle(this.wp.getPreviewerElement(), "height", previewHeight + "px");
             }
          }
          else if (this.fullscreen)
@@ -726,7 +733,7 @@
        * @method _setViewerHeight
        * @private
        */
-      _setViewerHeight : function PdfJs_setViewerHeight()
+      _setViewerHeight: function PdfJs_setViewerHeight()
       {
          var previewRegion = Dom.getRegion(this.viewer.parentNode), 
             controlRegion = Dom.getRegion(this.controls),
@@ -735,20 +742,25 @@
          
          if (newHeight === 0)
          {
-            // Some browser get viewer.parentNode wrong (same as this.controls),
-            // Probably due to timing isseu, new height from style hasn't
-            // rendered yet.
-            // use the default to get height.
             if (!this.maximized)
             {
-               var previewSize = this.wp.setupPreviewSize({
-                  commentsList: true,
-                  commentContent: false,
-                  siteNavigation: true,
-                  nodeHeader: true
-               });
-               newHeight = previewSize - 
-                  10 - controlHeight -1; // Allow for bottom border of 1px
+               var dialogPane;
+               if (dialogPane = Dom.getAncestorByClassName(this.wp.getPreviewerElement(), "dijitDialogPaneContent"))
+               {
+                  var h = Dom.getStyle(dialogPane, "height");
+                  var previewHeight = (parseInt(h) -42 -10 -controlHeight -1) + "px";
+                  Dom.setStyle(this.wp.getPreviewerElement(), "height", previewHeight);
+               }
+               else
+               {
+                  var sourceYuiEl = new YAHOO.util.Element(this.wp.getPreviewerElement()),
+                      docHeight = Dom.getDocumentHeight(),
+                      clientHeight = Dom.getClientHeight();
+   			      // Take the smaller of the two
+   			      var previewHeight = ((docHeight < clientHeight) ? docHeight : clientHeight) - 220;
+   			      // Leave space for header etc.
+                  newHeight = previewHeight - 10 - controlHeight -1; // Allow for bottom border of 1px
+               }
             }
             else
             {
@@ -781,13 +793,12 @@
        * @method _loadPdf
        * @private
        */
-      _loadPdf : function PdfJs__loadPdf(params)
+      _loadPdf: function PdfJs__loadPdf(params)
       {
          // Workaround for ALF-17458
          this.wp.options.name = this.wp.options.name.replace(/[^\w_\-\. ]/g, "");
          
-         var me = this, fileurl = this.attributes.src ? this.wp.getThumbnailUrl(this.attributes.src) : this.wp
-               .getContentUrl();
+         var me = this, fileurl = this.attributes.src ? this.wp.getThumbnailUrl(this.attributes.src) : this.wp.getContentUrl();
          
          // Add the full protocol + host as pdf.js require this
          if (fileurl.substr(0, 4).toLowerCase() !== 'http')
@@ -809,7 +820,7 @@
                radius: 10, // The radius of the inner circle
                corners: 1, // Corner roundness (0..1)
                rotate: 0, // The rotation offset
-               color: '#fff', // #rgb or #rrggbb
+               color: '#666', // #rgb or #rrggbb
                speed: 1, // Rounds per second
                trail: 60, // Afterglow percentage
                shadow: false, // Whether to render a shadow
@@ -831,10 +842,13 @@
 
          // Set the worker source
          PDFJS.workerSrc = this.workerSrc;
+         // Set the char map source dir
+         PDFJS.cMapUrl = Alfresco.constants.URL_CONTEXT + 'res/extras/components/preview/pdfjs/cmaps/';
+         PDFJS.cMapPacked = true;
 
          // PDFJS range request for progessive loading
          // We also test if it may already be set to true by compatibility.js tests, some browsers do not support it.
-         if(this.attributes.progressiveLoading == "true" && PDFJS.disableRange != true)
+         if (this.attributes.progressiveLoading == "true" && PDFJS.disableRange != true)
          {
              PDFJS.disableRange = false;
              // disable autofetch - retrieve just the ranges needed to display
@@ -847,14 +861,14 @@
 
          if (Alfresco.logger.isDebugEnabled())
          {
+            Alfresco.logger.debug("Using PDFJS.disableRange=" + PDFJS.disableRange + " PDFJS.disableAutoFetch:" + PDFJS.disableAutoFetch);
             Alfresco.logger.debug("Loading PDF file from " + fileurl);
          }
 
          PDFJS.getDocument(params).then
          (
             Alfresco.util.bind(this._onGetDocumentSuccess, this),
-            Alfresco.util.bind(this._onGetDocumentFailure, this),
-            Alfresco.util.bind(this._onGetDocumentProgress, this)
+            Alfresco.util.bind(this._onGetDocumentFailure, this)
          );
       },
       
@@ -866,8 +880,8 @@
        */
       _onGetDocumentSuccess: function PdfJs__onGetDocumentSuccess(pdf)
       {
-         this.pdfDoc = pdf;
-         this.numPages = this.pdfDoc.numPages;
+         this.pdfDocument = pdf;
+         this.numPages = this.pdfDocument.numPages;
          if (Alfresco.logger.isDebugEnabled())
          {
             Alfresco.logger.debug("Rendering PDF with fingerprint " + pdf.fingerprint + " for " + this.wp.options.name);
@@ -960,18 +974,6 @@
       },
 
       /**
-       * Notifications of progress receiving the PDF document. Not currently used.
-       * 
-       * @function _onGetDocumentProgress
-       * @private
-       */
-      _onGetDocumentProgress: function PdfJs__onGetDocumentProgress(progressData)
-      {
-         // Do nothing
-         //this.progress(progressData.loaded / progressData.total);
-      },
-
-      /**
        * Display the PDF content in the container
        * 
        * @method _renderPdf
@@ -979,27 +981,29 @@
        */
       _renderPdf : function PdfJs__renderPdf()
       {
+         // TODO: look at only retrieving first N pages until they are displayed
          var pagePromises = [], pagesRefMap = {}, pagesCount = this.numPages;
          for ( var i = 1; i <= pagesCount; i++)
          {
-            pagePromises.push(this.pdfDoc.getPage(i));
+            pagePromises.push(this.pdfDocument.getPage(i));
          }
-         var pagesPromise = PDFJS.Promise.all(pagePromises);
+         var pagesPromise = Promise.all(pagePromises);
 
-         var destinationsPromise = this.pdfDoc.getDestinations();
+         var destinationsPromise = this.pdfDocument.getDestinations();
 
          var renderPageContainer = Alfresco.util.bind(function(promisedPages)
          {
             var self = this;
-            this.documentView = new DocumentView(this.id + "-viewer", {
+            this.documentView = new DocumentView(this.wp.id + "-viewer", {
                name: "documentView",
                pageLayout : this.attributes.pageLayout,
                currentScale : K_UNKNOWN_SCALE,
                defaultScale : this.documentConfig.scale ? this.documentConfig.scale : this.attributes.defaultScale,
-               disableTextLayer : this.attributes.disableTextLayer == "true",
-               autoMinScale : parseFloat(this.attributes.autoMinScale),
+               disableTextLayer : this.attributes.disableTextLayer == "true" || YAHOO.env.ua.ios || YAHOO.env.ua.android,
+               autoMinScale : parseFloat(Dom.getClientWidth() > 1024 ? this.attributes.autoMinScale : this.attributes.autoMinScaleMobile),
                autoMaxScale : parseFloat(this.attributes.autoMaxScale),
-               pdfJsPlugin : self
+               pdfJsPlugin : self,
+               pdfDocument: this.pdfDocument
             });
             this.documentView.onScrollChange.subscribe(function onDocumentViewScroll() {
                var newPn = this.documentView.getScrolledPageNumber();
@@ -1018,7 +1022,7 @@
             this.documentView.addPages(promisedPages);
             // this.thumbnailView.addPages(promisedPages);
 
-            for ( var i = 0; i < promisedPages.length; i++)
+            for (var i = 0; i < promisedPages.length; i++)
             {
                var page = promisedPages[i], pageRef = page.ref;
                pagesRefMap[pageRef.num + ' ' + pageRef.gen + ' R'] = i;
@@ -1026,21 +1030,14 @@
 
             this.documentView.render();
             // Make sure we do not have a page number greater than actual pages
-            if(this.pageNum > this.pdfDoc.numPages)
+            if (this.pageNum > this.pdfDocument.numPages)
             {
-                this.pageNum = this.pdfDoc.numPages;
+                this.pageNum = this.pdfDocument.numPages;
                 this._updatePageControls();
             }
             // Scroll to the current page, this will force the visible content to render
             this.documentView.scrollTo(this.pageNum);
             this.documentView.setActivePage(this.pageNum);
-
-            // Enable the sidebar
-            if (this.documentConfig.sidebarEnabled)
-            {
-               // WA Disabled for now since rendering the same page in two places at once causes the second render to never complete
-               //this.widgets.sidebarButton.set("checked", true);
-            }
 
             // Update toolbar
             this._updateZoomControls();
@@ -1051,8 +1048,7 @@
             
             // If the user clicked through to the document details from the search page, open
             // the search dialog and perform a search for that term
-            
-            if (this.attributes.autoSearch && document.referrer && document.referrer.indexOf("/search?") > 0)
+            if (this.attributes.autoSearch == "true" && document.referrer && document.referrer.indexOf("/search?") > 0)
             {
                var st = Alfresco.util.getQueryStringParameter("t", document.referrer);
                if (st)
@@ -1073,7 +1069,7 @@
             this._addOutline(outline);
          }, this);
          var setupOutline = Alfresco.util.bind(function () {
-            this.pdfDoc.getOutline().then(getOutline);
+            this.pdfDocument.getOutline().then(getOutline);
          }, this);
 
          pagesPromise.then(renderPageContainer);
@@ -1083,8 +1079,7 @@
          destinationsPromise.then(setDestinations);
 
          // outline view depends on destinations and pagesRefMap
-         PDFJS.Promise.all([ pagesPromise, destinationsPromise ]).then(setupOutline);
-
+         Promise.all([ pagesPromise, destinationsPromise ]).then(setupOutline);
       },
 
       /**
@@ -1098,7 +1093,7 @@
          // Update current page number
          this.pageNumber.value = this.pageNum;
          // Update toolbar controls
-         this.widgets.nextButton.set("disabled", this.pageNum >= this.pdfDoc.numPages);
+         this.widgets.nextButton.set("disabled", this.pageNum >= this.pdfDocument.numPages);
          this.widgets.previousButton.set("disabled", this.pageNum <= 1);
       },
 
@@ -1158,7 +1153,7 @@
        */
       _addOutline : function PdfJs__addOutline(outline)
       {
-         var pEl = Dom.get(this.id + "-outlineView");
+         var pEl = Dom.get(this.wp.id + "-outlineView");
 
          if (outline && outline.length > 0)
          {
@@ -1208,18 +1203,23 @@
       _navigateTo : function PdfJs__navigateTo(dest)
       {
          if (typeof dest === 'string')
-            dest = this.destinations[dest];
-         if (!(dest instanceof Array))
-            return; // invalid destination
-         // dest array looks like that: <page-ref> </XYZ|FitXXX> <args..>
-         var destRef = dest[0];
-        var pageNumber = destRef instanceof Object ?
-          this.pagesRefMap[destRef.num + ' ' + destRef.gen + ' R'] : (destRef + 1);
-         if (pageNumber > this.documentView.pages.length - 1)
-            pageNumber = this.documentView.pages.length - 1;
-         if (typeof pageNumber == "number")
          {
-            this._scrollToPage(pageNumber + 1);
+            dest = this.destinations[dest];
+         }
+         if (dest instanceof Array)
+         {
+            // dest array looks like that: <page-ref> </XYZ|FitXXX> <args..>
+            var destRef = dest[0];
+            var pageNumber = destRef instanceof Object ?
+            this.pagesRefMap[destRef.num + ' ' + destRef.gen + ' R'] : (destRef + 1);
+            if (pageNumber > this.documentView.pages.length - 1)
+            {
+               pageNumber = this.documentView.pages.length - 1;
+            }
+            if (typeof pageNumber === "number")
+            {
+               this._scrollToPage(pageNumber + 1);
+            }
          }
       },
 
@@ -1240,8 +1240,7 @@
             var base = "org.sharextras.media-viewers.pdfjs.document." + this.wp.options.nodeRef.replace(":/", "").replace("/", ".") + ".";
             this.documentConfig = {
                pageNum : window.localStorage[base + "pageNum"],
-               scale : window.localStorage[base + "scale"],
-               sidebarEnabled : ("true" == window.localStorage[base + "sidebar-enabled"])
+               scale : window.localStorage[base + "scale"]
             };
             if (this.documentConfig.scale == "null")
             {
@@ -1284,13 +1283,13 @@
          if (sbshown)
          {
             Dom.removeClass(this.viewer, "sideBarVisible");
-          }
-          else
+         }
+         else
          {
             Dom.addClass(this.viewer, "sideBarVisible");
             if (!this.thumbnailView)
             {
-               this.thumbnailView = new DocumentView(this.id + "-thumbnailView", {
+               this.thumbnailView = new DocumentView(this.wp.id + "-thumbnailView", {
                   name: "thumbnailView",
                   pageLayout : "single",
                   defaultScale : "page-width",
@@ -1301,16 +1300,18 @@
             }
          }
          this.documentView.alignRows();
+         this.documentView.setScale(this.documentView.parseScale(this.currentScaleSelection ? this.currentScaleSelection : this.attributes.defaultScale));
+         this._scrollToPage(this.pageNum);
          // Render any pages that have appeared
          this.documentView.renderVisiblePages();
 
-          var goToPage = function goToPage(e, obj) {
+         var goToPage = function goToPage(e, obj) {
             YAHOO.util.Event.stopEvent(e);
             this._scrollToPage(obj.pn);
          };
 
          // Lazily instantiate the TabView
-         this.widgets.tabview = this.widgets.tabview || new YAHOO.widget.TabView(this.id + "-sidebarTabView");
+         this.widgets.tabview = this.widgets.tabview || new YAHOO.widget.TabView(this.wp.id + "-sidebarTabView");
 
          // Set up the thumbnail view immediately
          if (this.thumbnailView && this.thumbnailView.pages.length > 0 && !this.thumbnailView.pages[0].container)
@@ -1318,12 +1319,12 @@
             this.thumbnailView.render();
             for ( var i = 0; i < this.thumbnailView.pages.length; i++)
             {
-                YAHOO.util.Event.addListener(this.thumbnailView.pages[i].container, "click", function(e, obj) {
+               YAHOO.util.Event.addListener(this.thumbnailView.pages[i].container, "click", function(e, obj) {
                   this.thumbnailView.setActivePage(obj.pn);
                   this.documentView.scrollTo(obj.pn);
-                }, {pn: i+1}, this);
+               }, {pn: i+1}, this);
             }
-             // Scroll to the current page, this will force the visible content to render
+            // Scroll to the current page, this will force the visible content to render
             this.thumbnailView.scrollTo(this.pageNum);
             this.thumbnailView.setActivePage(this.pageNum);
          }
@@ -1349,10 +1350,11 @@
        */
       onPageNext : function PdfJs_onPageNext(e_obj)
       {
-         if (this.pageNum >= this.pdfDoc.numPages)
-            return;
-         this.pageNum++;
-         this._scrollToPage(this.pageNum);
+         if (this.pageNum < this.pdfDocument.numPages)
+         {
+            this.pageNum++;
+            this._scrollToPage(this.pageNum);
+         }
       },
 
       /**
@@ -1364,7 +1366,7 @@
       {
          var el = this.viewer;
          if ((document.fullScreenElement && document.fullScreenElement !== null) ||    // alternative standard method
-               (!document.mozFullScreenElement && !document.webkitFullScreenElement && !document.webkitFullscreenElement)) // current working methods
+              (!document.mozFullScreenElement && !document.webkitFullScreenElement && !document.webkitFullscreenElement)) // current working methods
          {
             // Remove window resize behaviour
             Event.removeListener(window, "resize", this.onRecalculatePreviewLayout, this, true);
@@ -1409,15 +1411,13 @@
       onFullScreenChange: function PdfJs_onFullScreenChange(e_obj)
       {
          if ((document.fullScreenElement && document.fullScreenElement !== null) ||    // alternative standard method
-               (!document.mozFullScreenElement && !document.webkitFullScreenElement && !document.webkitFullscreenElement)) // current working methods
+             (!document.mozFullScreenElement && !document.webkitFullScreenElement && !document.webkitFullscreenElement)) // current working methods
          {
             Alfresco.logger.debug("Leaving full screen mode");
+            
             this.fullscreen = false;
             this.documentView.fullscreen = false;
-            
             this.documentView.setScale(this.oldScale);
-            // WA - Avoid res-setting page number as otherwise we cannot easily get back to where we were
-            //this.pageNum = this.oldPageNum;
 
             this._setViewerHeight();
             
@@ -1425,7 +1425,6 @@
             
             // Now redefine the row margins
             this.documentView.alignRows();
-            
             this._scrollToPage(this.pageNum);
             
             // Re-add window resize behaviour
@@ -1434,9 +1433,9 @@
          else
          {
             Alfresco.logger.debug("Entering full screen mode");
+            
             this.documentView.fullscreen = true;
             this.fullscreen = true;
-            
             // Remember the old scale and page numbers
             this.oldScale = this.documentView.currentScale;
             this.oldPageNum = this.pageNum;
@@ -1445,10 +1444,10 @@
 
             this.onResize.fire();
             
-            // Now redefine the row margins
-            this.documentView.alignRows();
             // Render any pages that have appeared
             this.documentView.setScale(this.documentView.parseScale("page-fit"));
+            // Now redefine the row margins
+            this.documentView.alignRows();
             this._scrollToPage(this.pageNum);
          }
       },
@@ -1466,9 +1465,8 @@
             Alfresco.util.PopupManager.displayMessage({
                text : this.wp.msg('error.badpage')
             });
-            return false;
-          }
-          else
+         }
+         else
          {
             this.pageNum = pn;
             this._scrollToPage(this.pageNum);
@@ -1477,9 +1475,9 @@
 
       onToggleSearchBar : function PdfJs_onToggleSearchBar(e_obj)
       {
-         if(!this.widgets.searchDialog)
+         if (!this.widgets.searchDialog)
          {
-            this.widgets.searchDialog = new YAHOO.widget.SimpleDialog(this.id + '-searchDialog',
+            this.widgets.searchDialog = new YAHOO.widget.SimpleDialog(this.wp.id + '-searchDialog',
             {
                close : false,
                draggable : false,
@@ -1492,7 +1490,7 @@
             });
             this.widgets.searchDialog.render();
             
-            new YAHOO.util.KeyListener(Dom.get(this.id + "-searchDialog"), { keys: 27 }, { // escape
+            new YAHOO.util.KeyListener(Dom.get(this.wp.id + "-searchDialog"), { keys: 27 }, { // escape
                fn: function (type, args) {
                   if (this.widgets.searchBarToggle.get("checked"))
                   {
@@ -1506,6 +1504,11 @@
             }).enable();
          }
          
+         if (this.widgets.linkBn && this.widgets.linkBn.get("checked") === true)
+         {
+            this.widgets.linkBn.set("checked", false);
+         }
+         
          if (e_obj.newValue === true)
          {
             this.widgets.searchDialog.show();
@@ -1515,17 +1518,22 @@
             iel.focus();
             iel.select();
             
-            if (!this.pdfFindController.documentView)
+            // Init PDFFindController
+            if (!PDFFindController.pdfPageSource)
             {
-               this.pdfFindController.initialize(this.documentView);
-               // Extract text
-               this.pdfFindController.extractText();
+               PDFFindController.initialize({
+                  pdfPageSource: this.documentView
+               });
+               PDFFindController.resolveFirstPage();
             }
+            
+            PDFFindController.reset();
+            PDFFindController.extractText();
          }
          else
          {
             this.widgets.searchDialog.hide();
-            this.pdfFindController.active = false;
+            PDFFindController.active = false;
          }
       },
 
@@ -1546,48 +1554,52 @@
        */
       onFindChange : function PdfJs_onFindChange(e_obj)
       {
-         var query = Dom.get(this.id + '-findInput').value
-         if (!query)
-            return;
+         var query = Dom.get(this.wp.id + '-findInput').value
+         if (!query) return;
 
-         var event = document.createEvent('CustomEvent'), findPrevious = false, eventid = 'find', highlight = this.widgets.searchHighlight
-               .get("checked"), caseSensitive = this.widgets.searchMatchCase.get("checked"), triggerevent;
+         var event = document.createEvent('CustomEvent'),
+             findPrevious = false,
+             eventid = 'find',
+             highlight = this.widgets.searchHighlight.get("checked"),
+             caseSensitive = this.widgets.searchMatchCase.get("checked"),
+             triggerevent;
 
          if (e_obj.currentTarget)
          {
             triggerevent = e_obj.currentTarget.id
-         } else
+         }
+         else
          {
             triggerevent = e_obj;
          }
 
          switch (triggerevent)
          {
-         case this.id + '-findNext':
-            eventid += 'again';
-            break;
-         case this.id + '-findPrevious':
-            eventid += 'again';
-            findPrevious = true;
-            break;
-         case 'highlightallchange':
-            eventid += 'highlightallchange';
-            break;
-         case 'casesensitivitychange':
-            eventid += 'casesensitivitychange';
-            break;
-         default:
-            if (query === this.lastSearchQuery)
-            {
+            case this.wp.id + '-findNext':
                eventid += 'again';
                break;
-            }
-            else
-            {
-               // Set inactive for find event, this will trigger a fresh search
-               // this.pdfFindController.active = false;
+            case this.wp.id + '-findPrevious':
+               eventid += 'again';
+               findPrevious = true;
                break;
-            }
+            case 'highlightallchange':
+               eventid += 'highlightallchange';
+               break;
+            case 'casesensitivitychange':
+               eventid += 'casesensitivitychange';
+               break;
+            default:
+               if (query === this.lastSearchQuery)
+               {
+                  eventid += 'again';
+                  break;
+               }
+               else
+               {
+                  // Set inactive for find event, this will trigger a fresh search
+                  // PDFFindController.active = false;
+                  break;
+               }
          }
          
          this.lastSearchQuery = query;
@@ -1614,7 +1626,6 @@
          this.documentView.setScale(this.documentView.parseScale(newScale));
          this._scrollToPage(this.pageNum);
          this._updateZoomControls();
-
       },
 
       /**
@@ -1637,11 +1648,11 @@
        */
       onZoomChange : function PdfJs_onZoomChange(p_sType, p_aArgs)
       {
-         var oEvent = p_aArgs[0], // DOM event
-             oMenuItem = p_aArgs[1]; // MenuItem instance that was the target of the event
-
-         var newScale = oMenuItem.value;
-         this.documentView.setScale(this.documentView.parseScale(newScale));
+         var oEvent = p_aArgs[0],      // DOM event
+             oMenuItem = p_aArgs[1];   // MenuItem instance that was the target of the event
+         
+         this.currentScaleSelection = oMenuItem.value;
+         this.documentView.setScale(this.documentView.parseScale(oMenuItem.value));
          this._scrollToPage(this.pageNum);
          this._updateZoomControls();
       },
@@ -1653,7 +1664,7 @@
        */
       onDownloadClick : function PdfJs_onDownloadClick(p_obj)
       {
-         window.location.href = this.wp.getContentUrl(true);
+         window.location.href = this.wp.getContentUrl(true).replace("api/node","slingshot/node");
       },
 
       /**
@@ -1679,9 +1690,9 @@
          {
             Dom.addClass(this.wp.getPreviewerElement(), "fullPage");
             this.widgets.maximize.set("label", this.wp.msg("button.minimize"));
-            this.widgets.maximize.set("title", this.wp.msg("button.minimize.tip"));
-          }
-          else
+            this.widgets.maximize.set("title", this.wp.msg("button.minimize.tip", YAHOO.env.ua.os == "macintosh" ? this.wp.msg("key.meta") : this.wp.msg("key.ctrl")));
+         }
+         else
          {
             Dom.removeClass(this.wp.getPreviewerElement(), "fullPage");
             this.widgets.maximize.set("label", this.wp.msg("button.maximize"));
@@ -1691,6 +1702,8 @@
          this._setPreviewerElementHeight();
          this._setViewerHeight();
          this.onResize.fire();
+         this.documentView.setScale(this.documentView.parseScale(this.currentScaleSelection ? this.currentScaleSelection : this.attributes.defaultScale));
+         this._scrollToPage(this.pageNum);
          // Now redefine the row margins
          this.documentView.alignRows();
          // Render any pages that have appeared
@@ -1718,12 +1731,12 @@
        */
       onLinkClick : function PdfJs_onLinkClick(p_obj)
       {
-          var dialogid = this.id + "-linkDialog",
+         var dialogid = this.wp.id + "-linkDialog",
              inputid = dialogid + "-input";
 
-          var fnSelectLink = function PdfJs_onLinkClick_fnSelectLink() {
+         var fnSelectLink = function PdfJs_onLinkClick_fnSelectLink() {
             var btnid = this.widgets.linkDialogBg.get('checkedButton').get('id');
-             var link = window.location.href.replace(window.location.hash, "") + (btnid.indexOf("-doc") > 0 ? "" : "#page=" + this.pageNum);
+            var link = window.location.href.replace(window.location.hash, "") + (btnid.indexOf("-doc") > 0 ? "" : "#page=" + this.pageNum);
             var iel = Dom.get(inputid);
             iel.value = link;
             iel.focus();
@@ -1732,8 +1745,8 @@
 
          if (!this.widgets.linkDialog)
          {
-             var linkDialog = new YAHOO.widget.SimpleDialog(dialogid,
-             {
+            var linkDialog = new YAHOO.widget.SimpleDialog(dialogid,
+            {
                close : false,
                draggable : false,
                effect : null,
@@ -1768,18 +1781,24 @@
             this.widgets.linkDialogBg = linkDialogBg;
             this.widgets.linkDialog = linkDialog;
 
-             YAHOO.util.Event.addListener(inputid, "click", function() {
+            YAHOO.util.Event.addListener(inputid, "click", function() {
                this.focus();
                this.select();
             });
          }
+         
+         if (this.widgets.searchBarToggle.get("checked") === true)
+         {
+            this.widgets.searchBarToggle.set("checked", false);
+         }
+         
          if (!this.widgets.linkDialog.cfg.getProperty("visible"))
          {
             this.widgets.linkDialog.show();
             this.widgets.linkDialog.bringToTop();
             fnSelectLink.call(this);
-          }
-          else
+         }
+         else
          {
             this.widgets.linkDialog.hide();
          }
@@ -1798,6 +1817,8 @@
             this._setPreviewerElementHeight();
             this._setViewerHeight();
             this.onResize.fire();
+            this.documentView.setScale(this.documentView.parseScale(this.currentScaleSelection ? this.currentScaleSelection : this.attributes.defaultScale));
+            this._scrollToPage(this.pageNum);
             // Now redefine the row margins
             this.documentView.alignRows();
             // Render any pages that have appeared
@@ -1827,9 +1848,9 @@
 
          if (pn)
          {
-            if (pn > this.pdfDoc.numPages)
+            if (pn > this.pdfDocument.numPages)
             {
-                pn = this.pdfDoc.numPages;
+                pn = this.pdfDocument.numPages;
             }
             else if(pn < 1)
             {
@@ -1922,17 +1943,14 @@
       },
 
       /**
-        * Get the vertical position of the pae relative to the top of the parent element. A negative number
-        * means that the page is above the current scroll position, a positive number means it is below.
+       * Get the vertical position of the page relative to the top of the parent element. A negative number
+       * means that the page is above the current scroll position, a positive number means it is below.
        * 
        * @method getVPos
        */
       getVPos : function DocumentPage_getVPos(page)
       {
-          var vregion = this.parent.viewerRegion,
-             pregion = this.getRegion();
-
-         return pregion.top - vregion.top;
+         return this.container.getBoundingClientRect().top + Dom.getDocumentScrollTop() - this.parent.viewerRegion.top;
       },
 
       /**
@@ -1942,7 +1960,7 @@
        */
       renderContent : function DocumentPage_renderContent()
       {
-         var region = Dom.getRegion(this.container),
+         var region = this.getRegion(),
              canvas = document.createElement('canvas');
          canvas.id = this.container.id.replace('-pageContainer-', '-canvas-');
          canvas.mozOpaque = true;
@@ -1953,7 +1971,11 @@
          // Hide the canvas until we've finished drawing the content, so the loading spinner shows through
          Dom.setStyle(canvas, "visibility", "hidden");
 
+         canvas.width = region.width;
+         canvas.height = region.height;
+
          // Add text layer
+         var viewport = this.content.getViewport(this.parent.currentScale);
          var textLayerDiv = null;
          if (!this.parent.config.disableTextLayer)
          {
@@ -1962,42 +1984,36 @@
             this.container.appendChild(textLayerDiv);
          }
          this.textLayerDiv = textLayerDiv;
-         this.textLayer = textLayerDiv ? new TextLayerBuilder(textLayerDiv, this.id - 1, this.pdfJsPlugin) : null;
-         if (this.textLayer)
-            this.textLayer.pdfFindController = this.pdfJsPlugin.pdfFindController;
+         this.textLayer = textLayerDiv ? new TextLayerBuilder(textLayerDiv, this.id - 1, this.pdfJsPlugin, viewport) : null;
 
-          var content = this.content,
+         var content = this.content,
              view = content.view,
              ctx = canvas.getContext('2d');
-
-         canvas.width = region.width;
-         canvas.height = region.height;
-
-         // Fill canvas with a white background
-         ctx.save();
-         ctx.fillStyle = 'rgb(255, 255, 255)';
-         ctx.fillRect(0, 0, canvas.width, canvas.height);
-         ctx.restore();
-         
-         // Removed to fix issue 112, since this no longer seems to appear in pdf.js's own viewer.js
-         //ctx.translate(-view[0] * this.parent.currentScale, -view[1] * this.parent.currentScale);
 
          // Render the content itself
          var renderContext = {
             canvasContext : ctx,
-            viewport : this.content.getViewport(this.parent.currentScale),
+            viewport : viewport,
             textLayer : this.textLayer
          };
          
          var startTime = 0;
-         
          if (Alfresco.logger.isDebugEnabled())
          {
-            startTime = new Date().getTime();
+            startTime = Date.now();
          }
          
+         var setTextFn = Alfresco.util.bind(function textContentResolved(textContent) {
+            this.textLayer.setTextContent(textContent);
+         }, this);
+         
          var renderFn = Alfresco.util.bind(function renderPageFn() {
-
+            
+            if (this.textLayer)
+            {
+               this.getTextContent().then(setTextFn);
+            }
+            
             // Hide the loading icon and make the canvas visible again
             if (this.loadingIconDiv)
             {
@@ -2008,22 +2024,12 @@
             // Log time taken to draw the page
             if (Alfresco.logger.isDebugEnabled())
             {
-               Alfresco.logger.debug("Rendered " + this.parent.name + " page " + this.id + " in " + (new Date().getTime() - startTime) + "ms");
+               Alfresco.logger.debug("Rendered " + this.parent.name + " page " + this.id + " in " + (Date.now() - startTime) + "ms");
             }
             
          }, this);
          
-         var setTextFn = Alfresco.util.bind(function textContentResolved(textContent) {
-            this.textLayer.setTextContent(textContent);
-         }, this);
-         
-         content.render(renderContext).then(renderFn);
-         
-         if (this.textLayer)
-         {
-            this.getTextContent().then(setTextFn);
-         }
-
+         content.render(renderContext).promise.then(renderFn);
       },
 
       /**
@@ -2034,10 +2040,9 @@
        */
       _setPageSize : function DocumentPage__setPageSize(page)
       {
-         var pageContainer = this.container, content = this.content,
-            viewPort = content.getViewport(this.parent.currentScale);
-         Dom.setStyle(pageContainer, "height", "" + Math.floor(viewPort.height) + "px");
-         Dom.setStyle(pageContainer, "width", "" + Math.floor(viewPort.width) + "px");
+         var viewPort = this.content.getViewport(this.parent.currentScale);
+         Dom.setStyle(this.container, "height", Math.floor(viewPort.height) + "px");
+         Dom.setStyle(this.container, "width", Math.floor(viewPort.width) + "px");
       },
 
       /**
@@ -2087,7 +2092,6 @@
        */
       scrollIntoView : function DocumentPage_scrollIntoView(el, spot)
       {
-
          var offsetY = 0;
          if (Alfresco.logger.isDebugEnabled())
          {
@@ -2119,7 +2123,6 @@
 
          this.parent.scrollTo(this.id, offsetY);
       }
-
    }
 
    /**
@@ -2134,6 +2137,8 @@
       this.currentScale = config.currentScale || K_UNKNOWN_SCALE;
       this.name = this.config.name || "";
       this.pdfJsPlugin = config.pdfJsPlugin;
+      
+      this.pdfDocument = config.pdfDocument;
 
       // Used for setupRenderLayoutTimer in TextLayerbuilder
       this.lastScroll = 0;
@@ -2255,23 +2260,27 @@
        */
       alignRows : function DocumentView_alignRows()
       {
-         var rowPos = -1, rowWidth = 0, largestRow = 0;
+         var rowPos = -1, rowWidth = 0, largestRow = 0, scrollY = Dom.getDocumentScrollTop();
          if (this.config.pageLayout == "multi")
          {
             Dom.setStyle(this.viewer, "padding-left", "0px");
-            for ( var i = 0; i < this.pages.length; i++)
+            for (var i = 0; i < this.pages.length; i++)
             {
-               var page = this.pages[i], container = page.container, vpos = page.getVPos();
+               var page = this.pages[i],
+                   container = page.container,
+                   containerBounds = container.getBoundingClientRect(),
+                   vpos = containerBounds.top + scrollY - page.parent.viewerRegion.top,
+                   marginLeft = parseInt(Dom.getStyle(container, "margin-left"));
                // If multi-page mode is on, we need to add custom extra margin to the LHS of the 1st item in the row to make it centred
                if (vpos != rowPos)
                {
-                  rowWidth = parseInt(Dom.getStyle(container, "margin-left")); // Rather than start from zero assume equal right padding on last row item
+                  rowWidth = marginLeft; // Rather than start from zero assume equal right padding on last row item
                }
-               rowWidth += Dom.getRegion(container).width + parseInt(Dom.getStyle(container, "margin-left"));
+               rowWidth += containerBounds.width + marginLeft;
                largestRow = Math.max(largestRow, rowWidth);
                rowPos = vpos;
             }
-            Dom.setStyle(this.viewer, "padding-left", "" + Math.floor(((this.viewer.clientWidth - largestRow) / 2)) + "px");
+            Dom.setStyle(this.viewer, "padding-left", Math.floor((this.viewer.clientWidth - largestRow) / 2) + "px");
          }
       },
 
@@ -2285,7 +2294,7 @@
          // region may not be populated properly if the div was hidden
          this.viewerRegion = Dom.getRegion(this.viewer);
          
-         var vheight = this.viewerRegion.height, vtop = this.viewerRegion.top;
+         var vheight = this.viewerRegion.height, vtop = this.viewerRegion.top, scrollY = Dom.getDocumentScrollTop();
          
          if (Alfresco.logger.isDebugEnabled())
          {
@@ -2293,26 +2302,30 @@
          }
 
          // Render visible pages
-         for ( var i = 0; i < this.pages.length; i++)
+         for (var i = 0; i < this.pages.length; i++)
          {
-            var page = this.pages[i], 
-               pregion = page.getRegion(),
-               top = pregion.top - vtop,
-               bottom = top + pregion.height,
-               vicinity = 0.6;
-            
-            // WA - improve algorith for selecting which pages to render, based on the following criteria
-            // Page top is above the viewer top edge, bottom below the bottom edge OR
-            // Bottom is within half the viewer height of the top edge OR
-            // Top is within half the viewer height of the bottom edge
-            if (page.container && !page.canvas && 
-                  (top < 0 && 0 < bottom || vheight * -1 * vicinity < bottom && bottom < vheight || 0 < top && top < vheight * (vicinity + 1) ))
+            var page = this.pages[i];
+            if (!page.canvas)
             {
-               if (Alfresco.logger.isDebugEnabled())
+               var pregion = page.container.getBoundingClientRect(),
+                   top = pregion.top + scrollY - vtop,
+                   bottom = top + pregion.height,
+                   vicinity = 1.5;
+               
+               // WA - improve algorithm for selecting which pages to render, based on the following criteria
+               // Page top is above the viewer top edge, bottom below the bottom edge OR
+               // Bottom is within half the viewer height of the top edge OR
+               // Top is within half the viewer height of the bottom edge
+               if (top < 0 && 0 < bottom ||
+                   -vheight * vicinity < bottom && bottom < vheight ||
+                   0 < top && top < vheight * (vicinity + 1))
                {
-                  Alfresco.logger.debug("Rendering " + this.name + " page " + (i+1) + " content (page top:" + top + ", bottom:" + bottom + ")");
+                  if (Alfresco.logger.isDebugEnabled())
+                  {
+                     Alfresco.logger.debug("Rendering " + this.name + " page " + (i+1) + " content (page top:" + top + ", bottom:" + bottom + ")");
+                  }
+                  page.renderContent();
                }
-               page.renderContent();
             }
          }
       },
@@ -2397,87 +2410,103 @@
             return scale;
          }
 
-         if (this.pages.length > 0)
+         if (this.pages.length !== 0)
          {
-             var currentPage = this.pages[0],
+            var currentPage = this.pages[0],
                 container = currentPage.container,
                 hmargin = parseInt(Dom.getStyle(container, "margin-left")) + parseInt(Dom.getStyle(container, "margin-right")),
                 vmargin = parseInt(Dom.getStyle(container, "margin-top")),
                 contentWidth = parseInt(currentPage.content.pageInfo.view[2]),
                 contentHeight = parseInt(currentPage.content.pageInfo.view[3]),
+                rotation = currentPage.content.pageInfo.rotate,
                 clientWidth = this.fullscreen ? window.screen.width : this.viewer.clientWidth - 1, // allow an extra pixel in width otherwise 2-up view wraps
                 clientHeight = this.fullscreen ? window.screen.height : this.viewer.clientHeight;
             
             Alfresco.logger.debug("Client height: " + this.viewer.clientHeight);
-
-            if ('page-width' == value)
+            if (rotation === 90 || rotation === 270)
             {
-               var pageWidthScale = (clientWidth - hmargin * 2) / contentWidth;
-               scale = pageWidthScale;
-             }
-             else if ('two-page-width' == value)
-            {
-               var pageWidthScale = (clientWidth - hmargin * 3) / contentWidth;
-               scale = pageWidthScale / 2;
-             }
-             else if ('page-height' == value)
-            {
-               var pageHeightScale = (clientHeight - vmargin * 2) / contentHeight;
-               scale = pageHeightScale;
-             }
-             else if ('page-fit' == value)
-            {
-                var pageWidthScale = (clientWidth - hmargin*2) / contentWidth,
-                   pageHeightScale = (clientHeight - vmargin*2) / contentHeight;
-                scale = Math.min(pageWidthScale, pageHeightScale);
-             }
-             else if ('two-page-fit' == value)
-            {
-                var pageWidthScale = (clientWidth - hmargin*3) / contentWidth,
-                   pageHeightScale = (clientHeight - vmargin*2) / contentHeight;
-                scale = Math.min(pageWidthScale / 2, pageHeightScale);
-             }
-             else if ('auto' == value)
-            {
-                var tpf = this.parseScale("two-page-fit"),
-                   opf = this.parseScale("page-fit"),
-                   opw = this.parseScale("page-width"),
-                   tpw = this.parseScale("two-page-width"),
-                   minScale = this.config.autoMinScale,
-                   maxScale = this.config.autoMaxScale;
-               if (tpf > minScale && this.numPages > 1)
-               {
-                  scale = tpf;
-                }
-                else if (opf > minScale)
-               {
-                   scale = opf;
-                }
-                else if (tpw > minScale && this.numPages > 1)
-               {
-                   scale = tpw;
-                }
-                else if (opw > minScale)
-               {
-                   scale = opw;
-                }
-                else
-               {
-                   scale = minScale;
-               }
-               // Make sure that the page is not zoomed in *too* far. 
-               // A limit of 125% max zoom is the default for the main view.
-               if (maxScale)
-               {
-                  scale = Math.min(scale, maxScale);
-               }
-             }
-             else
-            {
-               throw "Unrecognised zoom level '" + value + "'";
+               var temp = contentWidth;
+               contentWidth = contentHeight;
+               contentHeight = temp;
             }
-          }
-          else
+
+            switch (value)
+            {
+               case 'page-width':
+               {
+                  var pageWidthScale = (clientWidth - hmargin * 2) / contentWidth;
+                  scale = pageWidthScale;
+                  break;
+               }
+               case 'two-page-width':
+               {
+                  var pageWidthScale = (clientWidth - hmargin * 3) / contentWidth;
+                  scale = pageWidthScale / 2;
+                  break;
+               }
+               case 'page-height':
+               {
+                  var pageHeightScale = (clientHeight - vmargin * 2) / contentHeight;
+                  scale = pageHeightScale;
+                  break;
+               }
+               case 'page-fit':
+               {
+                  var pageWidthScale = (clientWidth - hmargin*2) / contentWidth,
+                      pageHeightScale = (clientHeight - vmargin*2) / contentHeight;
+                  scale = Math.min(pageWidthScale, pageHeightScale);
+                  break;
+               }
+               case 'two-page-fit':
+               {
+                  var pageWidthScale = (clientWidth - hmargin*3) / contentWidth,
+                      pageHeightScale = (clientHeight - vmargin*2) / contentHeight;
+                  scale = Math.min(pageWidthScale / 2, pageHeightScale);
+                  break;
+               }
+               case 'auto':
+               {
+                  var tpf = this.parseScale("two-page-fit"),
+                      opf = this.parseScale("page-fit"),
+                      opw = this.parseScale("page-width"),
+                      tpw = this.parseScale("two-page-width"),
+                      minScale = this.config.autoMinScale,
+                      maxScale = this.config.autoMaxScale;
+                  if (tpf > minScale && this.numPages > 1)
+                  {
+                     scale = tpf;
+                  }
+                  else if (opf > minScale)
+                  {
+                     scale = opf;
+                  }
+                  else if (tpw > minScale && this.numPages > 1)
+                  {
+                     scale = tpw;
+                  }
+                  else if (opw > minScale)
+                  {
+                     scale = opw;
+                  }
+                  else
+                  {
+                     scale = minScale;
+                  }
+                  // Make sure that the page is not zoomed in *too* far. 
+                  // A limit of 125% max zoom is the default for the main view.
+                  if (maxScale)
+                  {
+                     scale = Math.min(scale, maxScale);
+                  }
+                  break;
+               }
+               default:
+               {
+                  throw "Unrecognised zoom level '" + value + "'";
+               }
+            }
+         }
+         else
          {
             throw "Unrecognised zoom level - no pages";
          }
@@ -2495,10 +2524,10 @@
       getScrolledPageNumber : function DocumentView_getScrolledPageNumber()
       {
          // Calculate new page number
-         for ( var i = 0; i < this.pages.length; i++)
+         for (var i = 0; i < this.pages.length; i++)
          {
             var page = this.pages[i],
-               vpos = page.getVPos();
+                vpos = page.getVPos();
             if (vpos + parseInt(page.container.style.height) / 2 > 0)
             {
                return i + 1;
@@ -2541,7 +2570,7 @@
       onScrollEvent: function DocumentView_onScrollEvent(e)
       {
          this.renderOnScrollZero++;
-         YAHOO.lang.later(500, this, this.onScroll, e);
+         YAHOO.lang.later(50, this, this.onScroll, e);
       },
 
       /**
@@ -2562,742 +2591,737 @@
       }
    }
 
-   /**
-    * Text layer builder, used to render text layer into pages. Copied from pdf.js viewer.
-    */
-   var TextLayerBuilder = function textLayerBuilder(textLayerDiv, pageIdx, pdfJsPlugin)
-   {
-      var textLayerFrag = document.createDocumentFragment();
 
-      this.textLayerDiv = textLayerDiv;
-      this.layoutDone = false;
-      this.divContentDone = false;
-      this.pageIdx = pageIdx;
-      this.matches = [];
-      this.pdfJsPlugin = pdfJsPlugin
-
-      this.beginLayout = function textLayerBuilderBeginLayout()
-      {
-         this.textDivs = [];
-         this.textLayerQueue = [];
-         this.renderingDone = false;
-      };
-
-      this.endLayout = function textLayerBuilderEndLayout()
-      {
-         this.layoutDone = true;
-         this.insertDivContent();
-      };
-
-      this.renderLayer = function textLayerBuilderRenderLayer()
-      {
-         var self = this;
-         var textDivs = this.textDivs;
-         var textLayerDiv = this.textLayerDiv;
-         var canvas = document.createElement('canvas');
-         var ctx = canvas.getContext('2d');
-
-         if (Alfresco.logger.isDebugEnabled())
-         {
-            Alfresco.logger.debug("Render Text layer");
-         }
-         // No point in rendering so many divs as it'd make the browser unusable
-         // even after the divs are rendered
-         var MAX_TEXT_DIVS_TO_RENDER = 100000;
-         if (textDivs.length > MAX_TEXT_DIVS_TO_RENDER)
-         {
-            return;
-         }
-
-         for ( var i = 0, ii = textDivs.length; i < ii; i++)
-         {
-            var textDiv = textDivs[i];
-            textLayerFrag.appendChild(textDiv);
-
-            ctx.font = textDiv.style.fontSize + ' ' + textDiv.style.fontFamily;
-            var width = ctx.measureText(textDiv.textContent).width;
-
-            if (width > 0)
-            {
-               var textScale = textDiv.dataset.canvasWidth / width;
-
-               // Share extras changed to use Yahoo doom.
-               // TODO: Work out some more efficient way of determining
-               // prefix as original method do, instead of setting all.
-               Dom.setStyle(textDiv, '-ms-transform', 'scale(' + textScale + ', 1)');
-               Dom.setStyle(textDiv, '-webkit-transform', 'scale(' + textScale + ', 1)');
-               Dom.setStyle(textDiv, '-moz-transform', 'scale(' + textScale + ', 1)');
-               Dom.setStyle(textDiv, '-ms-transformOrigin', '0% 0%');
-               Dom.setStyle(textDiv, '-webkit-transformOrigin', '0% 0%');
-               Dom.setStyle(textDiv, '-moz-transformOrigin', '0% 0%');
-               // CustomStyle.setProp('transform' , textDiv,
-               // 'scale(' + textScale + ', 1)');
-               // CustomStyle.setProp('transformOrigin' , textDiv, '0% 0%');
-
-               textLayerDiv.appendChild(textDiv);
-            }
-         }
-
-         this.renderingDone = true;
-         this.updateMatches();
-
-         textLayerDiv.appendChild(textLayerFrag);
-      };
-
-      this.setupRenderLayoutTimer = function textLayerSetupRenderLayoutTimer()
-      {
-         // Schedule renderLayout() if user has been scrolling, otherwise
-         // run it right away
-         var kRenderDelay = 300; // in ms
-         var self = this;
-
-         if (Date.now() - self.pdfJsPlugin.documentView.lastScroll > kRenderDelay)
-         {
-            // Render right away
-            this.renderLayer();
-         } else
-         {
-            // Schedule
-            if (this.renderTimer)
-               clearTimeout(this.renderTimer);
-            this.renderTimer = setTimeout(function()
-            {
-               self.setupRenderLayoutTimer();
-            }, kRenderDelay);
-         }
-      };
-
-      this.appendText = function textLayerBuilderAppendText(geom)
-      {
-         var textDiv = document.createElement('div');
-
-         // vScale and hScale already contain the scaling to pixel units
-         var fontHeight = geom.fontSize * geom.vScale;
-         textDiv.dataset.canvasWidth = geom.canvasWidth * geom.hScale;
-         textDiv.dataset.fontName = geom.fontName;
-
-         textDiv.style.fontSize = fontHeight + 'px';
-         textDiv.style.fontFamily = geom.fontFamily;
-         textDiv.style.left = geom.x + 'px';
-         textDiv.style.top = (geom.y - fontHeight) + 'px';
-
-         // The content of the div is set in the `setTextContent` function.
-
-         this.textDivs.push(textDiv);
-      };
-
-      this.insertDivContent = function textLayerUpdateTextContent()
-      {
-         // Only set the content of the divs once layout has finished, the
-         // content
-         // for the divs is available and content is not yet set on the divs.
-         if (!this.layoutDone || this.divContentDone || !this.textContent)
-            return;
-
-         this.divContentDone = true;
-
-         var textDivs = this.textDivs;
-         var bidiTexts = this.textContent.bidiTexts;
-
-         for ( var i = 0; i < bidiTexts.length; i++)
-         {
-            var bidiText = bidiTexts[i];
-            var textDiv = textDivs[i];
-
-            textDiv.textContent = bidiText.str;
-            textDiv.dir = bidiText.ltr ? 'ltr' : 'rtl';
-         }
-
-         this.setupRenderLayoutTimer();
-      };
-
-      this.setTextContent = function textLayerBuilderSetTextContent(textContent)
-      {
-         this.textContent = textContent;
-         this.insertDivContent();
-      };
-
-      this.convertMatches = function textLayerBuilderConvertMatches(matches)
-      {
-         var i = 0;
-         var iIndex = 0;
-         var bidiTexts = this.textContent.bidiTexts;
-         var end = bidiTexts.length - 1;
-         var queryLen = this.pdfFindController.state.query.length;
-
-         var lastDivIdx = -1;
-         var pos;
-
-         var ret = [];
-
-         // Loop over all the matches.
-         for ( var m = 0; m < matches.length; m++)
-         {
-            var matchIdx = matches[m];
-            // # Calculate the begin position.
-
-            // Loop over the divIdxs.
-            while (i !== end && matchIdx >= (iIndex + bidiTexts[i].str.length))
-            {
-               iIndex += bidiTexts[i].str.length;
-               i++;
-            }
-
-            // TODO: Do proper handling here if something goes wrong.
-            if (i == bidiTexts.length)
-            {
-               console.error('Could not find matching mapping');
-            }
-
-            var match = {
-               begin : {
-                  divIdx : i,
-                  offset : matchIdx - iIndex
-               }
-            };
-
-            // # Calculate the end position.
-            matchIdx += queryLen;
-
-            // Somewhat same array as above, but use a > instead of >= to get
-            // the end
-            // position right.
-            while (i !== end && matchIdx > (iIndex + bidiTexts[i].str.length))
-            {
-               iIndex += bidiTexts[i].str.length;
-               i++;
-            }
-
-            match.end = {
-               divIdx : i,
-               offset : matchIdx - iIndex
-            };
-            ret.push(match);
-         }
-
-         return ret;
-      };
-
-      this.renderMatches = function textLayerBuilder_renderMatches(matches)
-      {
-
-         // Early exit if there is nothing to render.
-         if (matches.length === 0)
-         {
-            return;
-         }
-
-         var bidiTexts = this.textContent.bidiTexts;
-         var textDivs = this.textDivs;
-         var prevEnd = null;
-         var isSelectedPage = this.pageIdx === this.pdfFindController.selected.pageIdx;
-         var selectedMatchIdx = this.pdfFindController.selected.matchIdx;
-         var highlightAll = this.pdfFindController.state.highlightAll;
-
-         var infty = {
-            divIdx : -1,
-            offset : undefined
-         };
-
-         function beginText(begin, className)
-         {
-            var divIdx = begin.divIdx;
-            var div = textDivs[divIdx];
-            div.innerHTML = '';
-
-            var content = bidiTexts[divIdx].str.substring(0, begin.offset);
-            var node = document.createTextNode(content);
-            if (className)
-            {
-               var isSelected = isSelectedPage && divIdx === selectedMatchIdx;
-               var span = document.createElement('span');
-               span.className = className + (isSelected ? ' selected' : '');
-               span.appendChild(node);
-               div.appendChild(span);
-               return;
-            }
-            div.appendChild(node);
-         }
-
-         function appendText(from, to, className)
-         {
-            var divIdx = from.divIdx;
-            var div = textDivs[divIdx];
-
-            var content = bidiTexts[divIdx].str.substring(from.offset, to.offset);
-            var node = document.createTextNode(content);
-            if (className)
-            {
-               var span = document.createElement('span');
-               span.className = className;
-               span.appendChild(node);
-               div.appendChild(span);
-               return;
-            }
-            div.appendChild(node);
-         }
-
-         function highlightDiv(divIdx, className)
-         {
-            textDivs[divIdx].className = className;
-         }
-
-         var i0 = selectedMatchIdx, i1 = i0 + 1, i;
-
-         if (highlightAll)
-         {
-            i0 = 0;
-            i1 = matches.length;
-         } else if (!isSelectedPage)
-         {
-            // Not highlighting all and this isn't the selected page, so do
-            // nothing.
-            return;
-         }
-
-         for (i = i0; i < i1; i++)
-         {
-            var match = matches[i];
-            var begin = match.begin;
-            var end = match.end;
-
-            var isSelected = isSelectedPage && i === selectedMatchIdx;
-            var highlightSuffix = (isSelected ? ' selected' : '');
-            if (isSelected)
-            {
-               this.pdfFindController.documentView.pages[this.pageIdx].scrollIntoView(textDivs[begin.divIdx], {
-                  top : -50
-               });
-            }
-
-            // Match inside new div.
-            if (!prevEnd || begin.divIdx !== prevEnd.divIdx)
-            {
-               // If there was a previous div, then add the text at the end
-               if (prevEnd !== null)
-               {
-                  appendText(prevEnd, infty);
-               }
-               // clears the divs and set the content until the begin point.
-               beginText(begin);
-            } else
-            {
-               appendText(prevEnd, begin);
-            }
-
-            if (begin.divIdx === end.divIdx)
-            {
-               appendText(begin, end, 'highlight' + highlightSuffix);
-            } else
-            {
-               appendText(begin, infty, 'highlight begin' + highlightSuffix);
-               for ( var n = begin.divIdx + 1; n < end.divIdx; n++)
-               {
-                  highlightDiv(n, 'highlight middle' + highlightSuffix);
-               }
-               beginText(end, 'highlight end' + highlightSuffix);
-            }
-            prevEnd = end;
-         }
-
-         if (prevEnd)
-         {
-            appendText(prevEnd, infty);
-         }
-      };
-
-      this.updateMatches = function textLayerUpdateMatches()
-      {
-
-         // Only show matches, once all rendering is done.
-         if (!this.renderingDone)
-            return;
-
-         // Clear out all matches.
-         var matches = this.matches;
-         var textDivs = this.textDivs;
-         var bidiTexts = this.textContent.bidiTexts;
-         var clearedUntilDivIdx = -1;
-
-         // Clear out all current matches.
-         for ( var i = 0; i < matches.length; i++)
-         {
-            var match = matches[i];
-            var begin = Math.max(clearedUntilDivIdx, match.begin.divIdx);
-            for ( var n = begin; n <= match.end.divIdx; n++)
-            {
-               var div = textDivs[n];
-               div.textContent = bidiTexts[n].str;
-               div.className = '';
-            }
-            clearedUntilDivIdx = match.end.divIdx + 1;
-         }
-
-         if (!this.pdfFindController.active)
-            return;
-
-         // Convert the matches on the page controller into the match format
-         // used
-         // for the textLayer.
-         this.matches = matches = this.convertMatches(this.pdfFindController.pageMatches[this.pageIdx] || []);
-
-         this.renderMatches(this.matches);
-      };
-   };
-
-   /**
-    * PDFFindController - copied from pdf.js project, file viewer.js Changes
-    * includes PDFView -> self.documentView initialize() -> Added support for
-    * passing the documentView object
-    */
-
-   var FindStates = {
-      FIND_FOUND : 0,
-      FIND_NOTFOUND : 1,
-      FIND_WRAPPED : 2,
-      FIND_PENDING : 3
-   };
-
-   var PDFFindController = function()
-   {
-   };
-
-   PDFFindController.prototype = {
-      extractTextPromise : null,
-
-      // If active, find results will be highlighted.
-      active : false,
-
-      // Stores the text for each page.
-      pageContents : [],
-
-      pageMatches : [],
-
-      selected : {
-         pageIdx : 0,
-         matchIdx : 0
-      },
-
-      state : null,
-
-      dirtyMatch : false,
-
-      findTimeout : null,
-
-      // Share extras added to hold current documentView object
-      documentView : null,
-
-      initialize : function(documentView)
-      {
-         var events = [ 'find', 'findagain', 'findhighlightallchange', 'findcasesensitivitychange' ];
-
-         // Share extras add
-         this.documentView = documentView;
-
-         this.handleEvent = this.handleEvent.bind(this);
-
-         for ( var i = 0; i < events.length; i++)
-         {
-            window.addEventListener(events[i], this.handleEvent);
-         }
-      },
-
-      calcFindMatch : function(pageContent)
-      {
-         var query = this.state.query;
-         var caseSensitive = this.state.caseSensitive;
-         var queryLen = query.length;
-
-         if (queryLen === 0)
-            return [];
-
-         if (!caseSensitive)
-         {
-            pageContent = pageContent.toLowerCase();
-            query = query.toLowerCase();
-         }
-
-         var matches = [];
-
-         var matchIdx = -queryLen;
-         while (true)
-         {
-            matchIdx = pageContent.indexOf(query, matchIdx + queryLen);
-            if (matchIdx === -1)
-            {
-               break;
-            }
-
-            matches.push(matchIdx);
-         }
-         return matches;
-      },
-
-      extractText : function()
-      {
-         if (this.extractTextPromise)
-         {
-            return this.extractTextPromise;
-         }
-         this.extractTextPromise = new PDFJS.Promise();
-
-         var self = this;
-         function extractPageText(pageIndex)
-         {
-            self.documentView.pages[pageIndex].getTextContent().then(function textContentResolved(data)
-            {
-               // Build the find string.
-               var bidiTexts = data.bidiTexts;
-               var str = '';
-
-               for ( var i = 0; i < bidiTexts.length; i++)
-               {
-                  str += bidiTexts[i].str;
-               }
-
-               // Store the pageContent as a string.
-               self.pageContents.push(str);
-               // Ensure there is a empty array of matches.
-               self.pageMatches.push([]);
-
-               if ((pageIndex + 1) < self.documentView.pages.length)
-                  extractPageText(pageIndex + 1);
-               else
-                  self.extractTextPromise.resolve();
-            });
-         }
-         extractPageText(0);
-         return this.extractTextPromise;
-      },
-
-      handleEvent : function(e)
-      {
-         if (this.state === null || e.type !== 'findagain')
-         {
-            this.dirtyMatch = true;
-         }
-         this.state = e.detail;
-         this.updateUIState(FindStates.FIND_PENDING);
-
-         var promise = this.extractText();
-
-         clearTimeout(this.findTimeout);
-         if (e.type === 'find')
-         {
-            // Only trigger the find action after 250ms of silence.
-            this.findTimeout = setTimeout(function()
-            {
-               promise.then(this.performFind.bind(this));
-            }.bind(this), 250);
-         } else
-         {
-            promise.then(this.performFind.bind(this));
-         }
-      },
-
-      updatePage : function(idx)
-      {
-         var self = this;
-         var page = self.documentView.pages[idx];
-
-         if (this.selected.pageIdx === idx)
-         {
-            // If the page is selected, scroll the page into view, which
-            // triggers
-            // rendering the page, which adds the textLayer. Once the textLayer
-            // is
-            // build, it will scroll onto the selected match.
-            // Share Extras changed: used to be pages.scrollIntoView()
-            // self.documentView.scrollTo(idx+1);
-            page.scrollIntoView();
-         }
-
-         if (page.textLayer)
-         {
-            page.textLayer.updateMatches();
-         }
-      },
-
-      performFind : function()
-      {
-         // Recalculate all the matches.
-         // TODO: Make one match show up as the current match
-
-         var self = this;
-         var pages = self.documentView.pages;
-         var pageContents = this.pageContents;
-         var pageMatches = this.pageMatches;
-
-         this.active = true;
-
-         if (this.dirtyMatch)
-         {
-            // Need to recalculate the matches.
-            this.dirtyMatch = false;
-
-            this.selected = {
-               pageIdx : -1,
-               matchIdx : -1
-            };
-
-            // TODO: Make this way more lasily (aka. efficient) - e.g. calculate
-            // only
-            // the matches for the current visible pages.
-            var firstMatch = true;
-            for ( var i = 0; i < pageContents.length; i++)
-            {
-               var matches = pageMatches[i] = this.calcFindMatch(pageContents[i]);
-               if (firstMatch && matches.length !== 0)
-               {
-                  firstMatch = false;
-                  this.selected = {
-                     pageIdx : i,
-                     matchIdx : 0
-                  };
-               }
-               this.updatePage(i, true);
-            }
-            if (!firstMatch || !this.state.query)
-            {
-               this.updateUIState(FindStates.FIND_FOUND);
-            } else
-            {
-               this.updateUIState(FindStates.FIND_NOTFOUND);
-            }
-         } else
-         {
-            // If there is NO selection, then there is no match at all -> no
-            // sense to
-            // handle previous/next action.
-            if (this.selected.pageIdx === -1)
-            {
-               this.updateUIState(FindStates.FIND_NOTFOUND);
-               return;
-            }
-
-            // Handle findAgain case.
-            var previous = this.state.findPrevious;
-            var sPageIdx = this.selected.pageIdx;
-            var sMatchIdx = this.selected.matchIdx;
-            var findState = FindStates.FIND_FOUND;
-
-            if (previous)
-            {
-               // Select previous match.
-
-               if (sMatchIdx !== 0)
-               {
-                  this.selected.matchIdx -= 1;
-               } else
-               {
-                  var len = pageMatches.length;
-                  for ( var i = sPageIdx - 1; i != sPageIdx; i--)
-                  {
-                     if (i < 0)
-                        i += len;
-
-                     if (pageMatches[i].length !== 0)
-                     {
-                        this.selected = {
-                           pageIdx : i,
-                           matchIdx : pageMatches[i].length - 1
-                        };
-                        break;
-                     }
-                  }
-                  // If pageIdx stayed the same, select last match on the page.
-                  if (this.selected.pageIdx === sPageIdx)
-                  {
-                     this.selected.matchIdx = pageMatches[sPageIdx].length - 1;
-                     findState = FindStates.FIND_WRAPPED;
-                  } else if (this.selected.pageIdx > sPageIdx)
-                  {
-                     findState = FindStates.FIND_WRAPPED;
-                  }
-               }
-            } else
-            {
-               // Select next match.
-
-               if (pageMatches[sPageIdx].length !== sMatchIdx + 1)
-               {
-                  this.selected.matchIdx += 1;
-               } else
-               {
-                  var len = pageMatches.length;
-                  for ( var i = sPageIdx + 1; i < len + sPageIdx; i++)
-                  {
-                     if (pageMatches[i % len].length !== 0)
-                     {
-                        this.selected = {
-                           pageIdx : i % len,
-                           matchIdx : 0
-                        };
-                        break;
-                     }
-                  }
-
-                  // If pageIdx stayed the same, select first match on the page.
-                  if (this.selected.pageIdx === sPageIdx)
-                  {
-                     this.selected.matchIdx = 0;
-                     findState = FindStates.FIND_WRAPPED;
-                  } else if (this.selected.pageIdx < sPageIdx)
-                  {
-                     findState = FindStates.FIND_WRAPPED;
-                  }
-               }
-            }
-
-            this.updateUIState(findState, previous);
-            this.updatePage(sPageIdx, sPageIdx === this.selected.pageIdx);
-            if (sPageIdx !== this.selected.pageIdx)
-            {
-               this.updatePage(this.selected.pageIdx, true);
-            }
-         }
-      },
-
-      updateUIState : function(state, previous)
-      {
-         var findMsg = '';
-         var status = '';
-
-         /**
-          * TODO: For now do not display for hits, gets very noisy when stepping.
-          * Possibly change color or similar in search box to indicate hit instead
-          * Pending cand be ajax gif on search bar until state is found, then removed. 
-          * See pdf.js default Implementation
-          */
-
-         if(state===FindStates.FIND_FOUND||state===FindStates.FIND_PENDING)
-            return;
-         
-         switch (state) {
-           case FindStates.FIND_FOUND:
-             findMsg = this.documentView.pdfJsPlugin.wp.msg('search.message.found');
-             break;
-
-           case FindStates.FIND_PENDING:
-             findMsg = this.documentView.pdfJsPlugin.wp.msg('search.message.pending');
-             break;
-
-           case FindStates.FIND_NOTFOUND:
-             findMsg = this.documentView.pdfJsPlugin.wp.msg('search.message.notfound');
-             break;
-
-           case FindStates.FIND_WRAPPED:
-             if (previous) {
-                findMsg = this.documentView.pdfJsPlugin.wp.msg('search.message.wrapped.bottom');
-             } else {
-                findMsg = this.documentView.pdfJsPlugin.wp.msg('search.message.wrapped.top');
-             }
-             break;
-         }
-         
-         Alfresco.util.PopupManager.displayMessage({
-            text : findMsg
-         });
+/**
+ * Copied from pdf.js viewer.
+ */
+var FIND_SCROLL_OFFSET_TOP = -50;
+var FIND_SCROLL_OFFSET_LEFT = -400;
+
+/**
+ * Copied from pdf.js viewer.
+ */
+/**
+ * TextLayerBuilder provides text-selection
+ * functionality for the PDF. It does this
+ * by creating overlay divs over the PDF
+ * text. This divs contain text that matches
+ * the PDF text they are overlaying. This
+ * object also provides for a way to highlight
+ * text that is being searched for.
+ */
+var TextLayerBuilder = function textLayerBuilder(textLayerDiv, pageIdx, pdfJsPlugin, viewport) {
+  var textLayerFrag = document.createDocumentFragment();
+  this.textDivs = [];
+
+   // ALFRESCO CHANGES
+   this.viewport = viewport;
+   this.textLayerDiv = textLayerDiv;
+   this.layoutDone = false;
+   this.divContentDone = false;
+   this.pageIdx = pageIdx;
+   this.matches = [];
+   this.pdfJsPlugin = pdfJsPlugin
+   this.isViewerInPresentationMode = false;
+   // END ALFRESCO CHANGES
+
+  if (typeof PDFFindController === 'undefined') {
+    window.PDFFindController = null;
+  }
+
+  if (typeof this.lastScrollSource === 'undefined') {
+    this.lastScrollSource = null;
+  }
+
+  this.renderLayer = function textLayerBuilderRenderLayer() {
+    var textDivs = this.textDivs;
+    var canvas = document.createElement('canvas');
+    var ctx = canvas.getContext('2d');
+
+    // No point in rendering so many divs as it'd make the browser unusable
+    // even after the divs are rendered
+    var MAX_TEXT_DIVS_TO_RENDER = 100000;
+    if (textDivs.length > MAX_TEXT_DIVS_TO_RENDER) {
+      return;
+    }
+
+    for (var i = 0, ii = textDivs.length; i < ii; i++) {
+      var textDiv = textDivs[i];
+      if ('isWhitespace' in textDiv.dataset) {
+        continue;
       }
-   };
+
+      ctx.font = textDiv.style.fontSize + ' ' + textDiv.style.fontFamily;
+      var width = ctx.measureText(textDiv.textContent).width;
+
+      if (width > 0) {
+        textLayerFrag.appendChild(textDiv);
+        var textScale = textDiv.dataset.canvasWidth / width;
+        var rotation = textDiv.dataset.angle;
+        var transform = 'scale(' + textScale + ', 1)';
+        transform = 'rotate(' + rotation + 'deg) ' + transform;
+
+         // ALFRESCO CHANGES
+         // Share extras changed to use Yahoo dom.
+         // TODO: Work out some more efficient way of determining
+         // prefix as original method do, instead of setting all.
+         Dom.setStyle(textDiv, '-ms-transform', 'scale(' + textScale + ', 1)');
+         Dom.setStyle(textDiv, '-webkit-transform', 'scale(' + textScale + ', 1)');
+         Dom.setStyle(textDiv, '-moz-transform', 'scale(' + textScale + ', 1)');
+         Dom.setStyle(textDiv, '-ms-transformOrigin', '0% 0%');
+         Dom.setStyle(textDiv, '-webkit-transformOrigin', '0% 0%');
+         Dom.setStyle(textDiv, '-moz-transformOrigin', '0% 0%');
+         // END ALFRESCO CHANGES
+      }
+    }
+
+    this.textLayerDiv.appendChild(textLayerFrag);
+    this.renderingDone = true;
+    this.updateMatches();
+  };
+
+  this.setupRenderLayoutTimer = function textLayerSetupRenderLayoutTimer() {
+    // Schedule renderLayout() if user has been scrolling, otherwise
+    // run it right away
+    var RENDER_DELAY = 200; // in ms
+    var self = this;
+    var lastScroll = (this.lastScrollSource === null ?
+                      0 : this.lastScrollSource.lastScroll);
+
+    if (Date.now() - lastScroll > RENDER_DELAY) {
+      // Render right away
+      this.renderLayer();
+    } else {
+      // Schedule
+      if (this.renderTimer) {
+        clearTimeout(this.renderTimer);
+      }
+      this.renderTimer = setTimeout(function() {
+        self.setupRenderLayoutTimer();
+      }, RENDER_DELAY);
+    }
+  };
+
+  this.appendText = function textLayerBuilderAppendText(geom, styles) {
+    var style = styles[geom.fontName];
+    var textDiv = document.createElement('div');
+    this.textDivs.push(textDiv);
+    if (!/\S/.test(geom.str)) {
+      textDiv.dataset.isWhitespace = true;
+      return;
+    }
+    var tx = PDFJS.Util.transform(this.viewport.transform, geom.transform);
+    var angle = Math.atan2(tx[1], tx[0]);
+    if (style.vertical) {
+      angle += Math.PI / 2;
+    }
+    var fontHeight = Math.sqrt((tx[2] * tx[2]) + (tx[3] * tx[3]));
+    var fontAscent = (style.ascent ? style.ascent * fontHeight :
+      (style.descent ? (1 + style.descent) * fontHeight : fontHeight));
+
+    textDiv.style.position = 'absolute';
+    textDiv.style.left = (tx[4] + (fontAscent * Math.sin(angle))) + 'px';
+    textDiv.style.top = (tx[5] - (fontAscent * Math.cos(angle))) + 'px';
+    textDiv.style.fontSize = fontHeight + 'px';
+    textDiv.style.fontFamily = style.fontFamily;
+
+    textDiv.textContent = geom.str;
+    textDiv.dataset.fontName = geom.fontName;
+    textDiv.dataset.angle = angle * (180 / Math.PI);
+    if (style.vertical) {
+      textDiv.dataset.canvasWidth = geom.height * this.viewport.scale;
+    } else {
+      textDiv.dataset.canvasWidth = geom.width * this.viewport.scale;
+    }
+
+  };
+
+  this.setTextContent = function textLayerBuilderSetTextContent(textContent) {
+    this.textContent = textContent;
+
+    var textItems = textContent.items;
+    for (var i = 0; i < textItems.length; i++) {
+      this.appendText(textItems[i], textContent.styles);
+    }
+    this.divContentDone = true;
+
+    this.setupRenderLayoutTimer();
+  };
+
+  this.convertMatches = function textLayerBuilderConvertMatches(matches) {
+    var i = 0;
+    var iIndex = 0;
+    var bidiTexts = this.textContent.items;
+    var end = bidiTexts.length - 1;
+    var queryLen = (PDFFindController === null ?
+                    0 : PDFFindController.state.query.length);
+
+    var ret = [];
+
+    // Loop over all the matches.
+    for (var m = 0; m < matches.length; m++) {
+      var matchIdx = matches[m];
+      // # Calculate the begin position.
+
+      // Loop over the divIdxs.
+      while (i !== end && matchIdx >= (iIndex + bidiTexts[i].str.length)) {
+        iIndex += bidiTexts[i].str.length;
+        i++;
+      }
+
+      // TODO: Do proper handling here if something goes wrong.
+      if (i == bidiTexts.length) {
+        console.error('Could not find matching mapping');
+      }
+
+      var match = {
+        begin: {
+          divIdx: i,
+          offset: matchIdx - iIndex
+        }
+      };
+
+      // # Calculate the end position.
+      matchIdx += queryLen;
+
+      // Somewhat same array as above, but use a > instead of >= to get the end
+      // position right.
+      while (i !== end && matchIdx > (iIndex + bidiTexts[i].str.length)) {
+        iIndex += bidiTexts[i].str.length;
+        i++;
+      }
+
+      match.end = {
+        divIdx: i,
+        offset: matchIdx - iIndex
+      };
+      ret.push(match);
+    }
+
+    return ret;
+  };
+
+  this.renderMatches = function textLayerBuilder_renderMatches(matches) {
+    // Early exit if there is nothing to render.
+    if (matches.length === 0) {
+      return;
+    }
+
+    var bidiTexts = this.textContent.items;
+    var textDivs = this.textDivs;
+    var prevEnd = null;
+    var isSelectedPage = (PDFFindController === null ?
+      false : (this.pageIdx === PDFFindController.selected.pageIdx));
+
+    var selectedMatchIdx = (PDFFindController === null ?
+                            -1 : PDFFindController.selected.matchIdx);
+
+    var highlightAll = (PDFFindController === null ?
+                        false : PDFFindController.state.highlightAll);
+
+    var infty = {
+      divIdx: -1,
+      offset: undefined
+    };
+
+    function beginText(begin, className) {
+      var divIdx = begin.divIdx;
+      var div = textDivs[divIdx];
+      div.textContent = '';
+      appendTextToDiv(divIdx, 0, begin.offset, className);
+    }
+
+    function appendText(from, to, className) {
+      appendTextToDiv(from.divIdx, from.offset, to.offset, className);
+    }
+
+    function appendTextToDiv(divIdx, fromOffset, toOffset, className) {
+      var div = textDivs[divIdx];
+
+      var content = bidiTexts[divIdx].str.substring(fromOffset, toOffset);
+      var node = document.createTextNode(content);
+      if (className) {
+        var span = document.createElement('span');
+        span.className = className;
+        span.appendChild(node);
+        div.appendChild(span);
+        return;
+      }
+      div.appendChild(node);
+    }
+
+    function highlightDiv(divIdx, className) {
+      textDivs[divIdx].className = className;
+    }
+
+    var i0 = selectedMatchIdx, i1 = i0 + 1, i;
+
+    if (highlightAll) {
+      i0 = 0;
+      i1 = matches.length;
+    } else if (!isSelectedPage) {
+      // Not highlighting all and this isn't the selected page, so do nothing.
+      return;
+    }
+
+    for (i = i0; i < i1; i++) {
+      var match = matches[i];
+      var begin = match.begin;
+      var end = match.end;
+
+      var isSelected = isSelectedPage && i === selectedMatchIdx;
+      var highlightSuffix = (isSelected ? ' selected' : '');
+      if (isSelected && !this.isViewerInPresentationMode) {
+        // ALFRESCO - change reference to select correct pageIdx
+        this.pdfJsPlugin.documentView.pages[this.pageIdx].scrollIntoView(textDivs[begin.divIdx],
+            { top: FIND_SCROLL_OFFSET_TOP, left: FIND_SCROLL_OFFSET_LEFT });
+        // END ALFRESCO
+      }
+
+      // Match inside new div.
+      if (!prevEnd || begin.divIdx !== prevEnd.divIdx) {
+        // If there was a previous div, then add the text at the end
+        if (prevEnd !== null) {
+          appendText(prevEnd, infty);
+        }
+        // clears the divs and set the content until the begin point.
+        beginText(begin);
+      } else {
+        appendText(prevEnd, begin);
+      }
+
+      if (begin.divIdx === end.divIdx) {
+        appendText(begin, end, 'highlight' + highlightSuffix);
+      } else {
+        appendText(begin, infty, 'highlight begin' + highlightSuffix);
+        for (var n = begin.divIdx + 1; n < end.divIdx; n++) {
+          highlightDiv(n, 'highlight middle' + highlightSuffix);
+        }
+        beginText(end, 'highlight end' + highlightSuffix);
+      }
+      prevEnd = end;
+    }
+
+    if (prevEnd) {
+      appendText(prevEnd, infty);
+    }
+  };
+
+  this.updateMatches = function textLayerUpdateMatches() {
+    // Only show matches, once all rendering is done.
+    if (!this.renderingDone) {
+      return;
+    }
+
+    // Clear out all matches.
+    var matches = this.matches;
+    var textDivs = this.textDivs;
+    var bidiTexts = this.textContent.items;
+    var clearedUntilDivIdx = -1;
+
+    // Clear out all current matches.
+    for (var i = 0; i < matches.length; i++) {
+      var match = matches[i];
+      var begin = Math.max(clearedUntilDivIdx, match.begin.divIdx);
+      for (var n = begin; n <= match.end.divIdx; n++) {
+        var div = textDivs[n];
+        div.textContent = bidiTexts[n].str;
+        div.className = '';
+      }
+      clearedUntilDivIdx = match.end.divIdx + 1;
+    }
+
+    if (PDFFindController === null || !PDFFindController.active) {
+      return;
+    }
+
+    // Convert the matches on the page controller into the match format used
+    // for the textLayer.
+    this.matches = matches = (this.convertMatches(PDFFindController === null ?
+      [] : (PDFFindController.pageMatches[this.pageIdx] || [])));
+
+    this.renderMatches(this.matches);
+  };
+};
+
+
+/**
+ * PDFFindController - copied from pdf.js project, file viewer.js Changes
+ * includes PDFView -> self.documentView initialize() -> Added support for
+ * passing the documentView object
+ */
+
+var FindStates = {
+  FIND_FOUND: 0,
+  FIND_NOTFOUND: 1,
+  FIND_WRAPPED: 2,
+  FIND_PENDING: 3
+};
+
+/**
+ * Provides a "search" or "find" functionality for the PDF.
+ * This object actually performs the search for a given string.
+ */
+
+var PDFFindController = {
+  startedTextExtraction: false,
+
+  extractTextPromises: [],
+
+  pendingFindMatches: {},
+
+  // If active, find results will be highlighted.
+  active: false,
+
+  // Stores the text for each page.
+  pageContents: [],
+
+  pageMatches: [],
+
+  // Currently selected match.
+  selected: {
+    pageIdx: -1,
+    matchIdx: -1
+  },
+
+  // Where find algorithm currently is in the document.
+  offset: {
+    pageIdx: null,
+    matchIdx: null
+  },
+
+  resumePageIdx: null,
+
+  state: null,
+
+  dirtyMatch: false,
+
+  findTimeout: null,
+
+  pdfPageSource: null,
+
+  integratedFind: false,
+
+  initialize: function(options) {
+
+    this.pdfPageSource = options.pdfPageSource;
+    this.integratedFind = options.integratedFind;
+
+    var events = [
+      'find',
+      'findagain',
+      'findhighlightallchange',
+      'findcasesensitivitychange'
+    ];
+
+    this.firstPagePromise = new Promise(function (resolve) {
+      this.resolveFirstPage = resolve;
+    }.bind(this));
+    this.handleEvent = this.handleEvent.bind(this);
+
+    for (var i = 0; i < events.length; i++) {
+      window.addEventListener(events[i], this.handleEvent);
+    }
+  },
+
+  reset: function pdfFindControllerReset() {
+    this.startedTextExtraction = false;
+    this.extractTextPromises = [];
+    this.active = false;
+  },
+
+  calcFindMatch: function(pageIndex) {
+    var pageContent = this.pageContents[pageIndex];
+    var query = this.state.query;
+    var caseSensitive = this.state.caseSensitive;
+    var queryLen = query.length;
+
+    if (queryLen === 0) {
+      // Do nothing the matches should be wiped out already.
+      return;
+    }
+
+    if (!caseSensitive) {
+      pageContent = pageContent.toLowerCase();
+      query = query.toLowerCase();
+    }
+
+    var matches = [];
+
+    var matchIdx = -queryLen;
+    while (true) {
+      matchIdx = pageContent.indexOf(query, matchIdx + queryLen);
+      if (matchIdx === -1) {
+        break;
+      }
+
+      matches.push(matchIdx);
+    }
+    this.pageMatches[pageIndex] = matches;
+    this.updatePage(pageIndex);
+    if (this.resumePageIdx === pageIndex) {
+      this.resumePageIdx = null;
+      this.nextPageMatch();
+    }
+  },
+
+  extractText: function() {
+    if (this.startedTextExtraction) {
+      return;
+    }
+    this.startedTextExtraction = true;
+
+    this.pageContents = [];
+    var extractTextPromisesResolves = [];
+    for (var i = 0, ii = this.pdfPageSource.pdfDocument.numPages; i < ii; i++) {
+      this.extractTextPromises.push(new Promise(function (resolve) {
+        extractTextPromisesResolves.push(resolve);
+      }));
+    }
+
+    var self = this;
+    function extractPageText(pageIndex) {
+      self.pdfPageSource.pages[pageIndex].getTextContent().then(
+        function textContentResolved(textContent) {
+          var textItems = textContent.items;
+          var str = '';
+
+          for (var i = 0; i < textItems.length; i++) {
+            str += textItems[i].str;
+          }
+
+          // Store the pageContent as a string.
+          self.pageContents.push(str);
+
+          extractTextPromisesResolves[pageIndex](pageIndex);
+          if ((pageIndex + 1) < self.pdfPageSource.pages.length) {
+            extractPageText(pageIndex + 1);
+          }
+        }
+      );
+    }
+    extractPageText(0);
+  },
+
+  handleEvent: function(e) {
+    if (this.state === null || e.type !== 'findagain') {
+      this.dirtyMatch = true;
+    }
+    this.state = e.detail;
+    this.updateUIState(FindStates.FIND_PENDING);
+
+    this.firstPagePromise.then(function() {
+      this.extractText();
+
+      clearTimeout(this.findTimeout);
+      if (e.type === 'find') {
+        // Only trigger the find action after 250ms of silence.
+        this.findTimeout = setTimeout(this.nextMatch.bind(this), 250);
+      } else {
+        this.nextMatch();
+      }
+    }.bind(this));
+  },
+
+  updatePage: function(idx) {
+    var page = this.pdfPageSource.pages[idx];
+
+    if (this.selected.pageIdx === idx) {
+      // If the page is selected, scroll the page into view, which triggers
+      // rendering the page, which adds the textLayer. Once the textLayer is
+      // build, it will scroll onto the selected match.
+      page.scrollIntoView();
+    }
+
+    if (page.textLayer) {
+      page.textLayer.updateMatches();
+    }
+  },
+
+  nextMatch: function() {
+    var previous = this.state.findPrevious;
+    // ALFRESCO - changed .page to pageNum
+    var currentPageIndex = this.pdfPageSource.pageNum - 1;
+    var numPages = this.pdfPageSource.pages.length;
+
+    this.active = true;
+
+    if (this.dirtyMatch) {
+      // Need to recalculate the matches, reset everything.
+      this.dirtyMatch = false;
+      this.selected.pageIdx = this.selected.matchIdx = -1;
+      this.offset.pageIdx = currentPageIndex;
+      this.offset.matchIdx = null;
+      this.hadMatch = false;
+      this.resumePageIdx = null;
+      this.pageMatches = [];
+      var self = this;
+
+      for (var i = 0; i < numPages; i++) {
+        // Wipe out any previous highlighted matches.
+        this.updatePage(i);
+
+        // As soon as the text is extracted start finding the matches.
+        if (!(i in this.pendingFindMatches)) {
+          this.pendingFindMatches[i] = true;
+          this.extractTextPromises[i].then(function(pageIdx) {
+            delete self.pendingFindMatches[pageIdx];
+            self.calcFindMatch(pageIdx);
+          });
+        }
+      }
+    }
+
+    // If there's no query there's no point in searching.
+    if (this.state.query === '') {
+      this.updateUIState(FindStates.FIND_FOUND);
+      return;
+    }
+
+    // If we're waiting on a page, we return since we can't do anything else.
+    if (this.resumePageIdx) {
+      return;
+    }
+
+    var offset = this.offset;
+    // If there's already a matchIdx that means we are iterating through a
+    // page's matches.
+    if (offset.matchIdx !== null) {
+      var numPageMatches = this.pageMatches[offset.pageIdx].length;
+      if ((!previous && offset.matchIdx + 1 < numPageMatches) ||
+          (previous && offset.matchIdx > 0)) {
+        // The simple case, we just have advance the matchIdx to select the next
+        // match on the page.
+        this.hadMatch = true;
+        offset.matchIdx = previous ? offset.matchIdx - 1 : offset.matchIdx + 1;
+        this.updateMatch(true);
+        return;
+      }
+      // We went beyond the current page's matches, so we advance to the next
+      // page.
+      this.advanceOffsetPage(previous);
+    }
+    // Start searching through the page.
+    this.nextPageMatch();
+  },
+
+  matchesReady: function(matches) {
+    var offset = this.offset;
+    var numMatches = matches.length;
+    var previous = this.state.findPrevious;
+    if (numMatches) {
+      // There were matches for the page, so initialize the matchIdx.
+      this.hadMatch = true;
+      offset.matchIdx = previous ? numMatches - 1 : 0;
+      this.updateMatch(true);
+      // matches were found
+      return true;
+    } else {
+      // No matches attempt to search the next page.
+      this.advanceOffsetPage(previous);
+      if (offset.wrapped) {
+        offset.matchIdx = null;
+        if (!this.hadMatch) {
+          // No point in wrapping there were no matches.
+          this.updateMatch(false);
+          // while matches were not found, searching for a page 
+          // with matches should nevertheless halt.
+          return true;
+        }
+      }
+      // matches were not found (and searching is not done)
+      return false;
+    }
+  },
+
+  nextPageMatch: function() {
+    if (this.resumePageIdx !== null) {
+      console.error('There can only be one pending page.');
+    }
+    do {
+      var pageIdx = this.offset.pageIdx;
+      var matches = this.pageMatches[pageIdx];
+      if (!matches) {
+        // The matches don't exist yet for processing by "matchesReady",
+        // so set a resume point for when they do exist.
+        this.resumePageIdx = pageIdx;
+        break;
+      }
+    } while (!this.matchesReady(matches));
+  },
+
+  advanceOffsetPage: function(previous) {
+    var offset = this.offset;
+    var numPages = this.extractTextPromises.length;
+    offset.pageIdx = previous ? offset.pageIdx - 1 : offset.pageIdx + 1;
+    offset.matchIdx = null;
+    if (offset.pageIdx >= numPages || offset.pageIdx < 0) {
+      offset.pageIdx = previous ? numPages - 1 : 0;
+      offset.wrapped = true;
+      return;
+    }
+  },
+
+  updateMatch: function(found) {
+    var state = FindStates.FIND_NOTFOUND;
+    var wrapped = this.offset.wrapped;
+    this.offset.wrapped = false;
+    if (found) {
+      var previousPage = this.selected.pageIdx;
+      this.selected.pageIdx = this.offset.pageIdx;
+      this.selected.matchIdx = this.offset.matchIdx;
+      state = wrapped ? FindStates.FIND_WRAPPED : FindStates.FIND_FOUND;
+      // Update the currently selected page to wipe out any selected matches.
+      if (previousPage !== -1 && previousPage !== this.selected.pageIdx) {
+        this.updatePage(previousPage);
+      }
+    }
+    this.updateUIState(state, this.state.findPrevious);
+    if (this.selected.pageIdx !== -1) {
+      this.updatePage(this.selected.pageIdx, true);
+    }
+  },
+
+  updateUIState: function(state, previous) {
+      var findMsg = '';
+      var status = '';
+
+      // ALFRESCO - updateUIState method impl
+      
+      // TODO: For now do not display for hits, gets very noisy when stepping.
+      // Possibly change color or similar in search box to indicate hit instead
+      // Pending ajax gif on search bar until state is found, then removed. 
+      // See pdf.js default Implementation
+
+      if(state===FindStates.FIND_FOUND||state===FindStates.FIND_PENDING)
+         return;
+      
+      switch (state) {
+        case FindStates.FIND_FOUND:
+          findMsg = this.pdfPageSource.pdfJsPlugin.wp.msg('search.message.found');
+          break;
+
+        case FindStates.FIND_PENDING:
+          findMsg = this.pdfPageSource.pdfJsPlugin.wp.msg('search.message.pending');
+          break;
+
+        case FindStates.FIND_NOTFOUND:
+          findMsg = this.pdfPageSource.pdfJsPlugin.wp.msg('search.message.notfound');
+          break;
+
+        case FindStates.FIND_WRAPPED:
+          if (previous) {
+             findMsg = this.pdfPageSource.pdfJsPlugin.wp.msg('search.message.wrapped.bottom');
+          } else {
+             findMsg = this.pdfPageSource.pdfJsPlugin.wp.msg('search.message.wrapped.top');
+          }
+          break;
+      }
+      
+      Alfresco.util.PopupManager.displayMessage({
+         text : findMsg
+      });
+   }
+};
+
 })();
