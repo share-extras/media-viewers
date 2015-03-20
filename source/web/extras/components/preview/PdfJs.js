@@ -1664,7 +1664,7 @@
        */
       onDownloadClick : function PdfJs_onDownloadClick(p_obj)
       {
-         window.location.href = this.wp.getContentUrl(true).replace("api/node","slingshot/node");
+         window.location.href = this.wp.getContentUrl(true);
       },
 
       /**
