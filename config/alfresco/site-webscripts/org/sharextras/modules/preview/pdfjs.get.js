@@ -141,8 +141,35 @@ function main()
              title: msg.get("button.download")
          },
          {
+             type: "separator"
+         },
+         {
+             id: "favourite",
+             type: "button"
+         },
+         {
+             type: "separator",
+             useWrapper: true,
+             wrapperClassName: "favouritebuttonSep"
+         },
+         {
+             id: "searchBarToggle",
+             type: "button",
+             label: msg.get("button.search"),
+             icon: "components/images/search-16.png",
+             useWrapper: true,
+             wrapperClassName: "searchBarToggle",
+             disabled: true
+         },
+         {
+             type: "separator",
+             useWrapper: true,
+             wrapperClassName: "searchBarToggle"
+         },
+         {
              id: "link",
              type: "button",
+             label: msg.get("button.link"),
              icon: "components/images/link-16.png",
              title: msg.get("button.link"),
              useWrapper: true,
@@ -151,15 +178,14 @@ function main()
          {
              type: "separator",
              useWrapper: true,
-             wrapperClassName: "searchBarToggle"
+             wrapperClassName: "locatebuttonSep"
          },
          {
-             id: "searchBarToggle",
+             id: "locate",
              type: "button",
-             icon: "components/images/search-16.png",
-             useWrapper: true,
-             wrapperClassName: "searchBarToggle",
-             disabled: true
+             icon: "components/documentlibrary/actions/document-locate-16.png",
+             label: msg.get("button.locate"),
+             title: msg.get("button.locate")
          }
     ];
 }

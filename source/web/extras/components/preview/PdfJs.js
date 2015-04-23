@@ -525,6 +525,37 @@
             type : "menu",
             menu : downloadMenu
          });
+
+         this.services = {
+           preferences: new Alfresco.service.Preferences()
+         };
+
+         // Favourite button
+         this.widgets.favourite = Alfresco.util.createYUIButton(this, "favourite", this.onFavouriteClick, {
+           label: this.wp.msg("button.favourite." + (this.wp.options.documentDetails.item.isFavourite ? "remove" : "add")),
+           title: this.wp.msg("button.favourite." + (this.wp.options.documentDetails.item.isFavourite ? "remove" : "add"))
+         }, this.wp.id + "-favourite");
+
+         // CSS
+         var favouriteBtElt = this.widgets.favourite.get("element");
+         Dom.addClass(favouriteBtElt, (this.wp.options.documentDetails.item.isFavourite ? "remove-favourite" : "add-favourite"));
+
+         // Locate button
+         this.widgets.locate = Alfresco.util.createYUIButton(this, "locate", this.onLocateClick, {}, this.wp.id + "-locate");
+
+         if (window.location.pathname.match("/document-details$")) {
+            Dom.addClass(favouriteBtElt, "hide");
+            Dom.getElementsByClassName("favouritebuttonSep", "span", this.controls, function setDisplay(el) {
+               Dom.setStyle(el, "display", "none");
+            });
+
+            var locateBtElt = this.widgets.locate.get("element");
+            Dom.addClass(locateBtElt, "hide");
+            Dom.getElementsByClassName("locatebuttonSep", "span", this.controls, function setDisplay(el) {
+               Dom.setStyle(el, "display", "none");
+            });
+         }
+
          // Maximise button should show on the document details and document list pages
          if (Alfresco.constants.PAGEID === "document-details" || Alfresco.constants.PAGEID === "documentlibrary" ||
              window.location.pathname.match("/document-details$"))
@@ -1655,6 +1686,92 @@
          this.documentView.setScale(this.documentView.parseScale(oMenuItem.value));
          this._scrollToPage(this.pageNum);
          this._updateZoomControls();
+      },
+
+      /**
+       * Locate document
+       *
+       * @method onLocateClick
+       */
+      onLocateClick : function PdfJs_onLocateClick(p_obj) {
+        var jsNode = this.wp.options.documentDetails.item.node,
+            path = this.wp.options.documentDetails.item.location.path,
+            file,
+            recordSiteName = Alfresco.util.isValueSet(this.wp.options.documentDetails.item.location.site) ? this.wp.options.documentDetails.item.location.site.name : null;
+
+        if (jsNode.isLink) {
+          file = Alfresco.util.isValueSet(jsNode.linkedNode.properties) ? jsNode.linkedNode.properties.name : null;
+          Alfresco.util.PopupManager.displayMessage({
+            text: this.wp.msg("message.actions.failure.locate")
+          });
+        } else {
+          file = this.wp.options.documentDetails.item.displayName;
+        }
+
+        var documentUrl = Alfresco.util.siteURL((recordSiteName === null ? "repository" : "documentlibrary") + "?file=" + encodeURIComponent(file) + "&path=" + encodeURIComponent(path), {
+           site: recordSiteName
+        });
+
+        window.open(documentUrl);
+      },
+
+      /**
+       * Favourite handler
+       *
+       * @method onFavouriteClick
+       */
+      onFavouriteClick : function PdfJs_onFavouriteClick(p_obj, button) {
+        var orgValues = {
+          isFavourite: this.wp.options.documentDetails.item.isFavourite
+        };
+
+        var responseConfig = {
+          successCallback: {
+            fn: function () {
+              this.wp.options.documentDetails.item.isFavourite = !orgValues.isFavourite;
+              this.updateFavouriteButton(button);
+
+              Alfresco.util.PopupManager.displayMessage({
+                text:  this.wp.msg("message.favourite.update.success")
+              });
+             },
+             scope: this
+          },
+          failureCallback: {
+            fn: function () {
+              this.updateFavouriteButton(button);
+
+              Alfresco.util.PopupManager.displayMessage({
+                text:  this.wp.msg("message.favourite.update.failure")
+              });
+            },
+            scope: this
+          }
+        };
+
+        // Save
+        var action = this.wp.options.documentDetails.item.isFavourite ? "remove" : "add";
+        this.services.preferences[action].call(this.services.preferences, "org.alfresco.share.documents.favourites", this.wp.options.nodeRef, responseConfig);
+      },
+
+      /**
+       * Favourite UI handler
+       *
+       * @method updateFavouriteButton
+       */
+      updateFavouriteButton: function PdfJs_updateFavouriteButton(button) {
+        var btElt = button.get("element");
+        if (Dom.hasClass(btElt, "remove-favourite")) {
+          Dom.removeClass(btElt, "remove-favourite");
+          Dom.addClass(btElt, "add-favourite");
+          button.set("label", this.wp.msg("button.favourite.add"));
+          button.set("title", this.wp.msg("button.favourite.add"));
+        } else {
+          Dom.removeClass(btElt, "add-favourite");
+          Dom.addClass(btElt, "remove-favourite");
+          button.set("label", this.wp.msg("button.favourite.remove"));
+          button.set("title", this.wp.msg("button.favourite.remove"));
+        }
       },
 
       /**
