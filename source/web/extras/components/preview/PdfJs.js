@@ -130,9 +130,9 @@
           * 
           * @property defaultScale
           * @type String
-          * @default "auto"
+          * @default "1.5"
           */
-         defaultScale : "auto",
+         defaultScale : "1.5",
 
          /**
           * Multipler for zooming in/out
@@ -1699,20 +1699,32 @@
             file,
             recordSiteName = Alfresco.util.isValueSet(this.wp.options.documentDetails.item.location.site) ? this.wp.options.documentDetails.item.location.site.name : null;
 
-        if (jsNode.isLink) {
-          file = Alfresco.util.isValueSet(jsNode.linkedNode.properties) ? jsNode.linkedNode.properties.name : null;
-          Alfresco.util.PopupManager.displayMessage({
-            text: this.wp.msg("message.actions.failure.locate")
+        if (this.wp.options.inFolderLink) {
+          // Redirect to parent folder
+          if (jsNode.isLink) {
+            file = Alfresco.util.isValueSet(jsNode.linkedNode.properties) ? jsNode.linkedNode.properties.name : null;
+            Alfresco.util.PopupManager.displayMessage({
+              text: this.wp.msg("message.actions.failure.locate")
+            });
+          } else {
+            file = this.wp.options.documentDetails.item.displayName;
+          }
+
+          var documentUrl = Alfresco.util.siteURL((recordSiteName === null ? "repository" : "documentlibrary") + "?file=" + encodeURIComponent(file) + "&path=" + encodeURIComponent(path), {
+             site: recordSiteName
           });
+
+          window.open(documentUrl);
         } else {
-          file = this.wp.options.documentDetails.item.displayName;
+          // Redirect to document details page
+          var documentUrlPageDetails = YAHOO.lang.substitute(Alfresco.constants.URL_PAGECONTEXT + "{site}{documentType}-details?nodeRef={nodeRef}", {
+            site: recordSiteName ? "site/" + recordSiteName + "/" : "",
+            documentType: jsNode.isContainer ? "folder" : "document",
+            nodeRef: this.wp.options.nodeRef
+          });
+
+          window.open(documentUrlPageDetails);
         }
-
-        var documentUrl = Alfresco.util.siteURL((recordSiteName === null ? "repository" : "documentlibrary") + "?file=" + encodeURIComponent(file) + "&path=" + encodeURIComponent(path), {
-           site: recordSiteName
-        });
-
-        window.open(documentUrl);
       },
 
       /**
