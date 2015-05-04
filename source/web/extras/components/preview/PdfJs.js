@@ -532,18 +532,18 @@
 
          // Favourite button
          this.widgets.favourite = Alfresco.util.createYUIButton(this, "favourite", this.onFavouriteClick, {
-           label: this.wp.msg("button.favourite." + (this.wp.options.documentDetails.item.isFavourite ? "remove" : "add")),
-           title: this.wp.msg("button.favourite." + (this.wp.options.documentDetails.item.isFavourite ? "remove" : "add"))
+           label: this.wp.msg("button.favourite." + ((this.wp.options.documentDetails.item && this.wp.options.documentDetails.item.isFavourite) ? "remove" : "add")),
+           title: this.wp.msg("button.favourite." + ((this.wp.options.documentDetails.item && this.wp.options.documentDetails.item.isFavourite) ? "remove" : "add"))
          }, this.wp.id + "-favourite");
 
          // CSS
          var favouriteBtElt = this.widgets.favourite.get("element");
-         Dom.addClass(favouriteBtElt, (this.wp.options.documentDetails.item.isFavourite ? "remove-favourite" : "add-favourite"));
+         Dom.addClass(favouriteBtElt, ((this.wp.options.documentDetails.item && this.wp.options.documentDetails.item.isFavourite) ? "remove-favourite" : "add-favourite"));
 
          // Locate button
          this.widgets.locate = Alfresco.util.createYUIButton(this, "locate", this.onLocateClick, {}, this.wp.id + "-locate");
 
-         if (window.location.pathname.match("/document-details$")) {
+         if (window.location.pathname.match("/document-details$") || !this.wp.options.documentDetails.item) {
             Dom.addClass(favouriteBtElt, "hide");
             Dom.getElementsByClassName("favouritebuttonSep", "span", this.controls, function setDisplay(el) {
                Dom.setStyle(el, "display", "none");

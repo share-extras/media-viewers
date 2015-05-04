@@ -76,7 +76,7 @@ if (model.widgets)
          // Node details
          AlfrescoUtil.param('nodeRef');
          var documentDetails = AlfrescoUtil.getNodeDetails(model.nodeRef, model.site, {}, "documentLibrary");
-         widget.options.documentDetails = documentDetails;
+         widget.options.documentDetails = documentDetails || {};
       }
    }
 }
