@@ -6244,7 +6244,7 @@ var FontLoader = {
         setTimeout(isFontReady.bind(null, name, callback));
       }
 
-      var loadTestFontId = 'lt' + Date.now() + this.loadTestFontId++;
+      var loadTestFontId = 'lt' + (+Date.now()) + this.loadTestFontId++;
       // Chromium seems to cache fonts based on a hash of the actual font data,
       // so the font must be modified for each load test else it will appear to
       // be loaded already.
