@@ -70,7 +70,7 @@
                     <sourcePackageRoot>org.sharextras.customization.media-previews.pdfjs</sourcePackageRoot>
                 </customization>
             </customizations>
-            <auto-deploy>true</auto-deploy>
+            <auto-deploy>false</auto-deploy>
         </module>
         
         <module>
@@ -86,7 +86,7 @@
                     <sourcePackageRoot>org.sharextras.customization.media-previews.pdfjs-viewrender</sourcePackageRoot>
                 </customization>
             </customizations>
-            <auto-deploy>true</auto-deploy>
+            <auto-deploy>false</auto-deploy>
         </module>
 
         <!-- This module is disabled for now. You can still enable by custom configuration and using

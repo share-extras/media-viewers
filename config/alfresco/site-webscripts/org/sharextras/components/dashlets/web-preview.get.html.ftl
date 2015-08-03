@@ -5,7 +5,8 @@
       "componentId": "${instance.object.id}",
       "siteId": "${page.url.templateArgs.site!""}",
       "nodeRef": "<#if args.nodeRef?exists>${args.nodeRef}<#else></#if>",
-      "name": "<#if args.name?exists>${args.name}<#else></#if>"
+      "name": "<#if args.name?exists>${args.name}<#else></#if>",
+      "title": "<#if args.title??>${args.title}<#else></#if>"
    }).setMessages(${messages});
    var resizer = new Alfresco.widget.DashletResizer("${args.htmlid}", "${instance.object.id}");
    // Add end resize event handler
@@ -47,9 +48,13 @@
 })();
 //]]></script>
 <div class="dashlet video">
-   <div class="title" id="${args.htmlid}-title"><#if node??><a href="${url.context}/page/site/${page.url.templateArgs.site!''}/document-details?nodeRef=${args.nodeRef!''}">${args.name}</a><#else><#if args.name?exists>${args.name}<#else>${msg("header.video")}</#if></#if></div>
+   <div class="title" id="${args.htmlid}-title"><#if node??><#if args.title??>${getDocumentHrefLink(args.title)}<#else>${getDocumentHrefLink(args.name)}</#if><#else><#if args.title??>${args.title}<#elseif args.name?exists>${args.name}<#else>${msg("header.video")}</#if></#if></div>
    <div class="body" id="${args.htmlid}-body" style="height: ${args.height!400}px;">
       <div class="msg dashlet-padding video-widget-msg" id="${args.htmlid}-msg"></div>
       <div class="video-preview" id="${args.htmlid}-preview"></div>
    </div>
 </div>
+
+<#function getDocumentHrefLink linkName>
+  <#return '<a href="' + url.context + '/page/site/' + page.url.templateArgs.site!'' + '/document-details?nodeRef=' + args.nodeRef!'' + '">linkName</a>' />
+</#function>
