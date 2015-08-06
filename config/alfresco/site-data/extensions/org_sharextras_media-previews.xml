@@ -120,6 +120,22 @@
             </customizations>
             <auto-deploy>false</auto-deploy>
         </module>
+
+        <module>
+            <id>Embed Viewer Configuration</id>
+            <version>@VERSION@</version>
+            <customizations>
+                <customization>
+                    <targetPackageRoot>org.alfresco.components.preview</targetPackageRoot>
+                    <sourcePackageRoot>org.sharextras.customization.media-previews.embed-config</sourcePackageRoot>
+                </customization>
+                <customization>
+                    <targetPackageRoot>org.alfresco.components.documentlibrary</targetPackageRoot>
+                    <sourcePackageRoot>org.sharextras.customization.media-previews.embed-viewrender</sourcePackageRoot>
+                </customization>
+            </customizations>
+            <auto-deploy>false</auto-deploy>
+        </module>
         
         <module>
             <id>WebODF Viewer (Experimental)</id>
