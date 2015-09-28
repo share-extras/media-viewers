@@ -161,7 +161,11 @@
        */
       _setupTitle: function VideoWidget__setupTitle()
       {
-          if (this.options.nodeRef != "" && this.options.name != "")
+          if (this.options.title) {
+              this.titleEl.innerHTML = "<a href=\"" + Alfresco.constants.URL_PAGECONTEXT +
+                  "site/" + this.options.siteId + "/document-details?nodeRef=" + this.options.nodeRef + "\">" +
+                  this.options.title + "</a>";
+          } else if (this.options.nodeRef != "" && this.options.name != "")
           {
               this.titleEl.innerHTML = "<a href=\"" + Alfresco.constants.URL_PAGECONTEXT + 
                   "site/" + this.options.siteId + "/document-details?nodeRef=" + this.options.nodeRef + "\">" +
@@ -363,6 +367,7 @@
                       // Update options from the submitted form fields
                       this.options.nodeRef = Dom.get(this.configDialog.id + "-nodeRef").value;
                       this.options.name = Dom.get(this.configDialog.id + "-name").value;
+                      this.options.title = Dom.get(this.configDialog.id + "-title").value;
                           
                       // Update dashlet title and message area
                       this._setupTitle();
@@ -384,6 +389,7 @@
                      Dom.get(this.configDialog.id + "-nodeRef").value = this.options.nodeRef;
                      Dom.get(this.configDialog.id + "-video").innerHTML = this.options.name;
                      Dom.get(this.configDialog.id + "-name").value = this.options.name;
+                     Dom.get(this.configDialog.id + "-title").value = this.options.title || '';
 
                      if (!this.widgets.picker)
                      {

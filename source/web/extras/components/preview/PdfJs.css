@@ -470,3 +470,32 @@ canvas {
 /* === Printed media overrides === */
 @media print {
 }
+
+
+.previewer.PdfJs .yui-menu-button button {
+  background-image: url("../../../../yui/button/assets/skins/sam/menu-button-arrow.png");
+}
+
+.previewer.PdfJs .add-favourite .first-child {
+  background-image: url(../../../../components/images/star-deselected_16x16.png) !important;
+  background-position: left center !important;
+  background-repeat: no-repeat !important;
+  padding-left: 1.4em;
+}
+.previewer.PdfJs .add-favourite .first-child:hover {
+  background-image: url("../../../../components/images/star-selected_16x16.png") !important;
+}
+
+.previewer.PdfJs .remove-favourite .first-child {
+  background-image: url("../../../../components/images/star-selected_16x16.png") !important;
+  background-position: left center !important;
+  background-repeat: no-repeat !important;
+  padding-left: 1.4em;
+}
+.previewer.PdfJs .remove-favourite .first-child:hover {
+  background-image: url(../../../../components/images/star-deselected_16x16.png) !important;
+}
+
+.previewer.PdfJs .hide {
+  display: none !important;
+}

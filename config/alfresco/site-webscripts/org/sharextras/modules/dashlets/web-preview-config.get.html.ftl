@@ -3,6 +3,12 @@
    <div class="bd">
       <form id="${args.htmlid}-form" action="" method="POST">
          <div class="yui-gd">
+            <div class="yui-u first"><label for="${args.htmlid}-title">${msg("label.title")}:</label></div>
+            <div class="yui-u" >
+              <input type="text" name="title" id="${args.htmlid}-title" />
+            </div>
+         </div>
+         <div class="yui-gd">
             <div class="yui-u first"><label for="${args.htmlid}-video">${msg("label.video")}:</label></div>
             <div class="yui-u" >
                <span id="${args.htmlid}-video" class="video-name"></span>
